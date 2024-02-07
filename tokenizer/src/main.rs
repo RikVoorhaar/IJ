@@ -1,84 +1,110 @@
 use anyhow::Result;
+use std::str::FromStr;
+
 use logos::Logos;
+
+#[derive(Debug, PartialEq)]
+struct Plus;
+
+#[derive(Debug, PartialEq)]
+struct Multiplication;
+
+#[derive(Debug, PartialEq)]
+struct Number {
+    value: u64,
+}
+impl FromStr for Number {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        let value = s.parse()?;
+        Ok(Number { value })
+    }
+}
 
 #[derive(Logos, Debug, PartialEq)]
 #[logos(skip r"[ ]+")]
 enum Token {
+    #[token("+", |_| Plus)]
+    Plus(Plus),
+
+    #[token("*", |_| Multiplication)]
+    Multiplication(Multiplication),
+
     #[token("-")]
     Minus,
-
-    #[token("+")]
-    Plus,
-
-    #[token("*")]
-    Multiplication,
-
-    #[token("^")]
-    Power,
-
-    #[token("%")]
-    Reciprocation,
-
-    #[token("/")]
-    Reduction,
-
-    #[token("/.")]
-    Fold,
-
-    #[token("#")]
-    Shape,
-
-    #[token("T")]
-    Transpose,
-
-    #[token("&")]
-    PartialApplication,
-
-    #[token("@")]
-    Composition,
-
-    #[token(".@")]
-    Distribute,
-
-    #[token("~")]
-    Interchange,
-
-    #[token("$")]
-    Axes,
-
-    #[token("_")]
-    Flatten,
-
-    #[token(">#")]
-    Reshape,
-
     #[regex("[0-9]+", |lex| lex.slice().parse().ok())]
-    Number(u64),
+    Number(Number),
+    // #[token("/")]
+    // Reduction,
 
-    #[regex("[a-zA-Z][a-zA-Z0-9]*")]
-    Symbol,
+    // #[token("^")]
+    // Power,
 
-    #[token("=")]
-    Assign,
+    // #[token("%")]
+    // Reciprocation,
 
-    #[token("let")]
-    Let,
+    // #[token("/.")]
+    // Fold,
 
-    #[token("(")]
-    LParen,
+    // #[token("#")]
+    // Shape,
 
-    #[token(")")]
-    RParen,
+    // #[token("T")]
+    // Transpose,
 
-    #[token("[")]
-    LBracket,
+    // #[token("&")]
+    // PartialApplication,
 
-    #[token("]")]
-    RBracket,
+    // #[token("@")]
+    // Composition,
+
+    // #[token(".@")]
+    // Distribute,
+
+    // #[token("~")]
+    // Interchange,
+
+    // #[token("$")]
+    // Axes,
+
+    // #[token("_")]
+    // Flatten,
+
+    // #[token(">#")]
+    // Reshape,
+
+    // #[regex("[a-zA-Z][a-zA-Z0-9]*")]
+    // Symbol(&'a str),
+
+    // #[token("=")]
+    // Assign,
+
+    // #[token("let")]
+    // Let,
+
+    // #[token("(")]
+    // LParen,
+
+    // #[token(")")]
+    // RParen,
+
+    // #[token("[")]
+    // LBracket,
+
+    // #[token("]")]
+    // RBracket,
+}
+
+struct Node {
+    op: Token,
+    output_arity: usize,
+    operands: Vec<Node>,
+    functional_operands: Vec<Node>,
 }
 
 fn main() {
-    let input = "let x = 1 + 2 * 3";
+    let input = "+ 1 * 2 3";
     let lexer = Token::lexer(input);
 
     for token in lexer {
