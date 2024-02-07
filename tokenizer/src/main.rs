@@ -4,12 +4,9 @@ use std::str::FromStr;
 use logos::Logos;
 
 #[derive(Debug, PartialEq)]
-struct Plus;
+struct BinaryOp;
 
-#[derive(Debug, PartialEq)]
-struct Multiplication;
-
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 struct Number {
     value: u64,
 }
@@ -22,14 +19,14 @@ impl FromStr for Number {
     }
 }
 
-#[derive(Logos, Debug, PartialEq)]
+#[derive(Logos, Debug, PartialEq, Clone)]
 #[logos(skip r"[ ]+")]
 enum Token {
-    #[token("+", |_| Plus)]
-    Plus(Plus),
+    #[token("+")]
+    Plus,
 
-    #[token("*", |_| Multiplication)]
-    Multiplication(Multiplication),
+    #[token("*")]
+    Multiplication,
 
     #[token("-")]
     Minus,
@@ -95,6 +92,50 @@ enum Token {
     // #[token("]")]
     // RBracket,
 }
+
+trait TokenImpl {
+    fn _next_node(op: Token, tokens: &[Token]) -> (Node, Option<&[Token]>);
+}
+
+fn next_node(tokens: &[Token]) -> (Node, Option<&[Token]>) {
+    let (op, rest) = tokens.split_first().unwrap();
+    match op {
+        Token::Plus => BinaryOp::_next_node(op.clone(), rest),
+        Token::Multiplication => BinaryOp::_next_node(op.clone(), rest),
+        Token::Number(_) => Number::_next_node(op.clone(), rest),
+    }
+}
+
+impl TokenImpl for BinaryOp {
+    fn _next_node(op: Token, tokens: &[Token]) -> (Node, Option<&[Token]>) {
+        let (lhs, rest) = next_node(tokens);
+        let (rhs, rest) = next_node(rest.unwrap());
+        (
+            Node {
+                op,
+                output_arity: 1,
+                operands: vec![lhs, rhs],
+                functional_operands: vec![],
+            },
+            rest,
+        )
+    }
+}
+
+impl TokenImpl for Number {
+    fn _next_node(op: Token, tokens: &[Token]) -> (Node, Option<&[Token]>) {
+        (
+            Node {
+                op,
+                output_arity: 1,
+                operands: vec![],
+                functional_operands: vec![],
+            },
+            Some(tokens),
+        )
+    }
+}
+
 
 struct Node {
     op: Token,
