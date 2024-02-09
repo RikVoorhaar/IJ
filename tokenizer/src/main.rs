@@ -1,12 +1,9 @@
 use anyhow::Result;
-use std::str::FromStr;
+use std::{fmt::Debug, str::FromStr};
 
 use logos::Logos;
 
-#[derive(Debug, PartialEq)]
-struct BinaryOp;
-
-#[derive(Debug, PartialEq, Clone)]
+#[derive(PartialEq, Clone)]
 struct Number {
     value: u64,
 }
@@ -103,9 +100,12 @@ fn next_node(tokens: &[Token]) -> (Node, Option<&[Token]>) {
         Token::Plus => BinaryOp::_next_node(op.clone(), rest),
         Token::Multiplication => BinaryOp::_next_node(op.clone(), rest),
         Token::Number(_) => Number::_next_node(op.clone(), rest),
+        Token::Minus => MinusOp::_next_node(op.clone(), rest),
     }
 }
 
+#[derive(Debug, PartialEq)]
+struct BinaryOp;
 impl TokenImpl for BinaryOp {
     fn _next_node(op: Token, tokens: &[Token]) -> (Node, Option<&[Token]>) {
         let (lhs, rest) = next_node(tokens);
@@ -119,6 +119,37 @@ impl TokenImpl for BinaryOp {
             },
             rest,
         )
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct MinusOp;
+impl TokenImpl for MinusOp {
+    fn _next_node(op: Token, tokens: &[Token]) -> (Node, Option<&[Token]>) {
+        let (lhs, rest) = next_node(tokens);
+        match rest {
+            None => (
+                Node {
+                    op,
+                    output_arity: 1,
+                    operands: vec![lhs],
+                    functional_operands: vec![],
+                },
+                None,
+            ),
+            Some(rest) => {
+                let (rhs, rest) = next_node(rest);
+                (
+                    Node {
+                        op,
+                        output_arity: 1,
+                        operands: vec![lhs, rhs],
+                        functional_operands: vec![],
+                    },
+                    rest,
+                )
+            }
+        }
     }
 }
 
@@ -136,6 +167,11 @@ impl TokenImpl for Number {
     }
 }
 
+impl Debug for Number {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.value)
+    }
+}
 
 struct Node {
     op: Token,
@@ -144,11 +180,52 @@ struct Node {
     functional_operands: Vec<Node>,
 }
 
+impl Node {
+    fn fmt_nested(&self, f: &mut std::fmt::Formatter<'_>, nesting: usize) -> std::fmt::Result {
+        write!(
+            f,
+            "{}{:?}->({})",
+            _tab_nested(nesting),
+            self.op,
+            self.output_arity
+        )?;
+        if !&self.operands.is_empty() {
+            write!(f, "[")?;
+
+            for operand in &self.operands {
+                writeln!(f)?;
+                operand.fmt_nested(f, nesting + 1)?;
+            }
+            write!(f, "\n{}]", _tab_nested(nesting))?;
+        }
+
+        if !&self.functional_operands.is_empty() {
+            write!(f, "<")?;
+            for operand in &self.functional_operands {
+                operand.fmt_nested(f, nesting + 1)?;
+            }
+            write!(f, ">")?;
+        }
+        Ok(())
+    }
+}
+
+fn _tab_nested(nesting: usize) -> String {
+    "    ".repeat(nesting)
+}
+
+impl Debug for Node {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.fmt_nested(f, 0)
+    }
+}
+
 fn main() {
     let input = "+ 1 * 2 3";
     let lexer = Token::lexer(input);
 
-    for token in lexer {
-        println!("{:?}", token);
-    }
+    let tokens: Result<Vec<Token>, ()> = lexer.into_iter().collect();
+    let tokens = tokens.unwrap();
+    let (root, rest) = next_node(&tokens);
+    println!("{:?}", root);
 }
