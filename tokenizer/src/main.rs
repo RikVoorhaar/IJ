@@ -1,7 +1,7 @@
-use anyhow::Result;
-use std::{fmt::Debug, str::FromStr};
-
+use anyhow::{Context, Result};
 use logos::Logos;
+use std::{fmt::Debug, str::FromStr};
+use thiserror::Error;
 
 #[derive(PartialEq, Clone)]
 struct Number {
@@ -91,11 +91,13 @@ enum Token {
 }
 
 trait TokenImpl {
-    fn _next_node(op: Token, tokens: &[Token]) -> (Node, Option<&[Token]>);
+    fn _next_node(op: Token, tokens: &[Token]) -> Result<(Node, &[Token])>;
 }
 
-fn next_node(tokens: &[Token]) -> (Node, Option<&[Token]>) {
-    let (op, rest) = tokens.split_first().unwrap();
+fn next_node(tokens: &[Token]) -> Result<(Node, &[Token])> {
+    let (op, rest) = tokens
+        .split_first()
+        .ok_or_else(|| SyntaxError::EmptyStream)?;
     match op {
         Token::Plus => BinaryOp::_next_node(op.clone(), rest),
         Token::Multiplication => BinaryOp::_next_node(op.clone(), rest),
@@ -104,13 +106,24 @@ fn next_node(tokens: &[Token]) -> (Node, Option<&[Token]>) {
     }
 }
 
+#[derive(Error, Debug)]
+enum SyntaxError {
+    #[error("Token {0:?} excpected {1} arguments but got {2}.")]
+    InsufficientArguments(Token, usize, usize),
+
+    #[error("Next node called on an empty Token stream")]
+    EmptyStream,
+}
+
 #[derive(Debug, PartialEq)]
 struct BinaryOp;
 impl TokenImpl for BinaryOp {
-    fn _next_node(op: Token, tokens: &[Token]) -> (Node, Option<&[Token]>) {
-        let (lhs, rest) = next_node(tokens);
-        let (rhs, rest) = next_node(rest.unwrap());
-        (
+    fn _next_node(op: Token, tokens: &[Token]) -> Result<(Node, &[Token])> {
+        let (lhs, rest) = next_node(tokens)
+            .with_context(|| SyntaxError::InsufficientArguments(op.clone(), 2, 0))?;
+        let (rhs, rest) = next_node(rest)
+            .with_context(|| SyntaxError::InsufficientArguments(op.clone(), 2, 1))?;
+        Ok((
             Node {
                 op,
                 output_arity: 1,
@@ -118,52 +131,53 @@ impl TokenImpl for BinaryOp {
                 functional_operands: vec![],
             },
             rest,
-        )
+        ))
     }
 }
 
 #[derive(Debug, PartialEq)]
 struct MinusOp;
 impl TokenImpl for MinusOp {
-    fn _next_node(op: Token, tokens: &[Token]) -> (Node, Option<&[Token]>) {
-        let (lhs, rest) = next_node(tokens);
-        match rest {
-            None => (
+    fn _next_node(op: Token, tokens: &[Token]) -> Result<(Node, &[Token])> {
+        let (lhs, rest) = next_node(tokens)
+            .with_context(|| SyntaxError::InsufficientArguments(op.clone(), 1, 0))?;
+        if rest.is_empty() {
+            Ok((
                 Node {
                     op,
                     output_arity: 1,
                     operands: vec![lhs],
                     functional_operands: vec![],
                 },
-                None,
-            ),
-            Some(rest) => {
-                let (rhs, rest) = next_node(rest);
-                (
-                    Node {
-                        op,
-                        output_arity: 1,
-                        operands: vec![lhs, rhs],
-                        functional_operands: vec![],
-                    },
-                    rest,
-                )
-            }
+                &[],
+            ))
+        } else {
+            let (rhs, rest) = next_node(rest)
+                .with_context(|| SyntaxError::InsufficientArguments(op.clone(), 2, 1))?;
+            Ok((
+                Node {
+                    op,
+                    output_arity: 1,
+                    operands: vec![lhs, rhs],
+                    functional_operands: vec![],
+                },
+                rest,
+            ))
         }
     }
 }
 
 impl TokenImpl for Number {
-    fn _next_node(op: Token, tokens: &[Token]) -> (Node, Option<&[Token]>) {
-        (
+    fn _next_node(op: Token, tokens: &[Token]) -> Result<(Node, &[Token])> {
+        Ok((
             Node {
                 op,
                 output_arity: 1,
                 operands: vec![],
                 functional_operands: vec![],
             },
-            Some(tokens),
-        )
+            tokens,
+        ))
     }
 }
 
@@ -220,12 +234,13 @@ impl Debug for Node {
     }
 }
 
-fn main() {
-    let input = "+ 1 * 2 3";
+fn main() -> Result<()> {
+    let input = "+ 1 * -2 3";
     let lexer = Token::lexer(input);
 
     let tokens: Result<Vec<Token>, ()> = lexer.into_iter().collect();
     let tokens = tokens.unwrap();
-    let (root, rest) = next_node(&tokens);
+    let (root, _) = next_node(&tokens)?;
     println!("{:?}", root);
+    Ok(())
 }
