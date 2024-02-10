@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use logos::Logos;
 use std::{fmt::Debug, str::FromStr};
 use thiserror::Error;
@@ -76,13 +76,11 @@ enum Token {
 
     // #[token("let")]
     // Let,
+    #[token("(")]
+    LParen,
 
-    // #[token("(")]
-    // LParen,
-
-    // #[token(")")]
-    // RParen,
-
+    #[token(")")]
+    RParen,
     // #[token("[")]
     // LBracket,
 
@@ -95,14 +93,14 @@ trait TokenImpl {
 }
 
 fn next_node(tokens: &[Token]) -> Result<(Node, &[Token])> {
-    let (op, rest) = tokens
-        .split_first()
-        .ok_or_else(|| SyntaxError::EmptyStream)?;
+    let (op, rest) = tokens.split_first().ok_or(SyntaxError::EmptyStream)?;
     match op {
         Token::Plus => BinaryOp::_next_node(op.clone(), rest),
         Token::Multiplication => BinaryOp::_next_node(op.clone(), rest),
         Token::Number(_) => Number::_next_node(op.clone(), rest),
         Token::Minus => MinusOp::_next_node(op.clone(), rest),
+        Token::LParen => LParen::_next_node(op.clone(), rest),
+        _ => Err(anyhow!("Unexpected token {:?}", op)),
     }
 }
 
@@ -113,6 +111,45 @@ enum SyntaxError {
 
     #[error("Next node called on an empty Token stream")]
     EmptyStream,
+
+    #[error("Unmatched parenthesis")]
+    UnmatchedParenthesis,
+
+    #[error("Unresolved group {0}")]
+    UnresolvedGroup(String),
+}
+
+fn _find_matching_parenthesis(tokens: &[Token]) -> Result<usize> {
+    let mut depth = 1;
+    for (i, token) in tokens.iter().enumerate() {
+        match token {
+            Token::LParen => depth += 1,
+            Token::RParen => {
+                depth -= 1;
+                if depth == 0 {
+                    return Ok(i);
+                }
+            }
+            _ => (),
+        }
+    }
+    Err(SyntaxError::UnmatchedParenthesis.into())
+}
+
+#[derive(Debug, PartialEq)]
+struct LParen;
+impl TokenImpl for LParen {
+    fn _next_node(_op: Token, tokens: &[Token]) -> Result<(Node, &[Token])> {
+        let rparen_index = _find_matching_parenthesis(tokens)?;
+        let new_tokens = &tokens[..rparen_index];
+        let rest = &tokens[rparen_index + 1..];
+
+        let (node, remainder) = next_node(new_tokens)?;
+        if !remainder.is_empty() {
+            return Err(SyntaxError::UnresolvedGroup(format!("{:?}", new_tokens)).into());
+        }
+        Ok((node, rest))
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -235,11 +272,16 @@ impl Debug for Node {
 }
 
 fn main() -> Result<()> {
-    let input = "+ 1 * -2 3";
+    let input = "+ (*2 (-1)) 1";
     let lexer = Token::lexer(input);
 
-    let tokens: Result<Vec<Token>, ()> = lexer.into_iter().collect();
-    let tokens = tokens.unwrap();
+    let mut tokens = Vec::new();
+    for token in lexer {
+        match token {
+            Ok(token) => tokens.push(token),
+            Err(e) => return Err(anyhow!("Error: {:?}", e).context("Error in lexer")),
+        }
+    }
     let (root, _) = next_node(&tokens)?;
     println!("{:?}", root);
     Ok(())
