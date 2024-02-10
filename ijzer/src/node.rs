@@ -1,98 +1,13 @@
+use crate::lexer::{Number, Token};
 use anyhow::{anyhow, Context, Result};
-use logos::Logos;
-use std::{fmt::Debug, str::FromStr};
+use std::fmt::Debug;
 use thiserror::Error;
 
-#[derive(PartialEq, Clone)]
-struct Number {
-    value: u64,
-}
-impl FromStr for Number {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        let value = s.parse()?;
-        Ok(Number { value })
-    }
-}
-
-#[derive(Logos, Debug, PartialEq, Clone)]
-#[logos(skip r"[ ]+")]
-enum Token {
-    #[token("+")]
-    Plus,
-
-    #[token("*")]
-    Multiplication,
-
-    #[token("-")]
-    Minus,
-    #[regex("[0-9]+", |lex| lex.slice().parse().ok())]
-    Number(Number),
-    // #[token("/")]
-    // Reduction,
-
-    // #[token("^")]
-    // Power,
-
-    // #[token("%")]
-    // Reciprocation,
-
-    // #[token("/.")]
-    // Fold,
-
-    // #[token("#")]
-    // Shape,
-
-    // #[token("T")]
-    // Transpose,
-
-    // #[token("&")]
-    // PartialApplication,
-
-    // #[token("@")]
-    // Composition,
-
-    // #[token(".@")]
-    // Distribute,
-
-    // #[token("~")]
-    // Interchange,
-
-    // #[token("$")]
-    // Axes,
-
-    // #[token("_")]
-    // Flatten,
-
-    // #[token(">#")]
-    // Reshape,
-
-    // #[regex("[a-zA-Z][a-zA-Z0-9]*")]
-    // Symbol(&'a str),
-
-    // #[token("=")]
-    // Assign,
-
-    // #[token("let")]
-    // Let,
-    #[token("(")]
-    LParen,
-
-    #[token(")")]
-    RParen,
-    // #[token("[")]
-    // LBracket,
-
-    // #[token("]")]
-    // RBracket,
-}
-
-trait TokenImpl {
+pub trait TokenImpl {
     fn _next_node(op: Token, tokens: &[Token]) -> Result<(Node, &[Token])>;
 }
 
-fn next_node(tokens: &[Token]) -> Result<(Node, &[Token])> {
+pub fn next_node(tokens: &[Token]) -> Result<(Node, &[Token])> {
     let (op, rest) = tokens.split_first().ok_or(SyntaxError::EmptyStream)?;
     match op {
         Token::Plus => BinaryOp::_next_node(op.clone(), rest),
@@ -105,7 +20,7 @@ fn next_node(tokens: &[Token]) -> Result<(Node, &[Token])> {
 }
 
 #[derive(Error, Debug)]
-enum SyntaxError {
+pub enum SyntaxError {
     #[error("Token {0:?} excpected {1} arguments but got {2}.")]
     InsufficientArguments(Token, usize, usize),
 
@@ -224,7 +139,7 @@ impl Debug for Number {
     }
 }
 
-struct Node {
+pub struct Node {
     op: Token,
     output_arity: usize,
     operands: Vec<Node>,
@@ -269,20 +184,4 @@ impl Debug for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.fmt_nested(f, 0)
     }
-}
-
-fn main() -> Result<()> {
-    let input = "+ (*2 (-1)) 1";
-    let lexer = Token::lexer(input);
-
-    let mut tokens = Vec::new();
-    for token in lexer {
-        match token {
-            Ok(token) => tokens.push(token),
-            Err(e) => return Err(anyhow!("Error: {:?}", e).context("Error in lexer")),
-        }
-    }
-    let (root, _) = next_node(&tokens)?;
-    println!("{:?}", root);
-    Ok(())
 }
