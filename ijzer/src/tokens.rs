@@ -16,6 +16,20 @@ impl FromStr for Number {
     }
 }
 
+#[derive(PartialEq, Clone, Debug)]
+pub struct SymbolToken {
+    pub value: String,
+}
+impl FromStr for SymbolToken {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> std::prelude::v1::Result<Self, Self::Err> {
+        Ok(SymbolToken {
+            value: s.to_string(),
+        })
+    }
+}
+
 pub fn lexer(input: &str) -> Result<Vec<Token>> {
     let lex = Token::lexer(input);
     let mut tokens = Vec::new();
@@ -47,6 +61,15 @@ pub enum Token {
 
     #[token(")")]
     RParen,
+
+    #[regex("[a-zA-Z][a-zA-Z0-9]*", |lex| lex.slice().parse().ok())]
+    Symbol(SymbolToken),
+
+    #[token("var")]
+    Variable,
+
+    #[token("->")]
+    Arrow,
     // #[token("/")]
     // Reduction,
 
@@ -85,10 +108,6 @@ pub enum Token {
 
     // #[token(">#")]
     // Reshape,
-
-    // #[regex("[a-zA-Z][a-zA-Z0-9]*")]
-    // Symbol(&'a str),
-
     // #[token("=")]
     // Assign,
 

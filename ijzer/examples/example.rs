@@ -1,12 +1,21 @@
 use anyhow::Result;
-use ijzer::lexer::lexer;
-use ijzer::node::next_node;
+use ijzer::node::{parse_ast, SymbolTable};
+use ijzer::tokens::lexer;
 
 fn main() -> Result<()> {
+    let mut symbol_table = SymbolTable::new();
+
+    let input = "var x 1 -> 2";
+    println!("input: {:?}", input);
+    let tokens = lexer(input)?;
+    let root = parse_ast(&tokens, &mut symbol_table)?;
+    println!("{:?}", root);
+
     let input = "+ (2 (-1) 3) ";
     println!("input: {:?}", input);
     let tokens = lexer(input)?;
-    let (root, _) = next_node(&tokens)?;
+    let root = parse_ast(&tokens, &mut symbol_table)?;
     println!("{:?}", root);
+
     Ok(())
 }

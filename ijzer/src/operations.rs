@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use crate::lexer::Number;
+use crate::tokens::Number;
 
 #[derive(Clone, PartialEq)]
 pub enum Operation {
@@ -9,7 +9,8 @@ pub enum Operation {
     Subtract,
     Negate,
     Group,
-    Number(Number)
+    Number(Number),
+    Symbol(String),
 }
 
 impl Debug for Operation {
@@ -21,6 +22,7 @@ impl Debug for Operation {
             Self::Negate => write!(f, "Negate"),
             Self::Group => write!(f, "Group"),
             Self::Number(n) => write!(f, "Number({:?})", n),
+            Self::Symbol(s) => write!(f, "Symbol({:?})", s),
         }
     }
 }

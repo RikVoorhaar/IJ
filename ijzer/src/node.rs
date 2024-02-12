@@ -1,8 +1,9 @@
-use crate::lexer::{Number, Token};
 use crate::operations::Operation;
+use crate::syntax_error::SyntaxError;
+use crate::tokens::{Number, Token};
 use anyhow::{anyhow, Context, Result};
+use std::collections::HashMap;
 use std::fmt::Debug;
-use thiserror::Error;
 
 #[derive(Clone)]
 pub struct Node {
@@ -12,37 +13,138 @@ pub struct Node {
     functional_operands: Vec<Node>,
 }
 
-pub trait TokenImpl {
-    fn _next_node(op: Token, tokens: &[Token]) -> Result<(Node, &[Token])>;
+#[derive(Clone, PartialEq, Debug)]
+pub struct Variable {
+    name: String,
+    output_arity: usize,
+    input_arity: usize,
 }
 
-pub fn next_node(tokens: &[Token]) -> Result<(Node, &[Token])> {
+impl Variable {
+    fn into_node(self, operands: Vec<Node>) -> Node {
+        Node {
+            op: Operation::Symbol(self.name),
+            output_arity: self.output_arity,
+            operands,
+            functional_operands: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct SymbolTable {
+    symbols: HashMap<String, (Variable, Option<Node>)>,
+}
+
+impl SymbolTable {
+    pub fn new() -> Self {
+        SymbolTable {
+            symbols: HashMap::new(),
+        }
+    }
+
+    pub fn insert(&mut self, var: Variable, expression: Option<Node>) {
+        self.symbols.insert(var.name.clone(), (var, expression));
+    }
+}
+
+pub trait TokenImpl {
+    fn _next_node<'a>(
+        op: Token,
+        tokens: &'a [Token],
+        symbol_table: &SymbolTable,
+    ) -> Result<(Node, &'a [Token])>;
+}
+
+pub fn parse_ast(tokens: &[Token], symbol_table: &mut SymbolTable) -> Result<Node> {
+    let (op, rest) = tokens.split_first().ok_or(SyntaxError::EmptyStream)?;
+    match op {
+        Token::Variable => parse_var_statement(rest, symbol_table),
+        _ => {
+            let (node, remainer) = next_node(tokens, symbol_table)?;
+            if !remainer.is_empty() {
+                return Err(SyntaxError::UnhandledTokens(remainer.to_vec()).into());
+            }
+            Ok(node)
+        }
+    }
+}
+
+pub fn parse_var_statement(tokens: &[Token], symbol_table: &mut SymbolTable) -> Result<Node> {
+    let mut token_iter = tokens.iter();
+    let name = match token_iter.next().as_ref() {
+        Some(Token::Symbol(symbol)) => symbol.value.clone(),
+        Some(&token) => return Err(SyntaxError::UnexpectedToken(token.clone()).into()),
+        None => return Err(SyntaxError::EmptyStream.into()),
+    };
+    let input_arity = match token_iter.next().as_ref() {
+        Some(Token::Number(number)) => {
+            match token_iter.next().as_ref() {
+                Some(&Token::Arrow) => {}
+                Some(&token) => return Err(SyntaxError::UnexpectedToken(token.clone()).into()),
+                None => return Err(SyntaxError::EmptyStream.into()),
+            }
+            number.value as usize
+        }
+        Some(&Token::Arrow) => 0,
+        Some(&token) => return Err(SyntaxError::UnexpectedToken(token.clone()).into()),
+        None => return Err(SyntaxError::EmptyStream.into()),
+    };
+    let output_arity = match token_iter.next().as_ref() {
+        Some(Token::Number(number)) => number.value as usize,
+        Some(&token) => return Err(SyntaxError::UnexpectedToken(token.clone()).into()),
+        None => return Err(SyntaxError::EmptyStream.into()),
+    };
+    symbol_table.insert(
+        Variable {
+            name: name.clone(),
+            output_arity,
+            input_arity,
+        },
+        None,
+    );
+
+    Ok(Node {
+        op: Operation::Symbol(name),
+        output_arity,
+        operands: Vec::new(),
+        functional_operands: Vec::new(),
+    })
+}
+
+pub fn next_node<'a>(
+    tokens: &'a [Token],
+    symbol_table: &SymbolTable,
+) -> Result<(Node, &'a [Token])> {
     let (op, rest) = tokens.split_first().ok_or(SyntaxError::EmptyStream)?;
     let out = match op {
-        Token::Plus => _next_node_normal_op(Operation::Add, 2, 2, 1, rest),
-        Token::Multiplication => _next_node_normal_op(Operation::Multiply, 2, 2, 1, rest),
-        Token::Number(_) => Number::_next_node(op.clone(), rest),
-        Token::Minus => MinusOp::_next_node(op.clone(), rest),
-        Token::LParen => LParen::_next_node(op.clone(), rest),
+        Token::Plus => _next_node_normal_op(Operation::Add, 2, 2, 1, rest, symbol_table),
+        Token::Multiplication => {
+            _next_node_normal_op(Operation::Multiply, 2, 2, 1, rest, symbol_table)
+        }
+        Token::Number(_) => Number::_next_node(op.clone(), rest, symbol_table),
+        Token::Minus => MinusOp::_next_node(op.clone(), rest, symbol_table),
+        Token::LParen => LParen::_next_node(op.clone(), rest, symbol_table),
         _ => Err(anyhow!("Unexpected token {:?}", op)),
     };
 
     out
 }
 
-fn _next_node_normal_op(
+fn _next_node_normal_op<'a>(
     op: Operation,
     min_arity: usize,
     max_arity: usize,
     output_arity: usize,
-    tokens: &[Token],
-) -> Result<(Node, &[Token])> {
+    tokens: &'a [Token],
+    symbol_table: &SymbolTable,
+) -> Result<(Node, &'a [Token])> {
     let mut total_arity = 0;
     let mut overflow = 0;
     let mut operands = Vec::new();
     let mut rest = tokens;
     while !rest.is_empty() {
-        let (node, new_rest) = next_node(rest)?;
+        let (node, new_rest) = next_node(rest, symbol_table)?;
         if total_arity + node.output_arity > max_arity {
             overflow = node.output_arity;
             break;
@@ -68,21 +170,6 @@ fn _next_node_normal_op(
     ))
 }
 
-#[derive(Error, Debug)]
-pub enum SyntaxError {
-    #[error("Operation {0:?} excpected {1} arguments but got {2}.")]
-    InsufficientArguments(Operation, usize, usize),
-
-    #[error("Next node called on an empty Token stream")]
-    EmptyStream,
-
-    #[error("Unmatched parenthesis")]
-    UnmatchedParenthesis,
-
-    #[error("Unresolved group {0}")]
-    UnresolvedGroup(String),
-}
-
 fn _find_matching_parenthesis(tokens: &[Token]) -> Result<usize> {
     let mut depth = 1;
     for (i, token) in tokens.iter().enumerate() {
@@ -103,7 +190,11 @@ fn _find_matching_parenthesis(tokens: &[Token]) -> Result<usize> {
 #[derive(Debug, PartialEq)]
 struct LParen;
 impl TokenImpl for LParen {
-    fn _next_node(_op: Token, tokens: &[Token]) -> Result<(Node, &[Token])> {
+    fn _next_node<'a>(
+        _op: Token,
+        tokens: &'a [Token],
+        symbol_table: &SymbolTable,
+    ) -> Result<(Node, &'a [Token])> {
         let rparen_index = _find_matching_parenthesis(tokens)?;
         let mut rest = &tokens[..rparen_index];
         let remainder = &tokens[rparen_index + 1..];
@@ -114,7 +205,7 @@ impl TokenImpl for LParen {
         // }
         let mut operands = Vec::new();
         while !rest.is_empty() {
-            let (node, new_rest) = next_node(rest)?;
+            let (node, new_rest) = next_node(rest, symbol_table)?;
             rest = new_rest;
             operands.push(node);
         }
@@ -138,8 +229,12 @@ impl TokenImpl for LParen {
 #[derive(Debug, PartialEq)]
 struct MinusOp;
 impl TokenImpl for MinusOp {
-    fn _next_node(_: Token, tokens: &[Token]) -> Result<(Node, &[Token])> {
-        let (lhs, rest) = next_node(tokens)
+    fn _next_node<'a>(
+        _: Token,
+        tokens: &'a [Token],
+        symbol_table: &SymbolTable,
+    ) -> Result<(Node, &'a [Token])> {
+        let (lhs, rest) = next_node(tokens, symbol_table)
             .with_context(|| SyntaxError::InsufficientArguments(Operation::Negate, 1, 0))?;
         if rest.is_empty() {
             Ok((
@@ -152,7 +247,7 @@ impl TokenImpl for MinusOp {
                 &[],
             ))
         } else {
-            let (rhs, rest) = next_node(rest)
+            let (rhs, rest) = next_node(rest, symbol_table)
                 .with_context(|| SyntaxError::InsufficientArguments(Operation::Subtract, 2, 1))?;
             Ok((
                 Node {
@@ -168,7 +263,11 @@ impl TokenImpl for MinusOp {
 }
 
 impl TokenImpl for Number {
-    fn _next_node(op: Token, tokens: &[Token]) -> Result<(Node, &[Token])> {
+    fn _next_node<'a>(
+        op: Token,
+        tokens: &'a [Token],
+        _: &SymbolTable,
+    ) -> Result<(Node, &'a [Token])> {
         let node_op = match op {
             Token::Number(n) => Operation::Number(n),
             _ => unreachable!(),
