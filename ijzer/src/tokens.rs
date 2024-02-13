@@ -18,14 +18,14 @@ impl FromStr for Number {
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct SymbolToken {
-    pub value: String,
+    pub name: String,
 }
 impl FromStr for SymbolToken {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> std::prelude::v1::Result<Self, Self::Err> {
         Ok(SymbolToken {
-            value: s.to_string(),
+            name: s.to_string(),
         })
     }
 }
@@ -70,6 +70,9 @@ pub enum Token {
 
     #[token("->")]
     Arrow,
+
+    #[token("=")]
+    Assign,
     // #[token("/")]
     // Reduction,
 
@@ -108,8 +111,6 @@ pub enum Token {
 
     // #[token(">#")]
     // Reshape,
-    // #[token("=")]
-    // Assign,
 
     // #[token("let")]
     // Let,

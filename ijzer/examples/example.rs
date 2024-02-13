@@ -11,7 +11,13 @@ fn main() -> Result<()> {
     let root = parse_ast(&tokens, &mut symbol_table)?;
     println!("{:?}", root);
 
-    let input = "+ (x 1) ";
+    let input = "y = (+ (x 1) 2)";
+    println!("input: {:?}", input);
+    let tokens = lexer(input)?;
+    let root = parse_ast(&tokens, &mut symbol_table)?;
+    println!("{:?}", root);
+
+    let input = "* y";
     println!("input: {:?}", input);
     let tokens = lexer(input)?;
     let root = parse_ast(&tokens, &mut symbol_table)?;

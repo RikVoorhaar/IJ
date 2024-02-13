@@ -11,6 +11,7 @@ pub enum Operation {
     Group,
     Number(Number),
     Symbol(String),
+    Assign,
 }
 
 impl Debug for Operation {
@@ -23,6 +24,7 @@ impl Debug for Operation {
             Self::Group => write!(f, "Group"),
             Self::Number(n) => write!(f, "Number({:?})", n),
             Self::Symbol(s) => write!(f, "Symbol({:?})", s),
+            Self::Assign => write!(f, "Assign"),
         }
     }
 }

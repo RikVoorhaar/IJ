@@ -4,6 +4,7 @@ use crate::tokens::{Number, SymbolToken, Token};
 use anyhow::{anyhow, Context, Result};
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::ops::Deref;
 
 #[derive(Clone)]
 pub struct Node {
@@ -18,17 +19,6 @@ pub struct Variable {
     name: String,
     output_arity: usize,
     input_arity: usize,
-}
-
-impl Variable {
-    fn into_node(self, operands: Vec<Node>) -> Node {
-        Node {
-            op: Operation::Symbol(self.name),
-            output_arity: self.output_arity,
-            operands,
-            functional_operands: Vec::new(),
-        }
-    }
 }
 
 #[derive(Debug, Default)]
@@ -60,6 +50,7 @@ pub fn parse_ast(tokens: &[Token], symbol_table: &mut SymbolTable) -> Result<Nod
     let (op, rest) = tokens.split_first().ok_or(SyntaxError::EmptyStream)?;
     match op {
         Token::Variable => parse_var_statement(rest, symbol_table),
+        Token::Symbol(symbol) => parse_assign(symbol.name.clone(), rest, symbol_table),
         _ => {
             let (node, remainer) = next_node(tokens, symbol_table)?;
             if !remainer.is_empty() {
@@ -73,7 +64,7 @@ pub fn parse_ast(tokens: &[Token], symbol_table: &mut SymbolTable) -> Result<Nod
 pub fn parse_var_statement(tokens: &[Token], symbol_table: &mut SymbolTable) -> Result<Node> {
     let mut token_iter = tokens.iter();
     let name = match token_iter.next().as_ref() {
-        Some(Token::Symbol(symbol)) => symbol.value.clone(),
+        Some(Token::Symbol(symbol)) => symbol.name.clone(),
         Some(&token) => return Err(SyntaxError::UnexpectedToken(token.clone()).into()),
         None => return Err(SyntaxError::EmptyStream.into()),
     };
@@ -108,6 +99,44 @@ pub fn parse_var_statement(tokens: &[Token], symbol_table: &mut SymbolTable) -> 
         op: Operation::Symbol(name),
         output_arity,
         operands: Vec::new(),
+        functional_operands: Vec::new(),
+    })
+}
+
+pub fn parse_assign(
+    variable_name: String,
+    tokens: &[Token],
+    symbol_table: &mut SymbolTable,
+) -> Result<Node> {
+    let (first_token, rest) = tokens.split_first().ok_or(SyntaxError::EmptyStream)?;
+    match first_token {
+        Token::Assign => {}
+        token => return Err(SyntaxError::UnexpectedToken(token.clone()).into()),
+    };
+
+    let (expression, rest) = next_node(rest, symbol_table)?;
+    if !rest.is_empty() {
+        return Err(SyntaxError::UnhandledTokens(rest.to_vec()).into());
+    }
+    let symbol_node = Node {
+        op: Operation::Symbol(variable_name.clone()),
+        output_arity: expression.output_arity,
+        operands: Vec::new(),
+        functional_operands: Vec::new(),
+    };
+    symbol_table.insert(
+        Variable {
+            name: variable_name.clone(),
+            output_arity: expression.output_arity,
+            input_arity: 0,
+        },
+        Some(expression.clone()),
+    );
+
+    Ok(Node {
+        op: Operation::Assign,
+        output_arity: 0,
+        operands: vec![symbol_node, expression],
         functional_operands: Vec::new(),
     })
 }
@@ -230,11 +259,11 @@ fn _next_node_symbol<'a>(
 ) -> Result<(Node, &'a [Token])> {
     let (symbol, _) = symbol_table
         .symbols
-        .get(&op.value)
-        .ok_or(SyntaxError::UnknownSymbol(op.value.clone()))?;
+        .get(&op.name)
+        .ok_or(SyntaxError::UnknownSymbol(op.name.clone()))?;
 
     return _next_node_normal_op(
-        Operation::Symbol(op.value),
+        Operation::Symbol(op.name),
         symbol.input_arity,
         symbol.input_arity,
         symbol.output_arity,
