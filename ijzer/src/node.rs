@@ -1,6 +1,6 @@
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
-use crate::tokens::{Number, Token};
+use crate::tokens::{Number, SymbolToken, Token};
 use anyhow::{anyhow, Context, Result};
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -125,6 +125,7 @@ pub fn next_node<'a>(
         Token::Number(_) => Number::_next_node(op.clone(), rest, symbol_table),
         Token::Minus => MinusOp::_next_node(op.clone(), rest, symbol_table),
         Token::LParen => LParen::_next_node(op.clone(), rest, symbol_table),
+        Token::Symbol(op) => _next_node_symbol(op.clone(), rest, symbol_table),
         _ => Err(anyhow!("Unexpected token {:?}", op)),
     };
 
@@ -199,10 +200,6 @@ impl TokenImpl for LParen {
         let mut rest = &tokens[..rparen_index];
         let remainder = &tokens[rparen_index + 1..];
 
-        // let (node, remainder) = next_node(rest)?;
-        // if !remainder.is_empty() {
-        //     return Err(SyntaxError::UnresolvedGroup(format!("{:?}", rest)).into());
-        // }
         let mut operands = Vec::new();
         while !rest.is_empty() {
             let (node, new_rest) = next_node(rest, symbol_table)?;
@@ -224,6 +221,26 @@ impl TokenImpl for LParen {
             )),
         }
     }
+}
+
+fn _next_node_symbol<'a>(
+    op: SymbolToken,
+    tokens: &'a [Token],
+    symbol_table: &SymbolTable,
+) -> Result<(Node, &'a [Token])> {
+    let (symbol, _) = symbol_table
+        .symbols
+        .get(&op.value)
+        .ok_or(SyntaxError::UnknownSymbol(op.value.clone()))?;
+
+    return _next_node_normal_op(
+        Operation::Symbol(op.value),
+        symbol.input_arity,
+        symbol.input_arity,
+        symbol.output_arity,
+        tokens,
+        symbol_table,
+    );
 }
 
 #[derive(Debug, PartialEq)]
