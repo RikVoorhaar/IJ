@@ -1,10 +1,9 @@
-use crate::operations::Operation;
+use crate::operations::{self, Operation};
 use crate::syntax_error::SyntaxError;
-use crate::tokens::{Number, SymbolToken, Token};
+use crate::tokens::{self, Number, SymbolToken, Token};
 use anyhow::{anyhow, Context, Result};
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::ops::Deref;
 
 #[derive(Clone)]
 pub struct Node {
@@ -161,14 +160,12 @@ pub fn next_node<'a>(
     out
 }
 
-fn _next_node_normal_op<'a>(
-    op: Operation,
+fn gather_operands<'a>(
     min_arity: usize,
     max_arity: usize,
-    output_arity: usize,
     tokens: &'a [Token],
     symbol_table: &SymbolTable,
-) -> Result<(Node, &'a [Token])> {
+) -> Result<(Vec<Node>, &'a [Token])> {
     let mut total_arity = 0;
     let mut overflow = 0;
     let mut operands = Vec::new();
@@ -180,15 +177,31 @@ fn _next_node_normal_op<'a>(
             break;
         }
         total_arity += node.output_arity;
-        operands.push(node);
+        match node.op {
+            Operation::Group => {
+                operands.extend(node.operands);
+            }
+            _ => operands.push(node),
+        }
         rest = new_rest;
     }
     if total_arity < min_arity {
-        return Err(
-            SyntaxError::InsufficientArguments(op, min_arity, total_arity + overflow).into(),
-        );
+        return Err(SyntaxError::InsufficientArguments(min_arity, total_arity + overflow).into());
     }
 
+    Ok((operands, rest))
+}
+
+fn _next_node_normal_op<'a>(
+    op: Operation,
+    min_arity: usize,
+    max_arity: usize,
+    output_arity: usize,
+    tokens: &'a [Token],
+    symbol_table: &SymbolTable,
+) -> Result<(Node, &'a [Token])> {
+    let (operands, rest) = gather_operands(min_arity, max_arity, tokens, symbol_table)
+        .with_context(|| anyhow!("Error caused by {:?}", op))?;
     Ok((
         Node {
             op,
@@ -226,18 +239,17 @@ impl TokenImpl for LParen {
         symbol_table: &SymbolTable,
     ) -> Result<(Node, &'a [Token])> {
         let rparen_index = _find_matching_parenthesis(tokens)?;
-        let mut rest = &tokens[..rparen_index];
         let remainder = &tokens[rparen_index + 1..];
+        let tokens = &tokens[..rparen_index];
 
-        let mut operands = Vec::new();
-        while !rest.is_empty() {
-            let (node, new_rest) = next_node(rest, symbol_table)?;
-            rest = new_rest;
-            operands.push(node);
+        let (operands, rest) = gather_operands(1, usize::MAX, tokens, symbol_table)
+            .with_context(|| anyhow!("Error created by bracket parsing"))?;
+        if !rest.is_empty() {
+            return Err(SyntaxError::UnhandledTokens(rest.to_vec()).into());
         }
 
         match operands.len() {
-            0 => Err(SyntaxError::EmptyStream.into()),
+            0 => unreachable!(),
             1 => Ok((operands[0].clone(), remainder)),
             _ => Ok((
                 Node {
@@ -280,30 +292,27 @@ impl TokenImpl for MinusOp {
         tokens: &'a [Token],
         symbol_table: &SymbolTable,
     ) -> Result<(Node, &'a [Token])> {
-        let (lhs, rest) = next_node(tokens, symbol_table)
-            .with_context(|| SyntaxError::InsufficientArguments(Operation::Negate, 1, 0))?;
-        if rest.is_empty() {
-            Ok((
+        let (operands, rest) = gather_operands(1, 2, tokens, symbol_table)?;
+        match operands.iter().map(|node| node.output_arity).sum() {
+            1 => Ok((
                 Node {
                     op: Operation::Negate,
                     output_arity: 1,
-                    operands: vec![lhs],
-                    functional_operands: vec![],
+                    operands,
+                    functional_operands: Vec::new(),
                 },
-                &[],
-            ))
-        } else {
-            let (rhs, rest) = next_node(rest, symbol_table)
-                .with_context(|| SyntaxError::InsufficientArguments(Operation::Subtract, 2, 1))?;
-            Ok((
+                rest,
+            )),
+            2 => Ok((
                 Node {
                     op: Operation::Subtract,
                     output_arity: 1,
-                    operands: vec![lhs, rhs],
-                    functional_operands: vec![],
+                    operands,
+                    functional_operands: Vec::new(),
                 },
                 rest,
-            ))
+            )),
+            _ => unreachable!(),
         }
     }
 }

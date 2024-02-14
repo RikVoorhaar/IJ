@@ -1,11 +1,10 @@
-use crate::operations::Operation;
 use crate::tokens::Token;
 
 use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum SyntaxError {
-    #[error("Operation {0:?} excpected {1} arguments but got {2}.")]
-    InsufficientArguments(Operation, usize, usize),
+    #[error("Excpected {0} arguments but got {1}.")]
+    InsufficientArguments(usize, usize),
 
     #[error("Next node called on an empty Token stream")]
     EmptyStream,
