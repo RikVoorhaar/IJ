@@ -73,6 +73,15 @@ pub enum Token {
 
     #[token("=")]
     Assign,
+
+    #[token("I")]
+    Identity,
+
+    #[token("fn")]
+    Function,
+
+    #[token(",")]
+    Comma,
     // #[token("/")]
     // Reduction,
 

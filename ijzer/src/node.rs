@@ -11,6 +11,39 @@ pub struct Node {
     output_arity: usize,
     operands: Vec<Node>,
     functional_operands: Vec<Node>,
+    input_arity: usize,
+}
+
+impl Node {
+    pub fn new(op: Operation, output_arity: usize, operands: Vec<Node>) -> Self {
+        Node {
+            op,
+            output_arity,
+            input_arity: operands.iter().map(|n| n.output_arity).sum(),
+            operands,
+            functional_operands: Vec::new(),
+        }
+    }
+
+    pub fn new_with_input_arity(
+        op: Operation,
+        output_arity: usize,
+        operands: Vec<Node>,
+        input_arity: usize,
+    ) -> Result<Self, SyntaxError> {
+        let operand_arity: usize = operands.iter().map(|n| n.output_arity).sum();
+        if input_arity < operand_arity {
+            Err(SyntaxError::TooManyInputs)
+        } else {
+            Ok(Node {
+                op,
+                output_arity,
+                input_arity,
+                operands,
+                functional_operands: Vec::new(),
+            })
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -85,7 +118,8 @@ fn parse_ast(context: &mut ASTContext) -> Result<Node> {
         .ok_or(SyntaxError::EmptyStream)?;
     match op {
         Token::Variable => parse_var_statement(context),
-        Token::Symbol(symbol) => parse_assign(symbol.name.clone(), context),
+        Token::Function => parse_fn_statement(context),
+        Token::Symbol(symbol) => parse_assign(symbol.name.clone(), context, false),
         _ => {
             let (node, remainder) = next_node(&context.tokens, context)?;
             if !remainder.is_empty() {
@@ -97,6 +131,21 @@ fn parse_ast(context: &mut ASTContext) -> Result<Node> {
             Ok(node)
         }
     }
+}
+
+pub fn parse_fn_statement(context: &mut ASTContext) -> Result<Node> {
+    let mut token_iter = context.tokens.iter().skip(1);
+    let name = match token_iter.next().as_ref() {
+        Some(Token::Symbol(symbol)) => symbol.name.clone(),
+        Some(&token) => {
+            return Err(context.add_context_to_syntax_error(
+                SyntaxError::UnexpectedToken(token.clone()),
+                context.get_tokens(),
+            ))
+        }
+        None => return Err(SyntaxError::EmptyStream.into()),
+    };
+    parse_assign(name, context, true)
 }
 
 pub fn parse_var_statement(context: &mut ASTContext) -> Result<Node> {
@@ -153,26 +202,18 @@ pub fn parse_var_statement(context: &mut ASTContext) -> Result<Node> {
         None,
     );
 
-    Ok(Node {
-        op: Operation::Symbol(name),
-        output_arity,
-        operands: Vec::new(),
-        functional_operands: Vec::new(),
-    })
+    Ok(Node::new(Operation::Symbol(name), output_arity, Vec::new()))
 }
 
-fn _get_variable_expression(context: &ASTContext) -> Result<Node> {
-    let (first_token, rest) = context.get_tokens()[1..]
-        .split_first()
-        .ok_or(SyntaxError::EmptyStream)?;
-
-    match first_token {
-        Token::Assign => {}
-        token => {
-            return Err(context
-                .add_context_to_syntax_error(SyntaxError::UnexpectedToken(token.clone()), rest))
-        }
-    };
+fn _get_variable_expression(context: &ASTContext, tokens: &[Token]) -> Result<Node> {
+    let mut split = tokens.split(|t| t == &Token::Assign);
+    if split.next().is_none() {
+        return Err(context
+            .add_context_to_syntax_error(SyntaxError::UnresolvedGroup("=".to_string()), tokens));
+    }
+    let rest = split
+        .next()
+        .ok_or(context.add_context_to_syntax_error(SyntaxError::EmptyStream, tokens))?;
 
     let (expression, rest) = next_node(rest, context)?;
     if !rest.is_empty() {
@@ -183,29 +224,99 @@ fn _get_variable_expression(context: &ASTContext) -> Result<Node> {
     Ok(expression)
 }
 
-pub fn parse_assign(variable_name: String, context: &mut ASTContext) -> Result<Node> {
-    let expression = _get_variable_expression(context)?;
-    let symbol_node = Node {
-        op: Operation::Symbol(variable_name.clone()),
-        output_arity: expression.output_arity,
-        operands: Vec::new(),
-        functional_operands: Vec::new(),
-    };
-    context.insert_variable(
-        Variable {
-            name: variable_name.clone(),
-            output_arity: expression.output_arity,
-            input_arity: 0,
-        },
-        Some(expression.clone()),
-    );
+fn _compute_input_arity(node: &Node) -> usize {
+    let this_node: usize =
+        node.input_arity - node.operands.iter().map(|n| n.output_arity).sum::<usize>();
+    let children: usize = node
+        .operands
+        .iter()
+        .map(_compute_input_arity)
+        .sum::<usize>();
+    this_node + children
+}
 
-    Ok(Node {
-        op: Operation::Assign,
-        output_arity: 0,
-        operands: vec![symbol_node, expression],
-        functional_operands: Vec::new(),
-    })
+pub fn parse_assign(
+    variable_name: String,
+    context: &mut ASTContext,
+    is_function: bool,
+) -> Result<Node> {
+    let expression = _get_variable_expression(context, context.get_tokens())?;
+    let input_arity = _compute_input_arity(&expression);
+    if is_function && input_arity == 0 {
+        return Err(context.add_context_to_syntax_error(
+            SyntaxError::FunctionWithoutInputs,
+            context.get_tokens(),
+        ));
+    }
+    if !is_function && input_arity != 0 {
+        return Err(context
+            .add_context_to_syntax_error(SyntaxError::VariableWithInput, context.get_tokens()));
+    }
+    if !is_function {
+        let left_of_assign = context.tokens.split(|t| t == &Token::Assign).next().ok_or(
+            context.add_context_to_syntax_error(
+                SyntaxError::UnresolvedGroup("=".to_string()),
+                context.get_tokens(),
+            ),
+        )?;
+        let symbol_names: Vec<String> = left_of_assign
+            .iter()
+            .filter(|&t| matches!(t, Token::Symbol(_)))
+            .map(|t| match t {
+                Token::Symbol(s) => s.name.clone(),
+                _ => unreachable!(),
+            })
+            .collect();
+        if symbol_names.len() != expression.output_arity {
+            return Err(context.add_context_to_syntax_error(
+                SyntaxError::IncorrectNumVariables(symbol_names.len(), expression.output_arity),
+                context.get_tokens(),
+            ));
+        }
+        let symbol_nodes: Vec<_> = symbol_names
+            .into_iter()
+            .map(|s| Node::new(Operation::Symbol(s), 1, Vec::new()))
+            .collect();
+        for symbol_node in symbol_nodes.iter() {
+            context.insert_variable(
+                Variable {
+                    name: variable_name.clone(),
+                    output_arity: 1,
+                    input_arity: 0,
+                },
+                Some(symbol_node.clone()),
+            );
+        }
+        Ok(Node::new(
+            Operation::Assign,
+            0,
+            vec![
+                Node::new(Operation::Group, expression.output_arity, symbol_nodes),
+                expression,
+            ],
+        ))
+    } else {
+        let symbol_node = Node::new_with_input_arity(
+            Operation::Symbol(variable_name.clone()),
+            expression.output_arity,
+            Vec::new(),
+            input_arity,
+        )?;
+        context.insert_variable(
+            Variable {
+                name: variable_name.clone(),
+                output_arity: expression.output_arity,
+                input_arity,
+            },
+            Some(expression.clone()),
+        );
+
+        Ok(Node::new(
+            Operation::Assign,
+            0,
+            vec![symbol_node, expression],
+        ))
+    }
 }
 
 pub fn next_node<'a>(tokens: &'a [Token], context: &ASTContext) -> Result<(Node, &'a [Token])> {
@@ -217,6 +328,7 @@ pub fn next_node<'a>(tokens: &'a [Token], context: &ASTContext) -> Result<(Node,
         Token::Minus => MinusOp::_next_node(op.clone(), rest, context),
         Token::LParen => LParen::_next_node(op.clone(), rest, context),
         Token::Symbol(op) => _next_node_symbol(op.clone(), rest, context),
+        Token::Identity => IdentityOp::_next_node(op.clone(), rest, context),
         _ => Err(anyhow!("Unexpected token {:?}", op)),
     };
 
@@ -268,15 +380,7 @@ fn _next_node_normal_op<'a>(
 ) -> Result<(Node, &'a [Token])> {
     let (operands, rest) = gather_operands(min_arity, max_arity, tokens, context)
         .with_context(|| anyhow!("Error caused by {:?}", op))?;
-    Ok((
-        Node {
-            op,
-            output_arity,
-            operands,
-            functional_operands: Vec::new(),
-        },
-        rest,
-    ))
+    Ok((Node::new(op, output_arity, operands), rest))
 }
 
 fn _find_matching_parenthesis(tokens: &[Token]) -> Result<usize, SyntaxError> {
@@ -319,12 +423,11 @@ impl TokenImpl for LParen {
             0 => unreachable!(),
             1 => Ok((operands[0].clone(), remainder)),
             _ => Ok((
-                Node {
-                    op: Operation::Group,
-                    output_arity: operands.iter().map(|n| n.output_arity).sum(),
+                Node::new(
+                    Operation::Group,
+                    operands.iter().map(|n| n.output_arity).sum(),
                     operands,
-                    functional_operands: Vec::new(),
-                },
+                ),
                 remainder,
             )),
         }
@@ -361,25 +464,27 @@ impl TokenImpl for MinusOp {
     ) -> Result<(Node, &'a [Token])> {
         let (operands, rest) = gather_operands(1, 2, tokens, context)?;
         match operands.iter().map(|node| node.output_arity).sum() {
-            1 => Ok((
-                Node {
-                    op: Operation::Negate,
-                    output_arity: 1,
-                    operands,
-                    functional_operands: Vec::new(),
-                },
-                rest,
-            )),
-            2 => Ok((
-                Node {
-                    op: Operation::Subtract,
-                    output_arity: 1,
-                    operands,
-                    functional_operands: Vec::new(),
-                },
-                rest,
-            )),
+            1 => Ok((Node::new(Operation::Negate, 1, operands), rest)),
+            2 => Ok((Node::new(Operation::Subtract, 1, operands), rest)),
             _ => unreachable!(),
+        }
+    }
+}
+
+struct IdentityOp;
+impl TokenImpl for IdentityOp {
+    fn _next_node<'a>(
+        _: Token,
+        tokens: &'a [Token],
+        context: &ASTContext,
+    ) -> Result<(Node, &'a [Token])> {
+        let (mut operands, rest) = gather_operands(0, 1, tokens, context)?;
+        if !operands.is_empty() {
+            Ok((operands.remove(0), rest))
+        } else {
+            let node = Node::new_with_input_arity(Operation::Identity, 1, operands, 1)
+                .map_err(|e| context.add_context_to_syntax_error(e, tokens))?;
+            Ok((node, rest))
         }
     }
 }
@@ -395,15 +500,7 @@ impl TokenImpl for Number {
             _ => unreachable!(),
         };
 
-        Ok((
-            Node {
-                op: node_op,
-                output_arity: 1,
-                operands: vec![],
-                functional_operands: vec![],
-            },
-            tokens,
-        ))
+        Ok((Node::new(node_op, 1, vec![]), tokens))
     }
 }
 
@@ -417,9 +514,10 @@ impl Node {
     fn fmt_nested(&self, f: &mut std::fmt::Formatter<'_>, nesting: usize) -> std::fmt::Result {
         write!(
             f,
-            "{}{:?}->({})",
+            "{}{:?} | ({}->{})",
             _tab_nested(nesting),
             self.op,
+            self.input_arity,
             self.output_arity
         )?;
         if !&self.operands.is_empty() {

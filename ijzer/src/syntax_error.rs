@@ -23,4 +23,17 @@ pub enum SyntaxError {
 
     #[error("Unknown symbol {0}")]
     UnknownSymbol(String),
+
+    #[error("Too many inputs")]
+    TooManyInputs,
+
+    #[error("Function without inputs")]
+    FunctionWithoutInputs,
+
+    #[error("Variable is not allowed to have input arguments")]
+    VariableWithInput,
+
+    #[error("Number of variables does not match output arity; got {0} variables but output arity {1}")]
+    IncorrectNumVariables(usize, usize),
+
 }

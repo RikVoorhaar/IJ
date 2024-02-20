@@ -4,9 +4,10 @@ use ijzer::tokens::lexer;
 
 static INPUT: &str = r#"
 var x 1 -> 2
-y = (+ (x (1)) 2)
-z = * y 
-return (1 (1 2))
+y = (+ (x (1)))
+fn z = * y I
+* (z 1 2)
+x y = (1 2)
 "#;
 
 fn main() -> Result<()> {
@@ -23,4 +24,4 @@ fn main() -> Result<()> {
     }
 
     Ok(())
-}
+} 
