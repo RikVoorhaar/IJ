@@ -13,6 +13,7 @@ pub enum Operation {
     Symbol(String),
     Assign,
     Identity,
+    Return,
 }
 
 impl Debug for Operation {
@@ -27,6 +28,7 @@ impl Debug for Operation {
             Self::Symbol(s) => write!(f, "Symbol({:?})", s),
             Self::Assign => write!(f, "Assign"),
             Self::Identity => write!(f, "Identity"),
+            Self::Return => write!(f, "Return"),
         }
     }
 }

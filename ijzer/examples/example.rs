@@ -7,7 +7,7 @@ var x 1 -> 2
 y = (+ (x (1)))
 fn z = * y I
 * (z 1 2)
-x y = (1 2)
+x y z= (1 2)
 "#;
 
 fn main() -> Result<()> {

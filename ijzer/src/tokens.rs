@@ -1,5 +1,4 @@
 use anyhow::{anyhow, Result};
-// use logos::Logos;
 pub use logos::Logos;
 use std::{fmt::Debug, str::FromStr};
 
@@ -42,7 +41,7 @@ pub fn lexer(input: &str) -> Result<Vec<Token>> {
     Ok(tokens)
 }
 
-#[derive(Logos, Debug, PartialEq, Clone)]
+#[derive(Logos, PartialEq, Clone)]
 #[logos(skip r"[ ]+")]
 pub enum Token {
     #[token("+")]
@@ -80,52 +79,26 @@ pub enum Token {
     #[token("fn")]
     Function,
 
-    #[token(",")]
-    Comma,
-    // #[token("/")]
-    // Reduction,
+    #[token("return")]
+    Return,
+}
 
-    // #[token("^")]
-    // Power,
-
-    // #[token("%")]
-    // Reciprocation,
-
-    // #[token("/.")]
-    // Fold,
-
-    // #[token("#")]
-    // Shape,
-
-    // #[token("T")]
-    // Transpose,
-
-    // #[token("&")]
-    // PartialApplication,
-
-    // #[token("@")]
-    // Composition,
-
-    // #[token(".@")]
-    // Distribute,
-
-    // #[token("~")]
-    // Interchange,
-
-    // #[token("$")]
-    // Axes,
-
-    // #[token("_")]
-    // Flatten,
-
-    // #[token(">#")]
-    // Reshape,
-
-    // #[token("let")]
-    // Let,
-    // #[token("[")]
-    // LBracket,
-
-    // #[token("]")]
-    // RBracket,
+impl Debug for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Plus => write!(f, "+"),
+            Self::Multiplication => write!(f, "*"),
+            Self::Minus => write!(f, "-"),
+            Self::Number(n) => write!(f, "{:?}", n),
+            Self::LParen => write!(f, "("),
+            Self::RParen => write!(f, ")"),
+            Self::Symbol(s) => write!(f, "{}", s.name),
+            Self::Variable => write!(f, "var"),
+            Self::Arrow => write!(f, "->"),
+            Self::Assign => write!(f, "="),
+            Self::Identity => write!(f, "I"),
+            Self::Function => write!(f, "fn"),
+            Self::Return => write!(f, "return"),
+        }
+    }
 }

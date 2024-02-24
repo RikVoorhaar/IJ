@@ -90,9 +90,14 @@ impl ASTContext {
 
     fn add_context_to_syntax_error(&self, error: SyntaxError, tokens: &[Token]) -> Error {
         let (start, end) = self.get_position(tokens);
+        let token_str = tokens
+            .iter()
+            .map(|t| format!("{:?}", t))
+            .collect::<Vec<String>>()
+            .join(" ");
         anyhow!(error).context(format!(
-            "Error at line {}:{}-{} \n {:?}",
-            self.line_no, start, end, tokens
+            "Error at line {}:{}-{} \n {}",
+            self.line_no, start, end, token_str
         ))
     }
 }
@@ -295,7 +300,7 @@ pub fn parse_assign(
                 expression,
             ],
         ))
-    } else {
+    } else { // is_function
         let symbol_node = Node::new_with_input_arity(
             Operation::Symbol(variable_name.clone()),
             expression.output_arity,
