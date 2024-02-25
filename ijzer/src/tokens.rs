@@ -73,7 +73,7 @@ pub enum Token {
     #[token("=")]
     Assign,
 
-    #[token("I")]
+    #[token("I", priority = 3)]
     Identity,
 
     #[token("fn")]

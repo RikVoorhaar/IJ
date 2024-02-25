@@ -15,8 +15,8 @@ pub enum SyntaxError {
     #[error("Unresolved group {0}")]
     UnresolvedGroup(String),
 
-    #[error("Unhandled tokens {0:?}")]
-    UnhandledTokens(Vec<Token>),
+    #[error("Unhandled tokens {0}")]
+    UnhandledTokens(String),
 
     #[error("Unexpected token {0:?}")]
     UnexpectedToken(Token),
