@@ -9,8 +9,8 @@ pub enum SyntaxError {
     #[error("Next node called on an empty Token stream")]
     EmptyStream,
 
-    #[error("Unmatched parenthesis")]
-    UnmatchedParenthesis,
+    #[error("Unmatched parenthesis: '{0}'")]
+    UnmatchedParenthesis(String),
 
     #[error("Unresolved group {0}")]
     UnresolvedGroup(String),

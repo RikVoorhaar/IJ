@@ -7,7 +7,7 @@ var x 1 -> 2
 y = (+ (x (1)))
 fn z = * y I
 * (z 1 2)
-x y z= (1 2)
+x y = (1 2)
 "#;
 
 fn main() -> Result<()> {
@@ -18,8 +18,8 @@ fn main() -> Result<()> {
         if tokens.is_empty() {
             continue;
         }
-        let root = parse_line(tokens, &mut symbol_table)?;
         println!("\ninput: {:?}", line);
+        let root = parse_line(tokens, &mut symbol_table)?;
         println!("{:?}", root);
     }
 

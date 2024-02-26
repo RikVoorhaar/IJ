@@ -47,6 +47,15 @@ impl TokenSlice {
         out.check_valid()?;
         Ok(out)
     }
+
+    fn move_end(&self, new_length: usize) -> Result<Self> {
+        if self.start + new_length > self.max {
+            return Err(anyhow!("Invalid slice"));
+        }
+        let out = TokenSlice::new(self.start, self.start + new_length, self.max);
+        out.check_valid()?;
+        Ok(out)
+    }
 }
 
 impl Node {
@@ -165,7 +174,7 @@ impl ASTContext {
     }
 }
 
-pub trait TokenImpl {
+trait TokenImpl {
     fn _next_node(
         op: Token,
         tokens: TokenSlice,
@@ -414,10 +423,10 @@ pub fn parse_assign(
 //     next_node(context.get_tokens(), context)
 // }
 
-pub fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Node, TokenSlice)> {
+fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Node, TokenSlice)> {
     let op = context.get_token_at_index(slice.start)?;
     let rest = slice.move_start(1)?;
-    let out = match op {
+    match op {
         Token::Plus => _next_node_normal_op(Operation::Add, 2, 2, 1, rest, context),
         Token::Multiplication => _next_node_normal_op(Operation::Multiply, 2, 2, 1, rest, context),
         Token::Number(_) => Number::_next_node(op.clone(), rest, context),
@@ -426,9 +435,7 @@ pub fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Node, T
         Token::Symbol(op) => _next_node_symbol(op.clone(), rest, context),
         Token::Identity => IdentityOp::_next_node(op.clone(), rest, context),
         _ => Err(anyhow!("Unexpected token {:?}", op)),
-    };
-
-    out
+    }
 }
 
 fn gather_operands(
@@ -466,7 +473,7 @@ fn gather_operands(
     Ok((operands, rest))
 }
 
-fn _next_node_normal_op<'a>(
+fn _next_node_normal_op(
     op: Operation,
     min_arity: usize,
     max_arity: usize,
@@ -482,7 +489,11 @@ fn _next_node_normal_op<'a>(
     ))
 }
 
-fn _find_matching_parenthesis(tokens: &[Token]) -> Result<usize, SyntaxError> {
+fn _find_matching_parenthesis(
+    context: &mut ASTContext,
+    slice: TokenSlice,
+) -> Result<usize, SyntaxError> {
+    let tokens = &context.get_tokens()[slice.start..slice.end];
     let mut depth = 1;
     for (i, token) in tokens.iter().enumerate() {
         match token {
@@ -496,7 +507,9 @@ fn _find_matching_parenthesis(tokens: &[Token]) -> Result<usize, SyntaxError> {
             _ => (),
         }
     }
-    Err(SyntaxError::UnmatchedParenthesis)
+    Err(SyntaxError::UnmatchedParenthesis(
+        context.tokens_to_string(slice),
+    ))
 }
 
 #[derive(Debug, PartialEq)]
@@ -507,11 +520,11 @@ impl TokenImpl for LParen {
         slice: TokenSlice,
         context: &mut ASTContext,
     ) -> Result<(Node, TokenSlice)> {
-        let tokens = &context.get_tokens()[slice.start..slice.end];
-        let rparen_index = _find_matching_parenthesis(tokens)
+        let rparen_index = _find_matching_parenthesis(context, slice)
             .map_err(|e| context.add_context_to_syntax_error(e, slice))?;
-        // let remainder = &tokens[rparen_index + 1..];
         let remainder = slice.move_start(rparen_index + 1)?;
+        // let slice = TokenSlice::new(slice.start, rparen_index, slice.max);
+        let slice = slice.move_end(rparen_index)?;
 
         let (operands, rest) = gather_operands(1, usize::MAX, slice, context)
             .with_context(|| anyhow!("Error created by bracket parsing"))?;
@@ -545,14 +558,14 @@ fn _next_node_symbol(
         .get(&op.name)
         .ok_or(SyntaxError::UnknownSymbol(op.name.clone()))?;
 
-    return _next_node_normal_op(
+    _next_node_normal_op(
         Operation::Symbol(op.name),
         symbol.input_arity,
         symbol.input_arity,
         symbol.output_arity,
         slice,
         context,
-    );
+    )
 }
 
 #[derive(Debug, PartialEq)]
