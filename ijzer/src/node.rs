@@ -8,12 +8,12 @@ use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct Node {
-    op: Operation,
-    output_arity: usize,
-    operands: Vec<Node>,
-    functional_operands: Vec<Node>,
-    input_arity: usize,
-    id: usize,
+    pub op: Operation,
+    pub output_arity: usize,
+    pub operands: Vec<Node>,
+    pub functional_operands: Vec<Node>,
+    pub input_arity: usize,
+    pub id: usize,
 }
 
 #[derive(Copy, Clone)]
@@ -143,13 +143,6 @@ impl ASTContext {
             .collect::<Vec<String>>()
             .join(" ")
     }
-
-    // fn get_token_slice(&self, slice: TokenSlice) -> &[Token] {
-    //     Rc::clone(&self.tokens)
-    //         .as_ref()
-    //         .get(slice.start..slice.end)
-    //         .unwrap()
-    // }
 
     fn get_token_at_index(&self, index: usize) -> Result<&Token> {
         self.tokens
