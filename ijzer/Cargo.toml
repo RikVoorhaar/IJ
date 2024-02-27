@@ -10,6 +10,9 @@ name = "example"
 [[example]]
 name = "arrays_example"
 
+[[example]]
+name = "compiler_example"
+
 [dependencies]
 anyhow = "1.0.79"
 logos = "0.14.0"
@@ -17,4 +20,5 @@ ndarray = "0.15.6"
 num-traits = "0.2.18"
 proc-macro2 = "1.0.78"
 quote = "1.0.35"
+syn = "2.0.51"
 thiserror = "1.0.56"
