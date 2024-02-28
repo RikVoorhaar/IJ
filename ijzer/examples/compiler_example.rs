@@ -1,9 +1,14 @@
+use std::process::{Command, Stdio};
+
+
 use anyhow::Result;
 use ijzer::{
     compiler::CompilerContext,
     node::{parse_line, ASTContext, Node},
     tokens::lexer,
+    pretty_print::pretty_print
 };
+use proc_macro2::TokenStream;
 
 fn main() -> Result<()> {
     let input: &str = "
@@ -36,9 +41,11 @@ fn main() -> Result<()> {
         let stream = compiler.compile_node(node_id)?;
         println!("{:?}", stream.to_string());
 
-        compiler.submit_as_parsed(node_id)
-
+        compiler.submit_as_parsed(node_id, stream)
     }
+
+    let _2 = (1, 2);
+    let (x, y) = _2;
 
     Ok(())
 }
