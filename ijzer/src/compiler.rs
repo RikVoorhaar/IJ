@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 use syn::Ident;
 
 use proc_macro2::{Span, TokenStream};
@@ -8,10 +8,11 @@ use quote::quote;
 use crate::{node::Node, operations::Operation};
 
 pub struct CompilerContext {
-    pub node_map: HashMap<usize, Node>,
+    pub node_map: HashMap<usize, Rc<Node>>,
     parseable: Vec<usize>,
     parsed: HashMap<usize, TokenStream>,
     pub parent: HashMap<usize, usize>,
+    inputs: Vec<usize>,
 }
 
 impl CompilerContext {
@@ -19,16 +20,16 @@ impl CompilerContext {
         let mut node_map = HashMap::new();
         let mut leaves = vec![];
         let mut parent = HashMap::new();
-        let mut stack = vec![root];
+        let mut stack = vec![Rc::new(root)];
 
-        while let Some(node) = stack.pop() {
-            node_map.insert(node.id, node.clone());
-            if node.operands.is_empty() {
-                leaves.push(node.id);
+        while let Some(node_rc) = stack.pop() {
+            node_map.insert(node_rc.id, node_rc.clone());
+            if node_rc.operands.is_empty() {
+                leaves.push(node_rc.id);
             }
-            for child in node.operands {
-                parent.insert(child.id, node.id);
-                stack.push(child);
+            for child in &node_rc.operands {
+                parent.insert(child.id, node_rc.id);
+                stack.push(Rc::new(child.clone()));
             }
         }
         let parsed = HashMap::new();
@@ -38,6 +39,7 @@ impl CompilerContext {
             parseable: leaves,
             parsed,
             parent,
+            inputs: vec![],
         }
     }
 
@@ -63,21 +65,27 @@ impl CompilerContext {
         self.parseable.pop()
     }
 
+
     pub fn compile_node(&mut self, node_id: usize) -> Result<TokenStream> {
-        let node = self.node_map.get(&node_id).unwrap();
+        let node = self.node_map.get(&node_id).unwrap().clone();
+
         let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
         let child_streams: HashMap<usize, TokenStream> = children
             .iter()
             .map(|id| (*id, self.parsed.remove(id).unwrap()))
             .collect();
+        let node_op = &node.op;
 
-        let stream = match node.op {
+        let stream = match node_op {
             Operation::Number(_) => Number::compile(node, self, child_streams)?,
             Operation::Symbol(_) => Symbol::compile(node, self, child_streams)?,
             Operation::Group => Group::compile(node, self, child_streams)?,
             Operation::Assign => Assign::compile(node, self, child_streams)?,
+            Operation::Function => Function::compile(node, self, child_streams)?,
             Operation::Add => Add::compile(node, self, child_streams)?,
             Operation::Multiply => Multiply::compile(node, self, child_streams)?,
+            Operation::Identity => Identity::compile(node, self, child_streams)?,
+            
 
             _ => NotImplemented::compile(node, self, child_streams)?,
         };
@@ -92,8 +100,8 @@ impl CompilerContext {
 
 pub trait CompileNode {
     fn compile(
-        node: &Node,
-        compiler: &CompilerContext,
+        node: Rc<Node>,
+        compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream>;
 }
@@ -101,8 +109,8 @@ pub trait CompileNode {
 struct Number;
 impl CompileNode for Number {
     fn compile(
-        node: &Node,
-        _compiler: &CompilerContext,
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
         _: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::Number(number) = &node.op {
@@ -121,8 +129,8 @@ impl CompileNode for Number {
 struct Symbol;
 impl CompileNode for Symbol {
     fn compile(
-        node: &Node,
-        _: &CompilerContext,
+        node: Rc<Node>,
+        _: &mut CompilerContext,
         _: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::Symbol(symbol) = &node.op {
@@ -134,11 +142,36 @@ impl CompileNode for Symbol {
     }
 }
 
+struct Identity;
+impl CompileNode for Identity {
+    fn compile(
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
+        _child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        if let Operation::Identity = &node.op {
+            let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
+            if !children.len() == 0 {
+                panic!("Expected 0 child, found {:?}", children.len());
+            }
+            _compiler.inputs.push(node.id);
+            let varname = _compiler.get_varname(node.id);
+
+            let res = quote! {
+                #varname
+            };
+            Ok(res)
+        } else {
+            panic!("Expected identity node, found {:?}", node);
+        }
+    }
+}
+
 struct Assign;
 impl CompileNode for Assign {
     fn compile(
-        node: &Node,
-        _compiler: &CompilerContext,
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::Assign = &node.op {
@@ -156,11 +189,40 @@ impl CompileNode for Assign {
     }
 }
 
+struct Function;
+impl CompileNode for Function {
+    fn compile(
+        node: Rc<Node>,
+        compiler: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        match &node.op {
+            Operation::Function => {}
+            _ => unreachable!("Expected function node, found {:?}", node),
+        }
+
+        let left_member = &node.operands[0];
+        let left_stream = child_streams[&left_member.id].clone();
+        let right_member = &node.operands[1];
+        let right_stream = child_streams[&right_member.id].clone();
+
+        let input_varnames = compiler
+            .inputs
+            .iter()
+            .map(|id| compiler.get_varname(*id))
+            .collect::<Vec<_>>();
+
+        Ok(quote!(
+            let #left_stream = {|#(#input_varnames),*| #right_stream};
+        ))
+    }
+}
+
 struct Add;
 impl CompileNode for Add {
     fn compile(
-        node: &Node,
-        _compiler: &CompilerContext,
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::Add = &node.op {
@@ -184,8 +246,8 @@ impl CompileNode for Add {
 struct Multiply;
 impl CompileNode for Multiply {
     fn compile(
-        node: &Node,
-        _compiler: &CompilerContext,
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::Multiply = &node.op {
@@ -210,8 +272,8 @@ impl CompileNode for Multiply {
 struct Group;
 impl CompileNode for Group {
     fn compile(
-        node: &Node,
-        _compiler: &CompilerContext,
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::Group = &node.op {
@@ -235,8 +297,8 @@ impl CompileNode for Group {
 struct NotImplemented;
 impl CompileNode for NotImplemented {
     fn compile(
-        node: &Node,
-        _compiler: &CompilerContext,
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
         _: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         let error_msg = format!("Compilation for operation '{:?}' not implemented", node.op);

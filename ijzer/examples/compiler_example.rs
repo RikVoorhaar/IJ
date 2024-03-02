@@ -1,15 +1,17 @@
 use anyhow::Result;
 use ijzer::{
+    arrays::{self, ArrayFunc},
     compiler::CompilerContext,
     node::{parse_line, ASTContext, Node},
     tokens::lexer,
 };
+use ndarray::array;
+
 use proc_macro2::TokenStream;
 
 fn main() -> Result<()> {
     let input: &str = "
     x = 1
-    
     y = (+ (x 1))
     fn z = * y I
     * (z 1 2)
@@ -41,6 +43,8 @@ fn main() -> Result<()> {
         }
         println!("{:?}", stream.to_string());
     }
-
+    let y = array![2];
+    let z = { |_0| arrays::Multiply::call(&[&y, &_0]) };
+    println!("{:?}", z(array![1]));
     Ok(())
 }
