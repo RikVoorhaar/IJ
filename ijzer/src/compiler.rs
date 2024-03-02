@@ -1,6 +1,6 @@
 use anyhow::Result;
-use std::collections::{HashMap, HashSet};
-use syn::{token::Token, Ident};
+use std::collections::HashMap;
+use syn::Ident;
 
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
@@ -76,6 +76,8 @@ impl CompilerContext {
             Operation::Symbol(_) => Symbol::compile(node, self, child_streams)?,
             Operation::Group => Group::compile(node, self, child_streams)?,
             Operation::Assign => Assign::compile(node, self, child_streams)?,
+            Operation::Add => Add::compile(node, self, child_streams)?,
+            Operation::Multiply => Multiply::compile(node, self, child_streams)?,
 
             _ => NotImplemented::compile(node, self, child_streams)?,
         };
@@ -100,15 +102,14 @@ struct Number;
 impl CompileNode for Number {
     fn compile(
         node: &Node,
-        compiler: &CompilerContext,
+        _compiler: &CompilerContext,
         _: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::Number(number) = &node.op {
-            let varname = compiler.get_varname(node.id);
             let val = number.value;
 
             let res = quote! {
-                let #varname = #val;
+                array![#val]
             };
             Ok(res)
         } else {
@@ -137,7 +138,7 @@ struct Assign;
 impl CompileNode for Assign {
     fn compile(
         node: &Node,
-        compiler: &CompilerContext,
+        _compiler: &CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::Assign = &node.op {
@@ -148,12 +149,61 @@ impl CompileNode for Assign {
         let left_stream = child_streams[&left_member.id].clone();
         let right_member = &node.operands[1];
         let right_stream = child_streams[&right_member.id].clone();
-        let right_varname = compiler.get_varname(right_member.id);
 
         Ok(quote!(
-            #right_stream
-            let #left_stream = #right_varname;
+            let #left_stream = #right_stream;
         ))
+    }
+}
+
+struct Add;
+impl CompileNode for Add {
+    fn compile(
+        node: &Node,
+        _compiler: &CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        if let Operation::Add = &node.op {
+            let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
+            if !children.len() == 2 {
+                panic!("Expected 2 children, found {:?}", children.len());
+            }
+
+            let childstream1 = child_streams.get(&children[0]).unwrap();
+            let childstream2 = child_streams.get(&children[1]).unwrap();
+
+            let res = quote! {
+                arrays::Add::call(&[&#childstream1, &#childstream2])
+            };
+            Ok(res)
+        } else {
+            panic!("Expected add node, found {:?}", node);
+        }
+    }
+}
+struct Multiply;
+impl CompileNode for Multiply {
+    fn compile(
+        node: &Node,
+        _compiler: &CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        if let Operation::Multiply = &node.op {
+            let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
+            if !children.len() == 2 {
+                panic!("Expected 2 children, found {:?}", children.len());
+            }
+
+            let childstream1 = child_streams.get(&children[0]).unwrap();
+            let childstream2 = child_streams.get(&children[1]).unwrap();
+
+            let res = quote! {
+                arrays::Multiply::call(&[&#childstream1, &#childstream2])
+            };
+            Ok(res)
+        } else {
+            panic!("Expected multiply node, found {:?}", node);
+        }
     }
 }
 
@@ -161,7 +211,7 @@ struct Group;
 impl CompileNode for Group {
     fn compile(
         node: &Node,
-        compiler: &CompilerContext,
+        _compiler: &CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::Group = &node.op {
@@ -185,12 +235,13 @@ impl CompileNode for Group {
 struct NotImplemented;
 impl CompileNode for NotImplemented {
     fn compile(
-        _node: &Node,
+        node: &Node,
         _compiler: &CompilerContext,
         _: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
+        let error_msg = format!("Compilation for operation '{:?}' not implemented", node.op);
         Ok(quote! {
-        panic!("Operation not implemented");
+            panic!(#error_msg);
         })
     }
 }

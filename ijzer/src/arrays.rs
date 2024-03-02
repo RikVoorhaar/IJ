@@ -2,6 +2,7 @@ use anyhow::Result;
 use ndarray::{Array, Dimension};
 use num_traits::Num;
 
+
 pub trait ArrayFunc<T, D>
 where
     T: Clone + Num,

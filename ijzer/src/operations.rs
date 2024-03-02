@@ -12,6 +12,7 @@ pub enum Operation {
     Number(Number),
     Symbol(String),
     Assign,
+    Function,
     Identity,
     Return,
 }
@@ -27,6 +28,7 @@ impl Debug for Operation {
             Self::Number(n) => write!(f, "Number({:?})", n),
             Self::Symbol(s) => write!(f, "Symbol({:?})", s),
             Self::Assign => write!(f, "Assign"),
+            Self::Function => write!(f, "Function"),
             Self::Identity => write!(f, "Identity"),
             Self::Return => write!(f, "Return"),
         }

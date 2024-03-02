@@ -404,7 +404,7 @@ pub fn parse_assign(
         );
 
         Ok(Node::new(
-            Operation::Assign,
+            Operation::Function,
             0,
             vec![symbol_node, expression],
             context.get_increment_id(),
