@@ -273,8 +273,8 @@ pub fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
     );
 
     Ok(Rc::new(Node::new(
-        Operation::Symbol(name),
-        output_arity,
+        Operation::Nothing,
+        0,
         Vec::new(),
         context.get_increment_id(),
     )))
@@ -577,11 +577,21 @@ impl TokenImpl for MinusOp {
         let (operands, rest) = gather_operands(1, 2, slice, context)?;
         match operands.iter().map(|node| node.output_arity).sum() {
             1 => Ok((
-                Rc::new(Node::new(Operation::Negate, 1, operands, context.get_increment_id())),
+                Rc::new(Node::new(
+                    Operation::Negate,
+                    1,
+                    operands,
+                    context.get_increment_id(),
+                )),
                 rest,
             )),
             2 => Ok((
-                Rc::new(Node::new(Operation::Subtract, 1, operands, context.get_increment_id())),
+                Rc::new(Node::new(
+                    Operation::Subtract,
+                    1,
+                    operands,
+                    context.get_increment_id(),
+                )),
                 rest,
             )),
             _ => unreachable!(),

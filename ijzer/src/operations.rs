@@ -14,7 +14,7 @@ pub enum Operation {
     Assign,
     Function,
     Identity,
-    Return,
+    Nothing,
 }
 
 impl Debug for Operation {
@@ -30,7 +30,7 @@ impl Debug for Operation {
             Self::Assign => write!(f, "Assign"),
             Self::Function => write!(f, "Function"),
             Self::Identity => write!(f, "Identity"),
-            Self::Return => write!(f, "Return"),
+            Self::Nothing => write!(f, "Nothing"),
         }
     }
 }

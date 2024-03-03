@@ -65,7 +65,6 @@ impl CompilerContext {
         self.parseable.pop()
     }
 
-
     pub fn compile_node(&mut self, node_id: usize) -> Result<TokenStream> {
         let node = self.node_map.get(&node_id).unwrap().clone();
 
@@ -85,9 +84,11 @@ impl CompilerContext {
             Operation::Add => Add::compile(node, self, child_streams)?,
             Operation::Multiply => Multiply::compile(node, self, child_streams)?,
             Operation::Identity => Identity::compile(node, self, child_streams)?,
+            Operation::Nothing => Nothing::compile(node, self, child_streams)?,
+            Operation::Subtract => Subtract::compile(node, self, child_streams)?,
+            Operation::Negate => Negate::compile(node, self, child_streams)?,
             
-
-            _ => NotImplemented::compile(node, self, child_streams)?,
+            // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
         Ok(stream)
@@ -243,6 +244,55 @@ impl CompileNode for Add {
         }
     }
 }
+struct Subtract;
+impl CompileNode for Subtract {
+    fn compile(
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        if let Operation::Subtract = &node.op {
+            let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
+            if !children.len() == 2 {
+                panic!("Expected 2 children, found {:?}", children.len());
+            }
+
+            let childstream1 = child_streams.get(&children[0]).unwrap();
+            let childstream2 = child_streams.get(&children[1]).unwrap();
+
+            let res = quote! {
+                arrays::Subtract::call(&[&#childstream1, &#childstream2])
+            };
+            Ok(res)
+        } else {
+            panic!("Expected subtract node, found {:?}", node);
+        }
+    }
+}
+struct Negate;
+impl CompileNode for Negate {
+    fn compile(
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        if let Operation::Negate = &node.op {
+            let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
+            if !children.len() == 1 {
+                panic!("Expected 1 child, found {:?}", children.len());
+            }
+
+            let childstream = child_streams.get(&children[0]).unwrap();
+
+            let res = quote! {
+                arrays::Negate::call(&[&#childstream])
+            };
+            Ok(res)
+        } else {
+            panic!("Expected negate node, found {:?}", node);
+        }
+    }
+}
 struct Multiply;
 impl CompileNode for Multiply {
     fn compile(
@@ -290,6 +340,22 @@ impl CompileNode for Group {
             Ok(res)
         } else {
             panic!("Expected group node, found {:?}", node);
+        }
+    }
+}
+
+struct Nothing;
+impl CompileNode for Nothing {
+    fn compile(
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
+        _: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        if let Operation::Nothing = &node.op {
+            let res = quote! {};
+            Ok(res)
+        } else {
+            panic!("Expected nothing node, found {:?}", node);
         }
     }
 }

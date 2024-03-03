@@ -13,11 +13,12 @@ use proc_macro2::TokenStream;
 
 fn main() -> Result<()> {
     let input: &str = "
-    x = 1
+    var x -> 1
     y = (+ (x 1))
+    z = - x y
     fn z = * y I
-    * (z 1 2)
     x y = (1 2)
+    * (z 1 -2)
     ";
     let mut symbol_table = ASTContext::new();
     let mut parsed_lines: Vec<Rc<Node>> = Vec::new();
@@ -45,8 +46,5 @@ fn main() -> Result<()> {
         }
         println!("{:?}", stream.to_string());
     }
-    let y = array![2];
-    let z = { |_0| arrays::Multiply::call(&[&y, &_0]) };
-    println!("{:?}", z(array![1]));
     Ok(())
 }
