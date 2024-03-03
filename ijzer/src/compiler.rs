@@ -16,11 +16,11 @@ pub struct CompilerContext {
 }
 
 impl CompilerContext {
-    pub fn new(root: Node) -> Self {
+    pub fn new(root: Rc<Node>) -> Self {
         let mut node_map = HashMap::new();
         let mut leaves = vec![];
         let mut parent = HashMap::new();
-        let mut stack = vec![Rc::new(root)];
+        let mut stack = vec![root];
 
         while let Some(node_rc) = stack.pop() {
             node_map.insert(node_rc.id, node_rc.clone());
@@ -29,7 +29,7 @@ impl CompilerContext {
             }
             for child in &node_rc.operands {
                 parent.insert(child.id, node_rc.id);
-                stack.push(Rc::new(child.clone()));
+                stack.push(child.clone());
             }
         }
         let parsed = HashMap::new();

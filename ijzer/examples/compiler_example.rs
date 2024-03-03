@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use anyhow::Result;
 use ijzer::{
     arrays::{self, ArrayFunc},
@@ -18,7 +20,7 @@ fn main() -> Result<()> {
     x y = (1 2)
     ";
     let mut symbol_table = ASTContext::new();
-    let mut parsed_lines: Vec<Node> = Vec::new();
+    let mut parsed_lines: Vec<Rc<Node>> = Vec::new();
 
     for line in input.lines() {
         let tokens = lexer(line)?;

@@ -10,8 +10,8 @@ use std::rc::Rc;
 pub struct Node {
     pub op: Operation,
     pub output_arity: usize,
-    pub operands: Vec<Node>,
-    pub functional_operands: Vec<Node>,
+    pub operands: Vec<Rc<Node>>,
+    pub functional_operands: Vec<Rc<Node>>,
     pub input_arity: usize,
     pub id: usize,
 }
@@ -59,7 +59,7 @@ impl TokenSlice {
 }
 
 impl Node {
-    pub fn new(op: Operation, output_arity: usize, operands: Vec<Node>, id: usize) -> Self {
+    pub fn new(op: Operation, output_arity: usize, operands: Vec<Rc<Node>>, id: usize) -> Self {
         Node {
             op,
             output_arity,
@@ -73,7 +73,7 @@ impl Node {
     pub fn new_with_input_arity(
         op: Operation,
         output_arity: usize,
-        operands: Vec<Node>,
+        operands: Vec<Rc<Node>>,
         id: usize,
         input_arity: usize,
     ) -> Result<Self, SyntaxError> {
@@ -102,7 +102,7 @@ pub struct Variable {
 
 #[derive(Debug, Default)]
 pub struct ASTContext {
-    symbols: HashMap<String, (Variable, Option<Node>)>,
+    symbols: HashMap<String, (Variable, Option<Rc<Node>>)>,
     tokens: Rc<Vec<Token>>,
     pub line_no: usize,
     id_counter: usize,
@@ -118,7 +118,7 @@ impl ASTContext {
         }
     }
 
-    pub fn insert_variable(&mut self, var: Variable, expression: Option<Node>) {
+    pub fn insert_variable(&mut self, var: Variable, expression: Option<Rc<Node>>) {
         self.symbols.insert(var.name.clone(), (var, expression));
     }
 
@@ -172,16 +172,16 @@ trait TokenImpl {
         op: Token,
         tokens: TokenSlice,
         context: &mut ASTContext,
-    ) -> Result<(Node, TokenSlice)>;
+    ) -> Result<(Rc<Node>, TokenSlice)>;
 }
 
-pub fn parse_line(tokens: Vec<Token>, context: &mut ASTContext) -> Result<Node> {
+pub fn parse_line(tokens: Vec<Token>, context: &mut ASTContext) -> Result<Rc<Node>> {
     context.set_tokens(tokens);
     context.line_no += 1;
     parse_ast(context)
 }
 
-fn parse_ast(context: &mut ASTContext) -> Result<Node> {
+fn parse_ast(context: &mut ASTContext) -> Result<Rc<Node>> {
     let (op, _) = &context
         .tokens
         .split_first()
@@ -203,7 +203,7 @@ fn parse_ast(context: &mut ASTContext) -> Result<Node> {
     }
 }
 
-pub fn parse_fn_statement(context: &mut ASTContext) -> Result<Node> {
+pub fn parse_fn_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
     let mut token_iter = context.tokens.iter().skip(1);
     let name = match token_iter.next().as_ref() {
         Some(Token::Symbol(symbol)) => symbol.name.clone(),
@@ -218,7 +218,7 @@ pub fn parse_fn_statement(context: &mut ASTContext) -> Result<Node> {
     parse_assign(name, context, true)
 }
 
-pub fn parse_var_statement(context: &mut ASTContext) -> Result<Node> {
+pub fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
     let mut token_iter = context.tokens.iter().skip(1);
     let name = match token_iter.next().as_ref() {
         Some(Token::Symbol(symbol)) => symbol.name.clone(),
@@ -272,15 +272,15 @@ pub fn parse_var_statement(context: &mut ASTContext) -> Result<Node> {
         None,
     );
 
-    Ok(Node::new(
+    Ok(Rc::new(Node::new(
         Operation::Symbol(name),
         output_arity,
         Vec::new(),
         context.get_increment_id(),
-    ))
+    )))
 }
 
-fn _get_variable_expression(context: &mut ASTContext) -> Result<Node> {
+fn _get_variable_expression(context: &mut ASTContext) -> Result<Rc<Node>> {
     let tokens = context.get_tokens();
     let mut split = tokens.split(|t| t == &Token::Assign);
     let assign_index: usize = split
@@ -301,7 +301,7 @@ fn _get_variable_expression(context: &mut ASTContext) -> Result<Node> {
     Ok(expression)
 }
 
-fn _compute_input_arity(node: &Node) -> usize {
+fn _compute_input_arity(node: &Rc<Node>) -> usize {
     let this_node: usize =
         node.input_arity - node.operands.iter().map(|n| n.output_arity).sum::<usize>();
     let children: usize = node
@@ -316,7 +316,7 @@ pub fn parse_assign(
     variable_name: String,
     context: &mut ASTContext,
     is_function: bool,
-) -> Result<Node> {
+) -> Result<Rc<Node>> {
     let expression = _get_variable_expression(context)?;
     let input_arity = _compute_input_arity(&expression);
     if is_function && input_arity == 0 {
@@ -353,12 +353,12 @@ pub fn parse_assign(
         let symbol_nodes: Vec<_> = symbol_names
             .into_iter()
             .map(|s| {
-                Node::new(
+                Rc::new(Node::new(
                     Operation::Symbol(s),
                     1,
                     Vec::new(),
                     context.get_increment_id(),
-                )
+                ))
             })
             .collect();
         for symbol_node in symbol_nodes.iter() {
@@ -371,20 +371,20 @@ pub fn parse_assign(
                 Some(symbol_node.clone()),
             );
         }
-        Ok(Node::new(
+        Ok(Rc::new(Node::new(
             Operation::Assign,
             0,
             vec![
-                Node::new(
+                Rc::new(Node::new(
                     Operation::Group,
                     expression.output_arity,
                     symbol_nodes,
                     context.get_increment_id(),
-                ),
+                )),
                 expression,
             ],
             context.get_increment_id(),
-        ))
+        )))
     } else {
         // is_function
         let symbol_node = Node::new_with_input_arity(
@@ -403,12 +403,12 @@ pub fn parse_assign(
             Some(expression.clone()),
         );
 
-        Ok(Node::new(
+        Ok(Rc::new(Node::new(
             Operation::Function,
             0,
-            vec![symbol_node, expression],
+            vec![Rc::new(symbol_node), expression],
             context.get_increment_id(),
-        ))
+        )))
     }
 }
 
@@ -416,7 +416,7 @@ pub fn parse_assign(
 //     next_node(context.get_tokens(), context)
 // }
 
-fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Node, TokenSlice)> {
+fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node>, TokenSlice)> {
     let op = context.get_token_at_index(slice.start)?;
     let rest = slice.move_start(1)?;
     match op {
@@ -436,7 +436,7 @@ fn gather_operands(
     max_arity: usize,
     slice: TokenSlice,
     context: &mut ASTContext,
-) -> Result<(Vec<Node>, TokenSlice)> {
+) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
     let mut total_arity = 0;
     let mut overflow = 0;
     let mut operands = Vec::new();
@@ -450,7 +450,7 @@ fn gather_operands(
         total_arity += node.output_arity;
         match node.op {
             Operation::Group => {
-                operands.extend(node.operands);
+                operands.extend(node.operands.clone());
             }
             _ => operands.push(node),
         }
@@ -473,11 +473,16 @@ fn _next_node_normal_op(
     output_arity: usize,
     slice: TokenSlice,
     context: &mut ASTContext,
-) -> Result<(Node, TokenSlice)> {
+) -> Result<(Rc<Node>, TokenSlice)> {
     let (operands, rest) = gather_operands(min_arity, max_arity, slice, context)
         .with_context(|| anyhow!("Error caused by {:?}", op))?;
     Ok((
-        Node::new(op, output_arity, operands, context.get_increment_id()),
+        Rc::new(Node::new(
+            op,
+            output_arity,
+            operands,
+            context.get_increment_id(),
+        )),
         rest,
     ))
 }
@@ -512,7 +517,7 @@ impl TokenImpl for LParen {
         _op: Token,
         slice: TokenSlice,
         context: &mut ASTContext,
-    ) -> Result<(Node, TokenSlice)> {
+    ) -> Result<(Rc<Node>, TokenSlice)> {
         let rparen_index = _find_matching_parenthesis(context, slice)
             .map_err(|e| context.add_context_to_syntax_error(e, slice))?;
         let remainder = slice.move_start(rparen_index + 1)?;
@@ -529,12 +534,12 @@ impl TokenImpl for LParen {
             0 => unreachable!(),
             1 => Ok((operands[0].clone(), remainder)),
             _ => Ok((
-                Node::new(
+                Rc::new(Node::new(
                     Operation::Group,
                     operands.iter().map(|n| n.output_arity).sum(),
                     operands,
                     context.get_increment_id(),
-                ),
+                )),
                 remainder,
             )),
         }
@@ -545,7 +550,7 @@ fn _next_node_symbol(
     op: SymbolToken,
     slice: TokenSlice,
     context: &mut ASTContext,
-) -> Result<(Node, TokenSlice)> {
+) -> Result<(Rc<Node>, TokenSlice)> {
     let (symbol, _) = context
         .symbols
         .get(&op.name)
@@ -568,15 +573,15 @@ impl TokenImpl for MinusOp {
         _: Token,
         slice: TokenSlice,
         context: &mut ASTContext,
-    ) -> Result<(Node, TokenSlice)> {
+    ) -> Result<(Rc<Node>, TokenSlice)> {
         let (operands, rest) = gather_operands(1, 2, slice, context)?;
         match operands.iter().map(|node| node.output_arity).sum() {
             1 => Ok((
-                Node::new(Operation::Negate, 1, operands, context.get_increment_id()),
+                Rc::new(Node::new(Operation::Negate, 1, operands, context.get_increment_id())),
                 rest,
             )),
             2 => Ok((
-                Node::new(Operation::Subtract, 1, operands, context.get_increment_id()),
+                Rc::new(Node::new(Operation::Subtract, 1, operands, context.get_increment_id())),
                 rest,
             )),
             _ => unreachable!(),
@@ -590,7 +595,7 @@ impl TokenImpl for IdentityOp {
         _: Token,
         tokens: TokenSlice,
         context: &mut ASTContext,
-    ) -> Result<(Node, TokenSlice)> {
+    ) -> Result<(Rc<Node>, TokenSlice)> {
         let (mut operands, rest) = gather_operands(0, 1, tokens, context)?;
         if !operands.is_empty() {
             Ok((operands.remove(0), rest))
@@ -603,7 +608,7 @@ impl TokenImpl for IdentityOp {
                 1,
             )
             .map_err(|e| context.add_context_to_syntax_error(e, tokens))?;
-            Ok((node, rest))
+            Ok((Rc::new(node), rest))
         }
     }
 }
@@ -613,14 +618,14 @@ impl TokenImpl for Number {
         op: Token,
         tokens: TokenSlice,
         context: &mut ASTContext,
-    ) -> Result<(Node, TokenSlice)> {
+    ) -> Result<(Rc<Node>, TokenSlice)> {
         let node_op = match op {
             Token::Number(n) => Operation::Number(n),
             _ => unreachable!(),
         };
 
         Ok((
-            Node::new(node_op, 1, vec![], context.get_increment_id()),
+            Rc::new(Node::new(node_op, 1, vec![], context.get_increment_id())),
             tokens,
         ))
     }
