@@ -1,0 +1,14 @@
+[package]
+name = "ijzer_examples"
+version = "0.1.0"
+edition = "2021"
+
+[[example]]
+name = "example"
+path = "examples/example.rs"
+
+[dependencies]
+anyhow = "1.0.80"
+ijzer = { path = "../ijzer" }
+ijzer_macro = { path = "../ijzer_macro" }
+ndarray = "0.15.6"

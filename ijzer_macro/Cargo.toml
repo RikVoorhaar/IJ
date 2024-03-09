@@ -1,0 +1,15 @@
+[package]
+name = "ijzer_macro"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ijzer = { path = "../ijzer" }
+proc-macro2 = "1.0.78"
+quote = "1.0.35"
+regex = "1.10.3"
+syn = {version="2.0.52", features = ["full"]}
+
+[lib]
+proc-macro = true
+

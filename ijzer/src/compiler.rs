@@ -87,7 +87,6 @@ impl CompilerContext {
             Operation::Nothing => Nothing::compile(node, self, child_streams)?,
             Operation::Subtract => Subtract::compile(node, self, child_streams)?,
             Operation::Negate => Negate::compile(node, self, child_streams)?,
-            
             // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
@@ -118,7 +117,7 @@ impl CompileNode for Number {
             let val = number.value;
 
             let res = quote! {
-                array![#val]
+                ndarray::array![#val]
             };
             Ok(res)
         } else {
@@ -152,7 +151,7 @@ impl CompileNode for Identity {
     ) -> Result<TokenStream> {
         if let Operation::Identity = &node.op {
             let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
-            if !children.len() == 0 {
+            if !children.is_empty() {
                 panic!("Expected 0 child, found {:?}", children.len());
             }
             _compiler.inputs.push(node.id);
@@ -228,7 +227,7 @@ impl CompileNode for Add {
     ) -> Result<TokenStream> {
         if let Operation::Add = &node.op {
             let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
-            if !children.len() == 2 {
+            if children.len() != 2 {
                 panic!("Expected 2 children, found {:?}", children.len());
             }
 
@@ -236,7 +235,7 @@ impl CompileNode for Add {
             let childstream2 = child_streams.get(&children[1]).unwrap();
 
             let res = quote! {
-                arrays::Add::call(&[&#childstream1, &#childstream2])
+                ijzer::arrays::Add::call(&[&#childstream1, &#childstream2])
             };
             Ok(res)
         } else {
@@ -253,7 +252,7 @@ impl CompileNode for Subtract {
     ) -> Result<TokenStream> {
         if let Operation::Subtract = &node.op {
             let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
-            if !children.len() == 2 {
+            if children.len() != 2 {
                 panic!("Expected 2 children, found {:?}", children.len());
             }
 
@@ -261,7 +260,7 @@ impl CompileNode for Subtract {
             let childstream2 = child_streams.get(&children[1]).unwrap();
 
             let res = quote! {
-                arrays::Subtract::call(&[&#childstream1, &#childstream2])
+                ijzer::arrays::Subtract::call(&[&#childstream1, &#childstream2])
             };
             Ok(res)
         } else {
@@ -278,14 +277,14 @@ impl CompileNode for Negate {
     ) -> Result<TokenStream> {
         if let Operation::Negate = &node.op {
             let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
-            if !children.len() == 1 {
+            if children.len() != 1 {
                 panic!("Expected 1 child, found {:?}", children.len());
             }
 
             let childstream = child_streams.get(&children[0]).unwrap();
 
             let res = quote! {
-                arrays::Negate::call(&[&#childstream])
+                ijzer::arrays::Negate::call(&[&#childstream])
             };
             Ok(res)
         } else {
@@ -302,7 +301,7 @@ impl CompileNode for Multiply {
     ) -> Result<TokenStream> {
         if let Operation::Multiply = &node.op {
             let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
-            if !children.len() == 2 {
+            if children.len() != 2 {
                 panic!("Expected 2 children, found {:?}", children.len());
             }
 
@@ -310,7 +309,7 @@ impl CompileNode for Multiply {
             let childstream2 = child_streams.get(&children[1]).unwrap();
 
             let res = quote! {
-                arrays::Multiply::call(&[&#childstream1, &#childstream2])
+                ijzer::arrays::Multiply::call(&[&#childstream1, &#childstream2])
             };
             Ok(res)
         } else {

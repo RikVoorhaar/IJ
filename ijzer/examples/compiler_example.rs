@@ -2,12 +2,10 @@ use std::rc::Rc;
 
 use anyhow::Result;
 use ijzer::{
-    arrays::{self, ArrayFunc},
     compiler::CompilerContext,
     node::{parse_line, ASTContext, Node},
     tokens::lexer,
 };
-use ndarray::array;
 
 use proc_macro2::TokenStream;
 
@@ -28,12 +26,9 @@ fn main() -> Result<()> {
         if tokens.is_empty() {
             continue;
         }
-        // println!("\ninput: {:?}", line);
         let root = parse_line(tokens, &mut symbol_table)?;
-        // println!("{:?}", root);
         parsed_lines.push(root);
     }
-    // println!("-----------------------");
 
     for root in parsed_lines.iter() {
         let mut compiler = CompilerContext::new(root.clone());
