@@ -2,18 +2,16 @@ use anyhow::Result;
 use ndarray::{Array, Dimension};
 use num_traits::Num;
 
-
 pub trait ArrayFunc<T, D>
 where
     T: Clone + Num,
     D: Dimension,
 {
     fn get_n_inputs() -> usize;
-    fn get_n_outputs() -> usize;
-    fn call(inputs: &[&Array<T, D>]) -> Vec<Array<T, D>>;
+    fn call(inputs: &[&Array<T, D>]) -> Array<T, D>;
 }
 
-pub fn call_safe<T, D, F>(inputs: &[&Array<T, D>]) -> Result<Vec<Array<T, D>>, anyhow::Error>
+pub fn call_safe<T, D, F>(inputs: &[&Array<T, D>]) -> Result<Array<T, D>, anyhow::Error>
 where
     T: Clone + Num,
     D: Dimension,
@@ -23,9 +21,6 @@ where
         return Err(anyhow::anyhow!("Wrong number of inputs"));
     }
     let res = F::call(inputs);
-    if res.len() != F::get_n_outputs() {
-        return Err(anyhow::anyhow!("Wrong number of outputs"));
-    }
     Ok(res)
 }
 
@@ -36,11 +31,8 @@ impl<T: Clone + Num, D: Dimension> ArrayFunc<T, D> for Identity<T, D> {
     fn get_n_inputs() -> usize {
         1
     }
-    fn get_n_outputs() -> usize {
-        1
-    }
-    fn call(inputs: &[&Array<T, D>]) -> Vec<Array<T, D>> {
-        vec![inputs[0].clone()]
+    fn call(inputs: &[&Array<T, D>]) -> Array<T, D> {
+        inputs[0].clone()
     }
 }
 
@@ -51,11 +43,8 @@ impl<T: Clone + Num, D: Dimension> ArrayFunc<T, D> for Add<T, D> {
     fn get_n_inputs() -> usize {
         2
     }
-    fn get_n_outputs() -> usize {
-        1
-    }
-    fn call(inputs: &[&Array<T, D>]) -> Vec<Array<T, D>> {
-        vec![inputs[0] + inputs[1]]
+    fn call(inputs: &[&Array<T, D>]) -> Array<T, D> {
+        inputs[0] + inputs[1]
     }
 }
 
@@ -66,11 +55,8 @@ impl<T: Clone + Num, D: Dimension> ArrayFunc<T, D> for Multiply<T, D> {
     fn get_n_inputs() -> usize {
         2
     }
-    fn get_n_outputs() -> usize {
-        1
-    }
-    fn call(inputs: &[&Array<T, D>]) -> Vec<Array<T, D>> {
-        vec![inputs[0] * inputs[1]]
+    fn call(inputs: &[&Array<T, D>]) -> Array<T, D> {
+        inputs[0] * inputs[1]
     }
 }
 
@@ -81,11 +67,8 @@ impl<T: Clone + Num, D: Dimension> ArrayFunc<T, D> for Negate<T, D> {
     fn get_n_inputs() -> usize {
         1
     }
-    fn get_n_outputs() -> usize {
-        1
-    }
-    fn call(inputs: &[&Array<T, D>]) -> Vec<Array<T, D>> {
-        vec![inputs[0].mapv(|x| T::zero() - x)]
+    fn call(inputs: &[&Array<T, D>]) -> Array<T, D> {
+        inputs[0].mapv(|x| T::zero() - x)
     }
 }
 
@@ -96,10 +79,7 @@ impl<T: Clone + Num, D: Dimension> ArrayFunc<T, D> for Subtract<T, D> {
     fn get_n_inputs() -> usize {
         2
     }
-    fn get_n_outputs() -> usize {
-        1
-    }
-    fn call(inputs: &[&Array<T, D>]) -> Vec<Array<T, D>> {
-        vec![inputs[0] - inputs[1]]
+    fn call(inputs: &[&Array<T, D>]) -> Array<T, D> {
+        inputs[0] - inputs[1]
     }
 }

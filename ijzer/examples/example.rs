@@ -3,11 +3,12 @@ use ijzer::node::{parse_line, ASTContext};
 use ijzer::tokens::lexer;
 
 static INPUT: &str = r#"
-var x 1 -> 2
-y = (+ (x (1)))
+var x -> 1
+y = (+ (x 1))
+z = - x y
 fn z = * y I
-* (z 1 2)
 x y = (1 2)
+* (z 1 -2)
 "#;
 
 fn main() -> Result<()> {
