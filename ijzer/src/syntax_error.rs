@@ -36,4 +36,6 @@ pub enum SyntaxError {
     #[error("Number of variables does not match output arity; got {0} variables but output arity {1}")]
     IncorrectNumVariables(usize, usize),
 
+    #[error("Invalid number format: {0}")]
+    InvalidNumberFormat(String),
 }

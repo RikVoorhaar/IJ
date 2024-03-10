@@ -242,7 +242,12 @@ pub fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
                 }
                 None => return Err(SyntaxError::EmptyStream.into()),
             }
-            number.value as usize
+            number.value.parse::<usize>().map_err(|_| {
+                context.add_context_to_syntax_error(
+                    SyntaxError::InvalidNumberFormat(number.value.clone()),
+                    context.full_slice(),
+                )
+            })?
         }
         Some(&Token::Arrow) => 0,
         Some(&token) => {
@@ -254,7 +259,12 @@ pub fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
         None => return Err(SyntaxError::EmptyStream.into()),
     };
     let output_arity = match token_iter.next().as_ref() {
-        Some(Token::Number(number)) => number.value as usize,
+        Some(Token::Number(number)) => number.value.parse::<usize>().map_err(|_| {
+            context.add_context_to_syntax_error(
+                SyntaxError::InvalidNumberFormat(number.value.clone()),
+                context.full_slice(),
+            )
+        })?,
         Some(&token) => {
             return Err(context.add_context_to_syntax_error(
                 SyntaxError::UnexpectedToken(token.clone()),

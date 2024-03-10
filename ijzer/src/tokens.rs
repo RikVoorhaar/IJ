@@ -4,14 +4,15 @@ use std::{fmt::Debug, str::FromStr};
 
 #[derive(PartialEq, Clone)]
 pub struct Number {
-    pub value: u64,
+    pub value: String,
 }
 impl FromStr for Number {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        let value = s.parse()?;
-        Ok(Number { value })
+        Ok(Number {
+            value: s.to_string(),
+        })
     }
 }
 
@@ -52,7 +53,8 @@ pub enum Token {
 
     #[token("-")]
     Minus,
-    #[regex("[0-9]+", |lex| lex.slice().parse().ok())]
+
+    #[regex("[0-9]+\\.?[0-9]*[a-zA-Z0-9]*", |lex| lex.slice().parse().ok())]
     Number(Number),
 
     #[token("(")]

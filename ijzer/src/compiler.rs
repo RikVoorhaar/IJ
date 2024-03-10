@@ -117,10 +117,13 @@ impl CompileNode for Number {
         _: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::Number(number) = &node.op {
-            let val = number.value;
+            let val = number.value.clone();
 
+            let parsed_val = syn::parse_str::<proc_macro2::TokenStream>(&val).map_err(|_| {
+                syn::Error::new_spanned(&val, "Failed to parse value into a Rust TokenStream")
+            })?;
             let res = quote! {
-                ndarray::array![#val]
+                ndarray::array![#parsed_val]
             };
             Ok(res)
         } else {
