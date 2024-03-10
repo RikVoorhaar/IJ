@@ -12,9 +12,10 @@ pub enum Operation {
     Number(Number),
     Symbol(String),
     Assign,
-    Function,
+    FunctionDeclaration,
     Identity,
     Nothing,
+    Function(String),
 }
 
 impl Debug for Operation {
@@ -26,11 +27,12 @@ impl Debug for Operation {
             Self::Negate => write!(f, "Negate"),
             Self::Group => write!(f, "Group"),
             Self::Number(n) => write!(f, "Number({:?})", n),
-            Self::Symbol(s) => write!(f, "Symbol({:?})", s),
+            Self::Symbol(s) => write!(f, "Symbol({})", s),
             Self::Assign => write!(f, "Assign"),
-            Self::Function => write!(f, "Function"),
+            Self::FunctionDeclaration => write!(f, "fn"),
             Self::Identity => write!(f, "Identity"),
             Self::Nothing => write!(f, "Nothing"),
+            Self::Function(s) => write!(f, "Function({})", s),
         }
     }
 }

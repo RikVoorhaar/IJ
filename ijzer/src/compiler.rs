@@ -5,7 +5,7 @@ use syn::Ident;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 
-use crate::{node::Node, operations::Operation};
+use crate::{operations::Operation, parser::Node};
 
 pub struct CompilerContext {
     pub node_map: HashMap<usize, Rc<Node>>,
@@ -78,9 +78,12 @@ impl CompilerContext {
         let stream = match node_op {
             Operation::Number(_) => Number::compile(node, self, child_streams)?,
             Operation::Symbol(_) => Symbol::compile(node, self, child_streams)?,
+            Operation::Function(_) => Function::compile(node, self, child_streams)?,
             Operation::Group => Group::compile(node, self, child_streams)?,
             Operation::Assign => Assign::compile(node, self, child_streams)?,
-            Operation::Function => Function::compile(node, self, child_streams)?,
+            Operation::FunctionDeclaration => {
+                FunctionDeclaration::compile(node, self, child_streams)?
+            }
             Operation::Add => Add::compile(node, self, child_streams)?,
             Operation::Multiply => Multiply::compile(node, self, child_streams)?,
             Operation::Identity => Identity::compile(node, self, child_streams)?,
@@ -141,6 +144,34 @@ impl CompileNode for Symbol {
         }
     }
 }
+struct Function;
+impl CompileNode for Function {
+    fn compile(
+        node: Rc<Node>,
+        _: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        if let Operation::Function(function_name) = &node.op {
+            let varname = Ident::new(function_name.as_str(), Span::call_site());
+            let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
+
+            let child_streams: Vec<TokenStream> = children
+                .iter()
+                .map(|id| child_streams[id].clone())
+                .collect();
+
+            if child_streams.is_empty() {
+                Ok(quote! {#varname})
+            } else {
+                Ok(quote! {
+                    #varname(#(#child_streams),*)
+                })
+            }
+        } else {
+            panic!("Expected symbol node, found {:?}", node);
+        }
+    }
+}
 
 struct Identity;
 impl CompileNode for Identity {
@@ -189,15 +220,15 @@ impl CompileNode for Assign {
     }
 }
 
-struct Function;
-impl CompileNode for Function {
+struct FunctionDeclaration;
+impl CompileNode for FunctionDeclaration {
     fn compile(
         node: Rc<Node>,
         compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         match &node.op {
-            Operation::Function => {}
+            Operation::FunctionDeclaration => {}
             _ => unreachable!("Expected function node, found {:?}", node),
         }
 
@@ -332,11 +363,15 @@ impl CompileNode for Group {
                 .map(|id| child_streams[id].clone())
                 .collect();
 
-            // let varname = compiler.get_varname(node.id);
-            let res = quote! {
-                (#(#child_streams),*)
-            };
-            Ok(res)
+            match child_streams.len() {
+                1 => {
+                    let stream = child_streams.first().unwrap();
+                    Ok(quote! {#stream})
+                }
+                _ => Ok(quote! {
+                    (#(#child_streams),*)
+                }),
+            }
         } else {
             panic!("Expected group node, found {:?}", node);
         }

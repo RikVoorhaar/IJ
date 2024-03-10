@@ -1,5 +1,5 @@
 use anyhow::Result;
-use ijzer::node::{parse_line, ASTContext};
+use ijzer::parser::{parse_line, ASTContext};
 use ijzer::tokens::lexer;
 
 static INPUT: &str = r#"

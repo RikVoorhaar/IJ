@@ -388,7 +388,7 @@ pub fn parse_assign(
     } else {
         // is_function
         let symbol_node = Node::new_with_input_arity(
-            Operation::Symbol(variable_name.clone()),
+            Operation::Function(variable_name.clone()),
             expression.output_arity,
             Vec::new(),
             context.get_increment_id(),
@@ -404,17 +404,13 @@ pub fn parse_assign(
         );
 
         Ok(Rc::new(Node::new(
-            Operation::Function,
+            Operation::FunctionDeclaration,
             0,
             vec![Rc::new(symbol_node), expression],
             context.get_increment_id(),
         )))
     }
 }
-
-// fn _next_node_get_all_tokens(context: &mut ASTContext) -> Result<(Node, TokenSlice)> {
-//     next_node(context.get_tokens(), context)
-// }
 
 fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node>, TokenSlice)> {
     let op = context.get_token_at_index(slice.start)?;
@@ -551,16 +547,21 @@ fn _next_node_symbol(
     slice: TokenSlice,
     context: &mut ASTContext,
 ) -> Result<(Rc<Node>, TokenSlice)> {
-    let (symbol, _) = context
+    let (variable, _) = context
         .symbols
         .get(&op.name)
         .ok_or(SyntaxError::UnknownSymbol(op.name.clone()))?;
 
+    let node_op = match variable.input_arity {
+        0 => Operation::Symbol(op.name),
+        _ => Operation::Function(op.name),
+    };
+
     _next_node_normal_op(
-        Operation::Symbol(op.name),
-        symbol.input_arity,
-        symbol.input_arity,
-        symbol.output_arity,
+        node_op,
+        variable.input_arity,
+        variable.input_arity,
+        variable.output_arity,
         slice,
         context,
     )
