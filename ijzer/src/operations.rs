@@ -16,6 +16,7 @@ pub enum Operation {
     Identity,
     Nothing,
     Function(String),
+    Array(String),
 }
 
 impl Debug for Operation {
@@ -33,6 +34,7 @@ impl Debug for Operation {
             Self::Identity => write!(f, "Identity"),
             Self::Nothing => write!(f, "Nothing"),
             Self::Function(s) => write!(f, "Function({})", s),
+            Self::Array(s) => write!(f, "Array[{}]", s),
         }
     }
 }

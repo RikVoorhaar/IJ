@@ -7,7 +7,8 @@ use ndarray::{array, Array1};
 fn test_function(x: Array1<f64>) -> Array1<f64> {
     r#"
     var x->1
-    y = (+ (x 1.0))
+    u = [3.0,4.0]
+    y = (+ (x u))
     fn z = * y I
     * (z 1.0 -2.4)
     "#

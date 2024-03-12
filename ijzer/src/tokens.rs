@@ -1,6 +1,9 @@
 use anyhow::{anyhow, Result};
 pub use logos::Logos;
-use std::{fmt::Debug, str::FromStr};
+use std::{
+    fmt::{Debug, Display},
+    str::FromStr,
+};
 
 #[derive(PartialEq, Clone)]
 pub struct Number {
@@ -13,6 +16,11 @@ impl FromStr for Number {
         Ok(Number {
             value: s.to_string(),
         })
+    }
+}
+impl Display for Number {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
     }
 }
 
@@ -63,6 +71,15 @@ pub enum Token {
     #[token(")")]
     RParen,
 
+    #[token("[")]
+    LSqBracket,
+
+    #[token("]")]
+    RSqBracket,
+
+    #[token(",")]
+    Comma,
+
     #[regex("[a-zA-Z][a-zA-Z0-9]*", |lex| lex.slice().parse().ok())]
     Symbol(SymbolToken),
 
@@ -101,6 +118,32 @@ impl Debug for Token {
             Self::Identity => write!(f, "I"),
             Self::Function => write!(f, "fn"),
             Self::Return => write!(f, "return"),
+            Self::Comma => write!(f, ", "),
+            Self::LSqBracket => write!(f, "["),
+            Self::RSqBracket => write!(f, "]"),
+        }
+    }
+}
+
+impl Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Plus => write!(f, "+"),
+            Self::Multiplication => write!(f, "*"),
+            Self::Minus => write!(f, "-"),
+            Self::Number(n) => write!(f, "{}", n),
+            Self::LParen => write!(f, "("),
+            Self::RParen => write!(f, ")"),
+            Self::Symbol(s) => write!(f, "{}", s.name),
+            Self::Variable => write!(f, "var"),
+            Self::Arrow => write!(f, "->"),
+            Self::Assign => write!(f, "="),
+            Self::Identity => write!(f, "I"),
+            Self::Function => write!(f, "fn"),
+            Self::Return => write!(f, "return"),
+            Self::Comma => write!(f, ","),
+            Self::LSqBracket => write!(f, "["),
+            Self::RSqBracket => write!(f, "]"),
         }
     }
 }

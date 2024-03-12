@@ -90,6 +90,7 @@ impl CompilerContext {
             Operation::Nothing => Nothing::compile(node, self, child_streams)?,
             Operation::Subtract => Subtract::compile(node, self, child_streams)?,
             Operation::Negate => Negate::compile(node, self, child_streams)?,
+            Operation::Array(_) => Array::compile(node, self, child_streams)?,
             // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
@@ -132,6 +133,29 @@ impl CompileNode for Number {
     }
 }
 
+struct Array;
+impl CompileNode for Array {
+    fn compile(
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
+        _: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        if let Operation::Array(s) = &node.op {
+            let val = s.clone();
+
+            let parsed_val = syn::parse_str::<proc_macro2::TokenStream>(&val).map_err(|_| {
+                syn::Error::new_spanned(&val, "Failed to parse value into a Rust TokenStream")
+            })?;
+            let res = quote! {
+                ndarray::array![#parsed_val]
+            };
+            Ok(res)
+        } else {
+            panic!("Expected array node, found {:?}", node);
+        }
+    }
+}
+
 struct Symbol;
 impl CompileNode for Symbol {
     fn compile(
@@ -147,6 +171,7 @@ impl CompileNode for Symbol {
         }
     }
 }
+
 struct Function;
 impl CompileNode for Function {
     fn compile(

@@ -139,7 +139,7 @@ impl ASTContext {
     fn tokens_to_string(&self, slice: TokenSlice) -> String {
         self.get_tokens()[slice.start..slice.end]
             .iter()
-            .map(|t| format!("{:?}", t))
+            .map(|t| format!("{}", t))
             .collect::<Vec<String>>()
             .join(" ")
     }
@@ -431,6 +431,7 @@ fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node>, T
         Token::Number(_) => Number::_next_node(op.clone(), rest, context),
         Token::Minus => MinusOp::_next_node(op.clone(), rest, context),
         Token::LParen => LParen::_next_node(op.clone(), rest, context),
+        Token::LSqBracket => LSqBracket::_next_node(op.clone(), rest, context),
         Token::Symbol(op) => _next_node_symbol(op.clone(), rest, context),
         Token::Identity => IdentityOp::_next_node(op.clone(), rest, context),
         _ => Err(anyhow!("Unexpected token {:?}", op)),
@@ -496,13 +497,15 @@ fn _next_node_normal_op(
 fn _find_matching_parenthesis(
     context: &mut ASTContext,
     slice: TokenSlice,
+    lparen: &Token,
+    rparen: &Token,
 ) -> Result<usize, SyntaxError> {
     let tokens = &context.get_tokens()[slice.start..slice.end];
     let mut depth = 1;
     for (i, token) in tokens.iter().enumerate() {
         match token {
-            Token::LParen => depth += 1,
-            Token::RParen => {
+            token if token == lparen => depth += 1,
+            token if token == rparen => {
                 depth -= 1;
                 if depth == 0 {
                     return Ok(i);
@@ -524,8 +527,9 @@ impl TokenImpl for LParen {
         slice: TokenSlice,
         context: &mut ASTContext,
     ) -> Result<(Rc<Node>, TokenSlice)> {
-        let rparen_index = _find_matching_parenthesis(context, slice)
-            .map_err(|e| context.add_context_to_syntax_error(e, slice))?;
+        let rparen_index =
+            _find_matching_parenthesis(context, slice, &Token::LParen, &Token::RParen)
+                .map_err(|e| context.add_context_to_syntax_error(e, slice))?;
         let remainder = slice.move_start(rparen_index + 1)?;
         // let slice = TokenSlice::new(slice.start, rparen_index, slice.max);
         let slice = slice.move_end(rparen_index)?;
@@ -549,6 +553,33 @@ impl TokenImpl for LParen {
                 remainder,
             )),
         }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct LSqBracket;
+impl TokenImpl for LSqBracket {
+    fn _next_node(
+        _op: Token,
+        slice: TokenSlice,
+        context: &mut ASTContext,
+    ) -> Result<(Rc<Node>, TokenSlice)> {
+        let rparen_index =
+            _find_matching_parenthesis(context, slice, &Token::LSqBracket, &Token::RSqBracket)
+                .map_err(|e| context.add_context_to_syntax_error(e, slice))?;
+        let remainder = slice.move_start(rparen_index + 1)?;
+        let slice = slice.move_end(rparen_index)?;
+        let contents = context.tokens_to_string(slice);
+
+        Ok((
+            Rc::new(Node::new(
+                Operation::Array(contents),
+                1,
+                Vec::new(),
+                context.get_increment_id(),
+            )),
+            remainder,
+        ))
     }
 }
 
