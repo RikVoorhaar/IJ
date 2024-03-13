@@ -9,6 +9,7 @@ pub mod operations;
 pub mod pretty_print;
 pub mod syntax_error;
 pub mod tokens;
+pub mod tensor;
 
 pub use arrays::*;
 pub use arrays::ArrayFunc;
