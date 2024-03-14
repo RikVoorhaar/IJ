@@ -16,8 +16,12 @@ name = "compiler_example"
 [[example]]
 name = "tokenstream_example"
 
+[[example]]
+name = "tensor_example"
+
 [dependencies]
 anyhow = "1.0.79"
+itertools = "0.12.1"
 logos = "0.14.0"
 ndarray = "0.15.6"
 num-traits = "0.2.18"

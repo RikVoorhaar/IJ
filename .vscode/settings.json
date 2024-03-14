@@ -3,5 +3,6 @@
         "./ijzer_macro/Cargo.toml",
         "./ijzer_examples/Cargo.toml",
         "./ijzer_examples/Cargo.toml"
-    ]
+    ],
+    "rust-analyzer.checkOnSave": true
 }
