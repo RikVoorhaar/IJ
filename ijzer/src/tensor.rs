@@ -13,8 +13,8 @@ pub struct Tensor<T: Clone + Num> {
 
 pub fn strides_from_shape(shape: &[usize]) -> Vec<usize> {
     let mut strides = vec![1; shape.len()];
-    for i in (0..shape.len() - 1).rev() {
-        strides[i] = strides[i + 1] * shape[i]
+    for i in (1..shape.len()).rev() {
+        strides[i - 1] = strides[i] * shape[i]
     }
     strides
 }
@@ -39,6 +39,14 @@ impl<T: Clone + Num> Tensor<T> {
     }
     pub fn size(&self) -> usize {
         self.shape.iter().product()
+    }
+
+    pub fn flat_to_index(&self, index: usize) -> Vec<usize> {
+        let mut result = vec![0; self.shape.len()];
+        for (i, &s) in self.strides.iter().enumerate() {
+            result[i] = (index / s) % self.shape[i];
+        }
+        result
     }
 
     pub fn zeros(shape: &[usize]) -> Tensor<T> {
@@ -140,33 +148,35 @@ impl<T: fmt::Display + Clone + Num> fmt::Display for Tensor<T> {
             return write!(f, "[]");
         }
 
-        let mut output = String::from("[");
-
-        let mut indices = vec![0; dims.len()];
-        loop {
-            let val = self.index(&indices);
-            output.push_str(&format!("{}", val));
-
-            for dim_index in (0..dims.len()).rev() {
-                if indices[dim_index] + 1 < dims[dim_index] {
-                    indices[dim_index] += 1;
-                    if dim_index < dims.len() - 1 {
-                        output.push_str(", ");
-                        for _ in dim_index + 1..dims.len() {
-                            output.push_str("[");
-                        }
-                    }
-                    break;
-                } else {
-                    indices[dim_index] = 0;
-                    if dim_index == 0 {
-                        output.push_str("]");
-                        return write!(f, "{}", output);
-                    } else {
-                        output.push_str("], ");
-                    }
+        let mut output = String::new();
+        for i in 0..self.size() {
+            let indices = self.flat_to_index(i);
+            let num_zeros = indices.iter().rev().take_while(|&&x| x == 0).count();
+            let num_non_zeros = indices.len() - num_zeros;
+            if num_zeros > 0 {
+                output.push_str(&" ".repeat(num_non_zeros));
+                output.push_str(&"[".repeat(num_zeros));
+            }
+            output.push_str(&format!("{}", self.index(&indices)));
+            let num_full = indices
+                .iter()
+                .zip(self.shape.iter())
+                .rev()
+                .take_while(|(&i, &s)| i + 1 == s)
+                .count();
+            output.push_str(&"]".repeat(num_full));
+            if num_full < self.shape.len() {
+                output.push_str(", ");
+            }
+            if num_full > 0 {
+                if num_full < self.shape.len() {
+                    output.push_str("\n");
                 }
             }
+            // } else {
+            //     output.push_str(", ");
+            // }
         }
+        write!(f, "{}", output)
     }
 }
