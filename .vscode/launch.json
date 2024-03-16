@@ -10,7 +10,10 @@
             "name": "Launch",
             "program": "${workspaceFolder}/ijzer/target/debug/examples/tensor_example",
             "args": [],
-            "cwd": "${workspaceFolder}"
-        },
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "RUST_BACKTRACE": "1"
+            }
+        }
     ]
 }

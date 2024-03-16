@@ -21,7 +21,10 @@ pub fn strides_from_shape(shape: &[usize]) -> Vec<usize> {
 
 pub fn broadcast_shapes(shape1: &[usize], shape2: &[usize]) -> Option<Vec<usize>> {
     let mut result = vec![];
-    for (s1, s2) in shape1.iter().rev().zip(shape2.iter().rev()) {
+    let max_len = std::cmp::max(shape1.len(), shape2.len());
+    let shape1_padded = shape1.iter().rev().chain(std::iter::repeat(&1)).take(max_len);
+    let shape2_padded = shape2.iter().rev().chain(std::iter::repeat(&1)).take(max_len);
+    for (s1, s2) in shape1_padded.zip(shape2_padded) {
         match (*s1, *s2) {
             (s1, s2) if s1 == s2 => result.push(s1),
             (1, s2) => result.push(s2),
@@ -69,6 +72,24 @@ impl<T: Clone + Num> Tensor<T> {
             data,
         };
     }
+    pub fn scalar(value: T) -> Tensor<T> {
+        let shape = vec![1];
+        let strides = vec![1];
+        let data = vec![value].into_boxed_slice();
+        return Tensor {
+            shape,
+            strides,
+            data,
+        };
+    }
+    pub fn from_vec(data: Vec<T>, shape: Vec<usize>) -> Tensor<T> {
+        let strides = strides_from_shape(&shape);
+        return Tensor {
+            shape,
+            strides,
+            data: data.into_boxed_slice(),
+        };
+    }
     pub fn reshape(&mut self, new_shape: &[usize]) -> Result<()> {
         if new_shape.iter().product::<usize>() != self.size() {
             return Err(anyhow!("New shape size must be equal to the original size"));
@@ -101,11 +122,13 @@ impl<T: Clone + Num> Tensor<T> {
             let idx1 = idx
                 .iter()
                 .zip(shape1.iter())
+                .skip(out_shape.len() - self.shape.len())
                 .map(|(&i, &s)| i % s)
                 .collect::<Vec<_>>();
             let idx2 = idx
                 .iter()
                 .zip(shape2.iter())
+                .skip(out_shape.len() - other.shape.len())
                 .map(|(&i, &s)| i % s)
                 .collect::<Vec<_>>();
 
@@ -173,9 +196,6 @@ impl<T: fmt::Display + Clone + Num> fmt::Display for Tensor<T> {
                     output.push_str("\n");
                 }
             }
-            // } else {
-            //     output.push_str(", ");
-            // }
         }
         write!(f, "{}", output)
     }
