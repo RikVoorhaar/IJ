@@ -14,6 +14,5 @@ fn main() -> Result<()> {
     //finally we need some unit tests.
     // println!("{}", t3);
     println!("{}", t5);
-
     Ok(())
 }
