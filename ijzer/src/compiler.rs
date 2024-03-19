@@ -124,7 +124,7 @@ impl CompileNode for Number {
                 syn::Error::new_spanned(&val, "Failed to parse value into a Rust TokenStream")
             })?;
             let res = quote! {
-                ndarray::array![#parsed_val]
+                ijzer::tensor::Tensor::scalar(#parsed_val)
             };
             Ok(res)
         } else {
@@ -147,7 +147,7 @@ impl CompileNode for Array {
                 syn::Error::new_spanned(&val, "Failed to parse value into a Rust TokenStream")
             })?;
             let res = quote! {
-                ndarray::array![#parsed_val]
+                ijzer::tensor::Tensor::from_vec(vec![#parsed_val], None)
             };
             Ok(res)
         } else {
@@ -294,7 +294,7 @@ impl CompileNode for Add {
             let childstream2 = child_streams.get(&children[1]).unwrap();
 
             let res = quote! {
-                ijzer::arrays::Add::call(&[&#childstream1, &#childstream2])
+                #childstream1.apply_binary_op(&#childstream2, |a, b| a + b).unwrap()
             };
             Ok(res)
         } else {
@@ -319,7 +319,7 @@ impl CompileNode for Subtract {
             let childstream2 = child_streams.get(&children[1]).unwrap();
 
             let res = quote! {
-                ijzer::arrays::Subtract::call(&[&#childstream1, &#childstream2])
+                #childstream1.apply_binary_op(&#childstream2, |a, b| a - b).unwrap()
             };
             Ok(res)
         } else {
@@ -343,7 +343,7 @@ impl CompileNode for Negate {
             let childstream = child_streams.get(&children[0]).unwrap();
 
             let res = quote! {
-                ijzer::arrays::Negate::call(&[&#childstream])
+               #childstream.map(|x| -x)
             };
             Ok(res)
         } else {
@@ -368,7 +368,7 @@ impl CompileNode for Multiply {
             let childstream2 = child_streams.get(&children[1]).unwrap();
 
             let res = quote! {
-                ijzer::arrays::Multiply::call(&[&#childstream1, &#childstream2])
+                #childstream1.apply_binary_op(&#childstream2, |a, b| a * b).unwrap()
             };
             Ok(res)
         } else {

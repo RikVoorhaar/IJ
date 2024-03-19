@@ -2,7 +2,6 @@ use anyhow::{anyhow, Result};
 use itertools::Itertools;
 use num_traits::{Float, Num};
 use rand::Rng;
-use rand_distr::Distribution;
 use std::fmt;
 use std::ops::{Index, IndexMut};
 
@@ -92,7 +91,8 @@ impl<T: Clone + Num> Tensor<T> {
             data,
         };
     }
-    pub fn from_vec(data: Vec<T>, shape: Vec<usize>) -> Tensor<T> {
+    pub fn from_vec(data: Vec<T>, shape: Option<Vec<usize>>) -> Tensor<T> {
+        let shape = shape.unwrap_or_else(|| vec![data.len()]);
         let strides = strides_from_shape(&shape);
         return Tensor {
             shape,
@@ -337,27 +337,27 @@ mod tests {
     #[test]
     fn test_from_vec() {
         let data_u64 = vec![1u64, 2, 3, 4];
-        let tensor_u64 = Tensor::from_vec(data_u64, vec![2, 2]);
+        let tensor_u64 = Tensor::from_vec(data_u64,Some( vec![2, 2]));
         assert_eq!(tensor_u64.shape, vec![2, 2]);
         assert_eq!(tensor_u64.data.to_vec(), vec![1u64, 2, 3, 4]);
 
         let data_f64 = vec![1.0f64, 2.0, 3.0, 4.0];
-        let tensor_f64 = Tensor::from_vec(data_f64, vec![2, 2]);
+        let tensor_f64 = Tensor::from_vec(data_f64, Some(vec![2, 2]));
         assert_eq!(tensor_f64.shape, vec![2, 2]);
         assert_eq!(tensor_f64.data.to_vec(), vec![1.0f64, 2.0, 3.0, 4.0]);
 
         let data_f32 = vec![1.0f32, 2.0, 3.0, 4.0];
-        let tensor_f32 = Tensor::from_vec(data_f32, vec![2, 2]);
+        let tensor_f32 = Tensor::from_vec(data_f32,Some( vec![2, 2]));
         assert_eq!(tensor_f32.shape, vec![2, 2]);
         assert_eq!(tensor_f32.data.to_vec(), vec![1.0f32, 2.0, 3.0, 4.0]);
 
         let data_i64 = vec![1i64, -2, 3, -4];
-        let tensor_i64 = Tensor::from_vec(data_i64, vec![2, 2]);
+        let tensor_i64 = Tensor::from_vec(data_i64, Some(vec![2, 2]));
         assert_eq!(tensor_i64.shape, vec![2, 2]);
         assert_eq!(tensor_i64.data.to_vec(), vec![1i64, -2, 3, -4]);
 
         let data_usize = vec![1usize, 2, 3, 4];
-        let tensor_usize = Tensor::from_vec(data_usize, vec![2, 2]);
+        let tensor_usize = Tensor::from_vec(data_usize, Some(vec![2, 2]));
         assert_eq!(tensor_usize.shape, vec![2, 2]);
         assert_eq!(tensor_usize.data.to_vec(), vec![1usize, 2, 3, 4]);
     }
@@ -365,7 +365,7 @@ mod tests {
     #[test]
     fn test_reshape_success() {
         let data = vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0];
-        let mut tensor = Tensor::from_vec(data.clone(), vec![2, 3]);
+        let mut tensor = Tensor::from_vec(data.clone(), Some(vec![2, 3]));
         assert!(tensor.reshape(&[3, 2]).is_ok());
         assert_eq!(tensor.shape, vec![3, 2]);
         assert_eq!(tensor.index(&[0, 1]), &1.0);
@@ -388,7 +388,7 @@ mod tests {
     #[test]
     fn test_map_division() {
         let data = vec![10.0, 20.0, 30.0, 40.0];
-        let tensor = Tensor::from_vec(data, vec![2, 2]);
+        let tensor = Tensor::from_vec(data,Some( vec![2, 2]));
         let result = tensor.map(|x| x / 2.0);
         assert_eq!(result.to_vec(), vec![5.0, 10.0, 15.0, 20.0]);
     }
@@ -396,7 +396,7 @@ mod tests {
     #[test]
     fn test_map_overflow() {
         let data = vec![u8::MAX, 0];
-        let tensor = Tensor::from_vec(data, vec![2]);
+        let tensor = Tensor::from_vec(data, Some(vec![2]));
         let result = tensor.map(|x| x.wrapping_add(1));
         assert_eq!(result.to_vec(), vec![0, 1]);
     }
@@ -404,31 +404,31 @@ mod tests {
     #[test]
     fn test_map_underflow() {
         let data = vec![0u8, 1];
-        let tensor = Tensor::from_vec(data, vec![2]);
+        let tensor = Tensor::from_vec(data, Some(vec![2]));
         let result = tensor.map(|x| x.wrapping_sub(1));
         assert_eq!(result.to_vec(), vec![u8::MAX, 0]);
     }
 
     #[test]
     fn test_apply_binary_op_subtraction() {
-        let tensor1 = Tensor::from_vec(vec![10.0, 20.0, 30.0, 40.0], vec![2, 2]);
-        let tensor2 = Tensor::from_vec(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2]);
+        let tensor1 = Tensor::from_vec(vec![10.0, 20.0, 30.0, 40.0], Some(vec![2, 2]));
+        let tensor2 = Tensor::from_vec(vec![1.0, 2.0, 3.0, 4.0], Some(vec![2, 2]));
         let result = tensor1.apply_binary_op(&tensor2, |a, b| a - b).unwrap();
         assert_eq!(result.to_vec(), vec![9.0, 18.0, 27.0, 36.0]);
     }
 
     #[test]
     fn test_apply_binary_op_division() {
-        let tensor1 = Tensor::from_vec(vec![10.0, 20.0, 30.0, 40.0], vec![2, 2]);
-        let tensor2 = Tensor::from_vec(vec![2.0, 4.0, 5.0, 10.0], vec![2, 2]);
+        let tensor1 = Tensor::from_vec(vec![10.0, 20.0, 30.0, 40.0], Some(vec![2, 2]));
+        let tensor2 = Tensor::from_vec(vec![2.0, 4.0, 5.0, 10.0], Some(vec![2, 2]));
         let result = tensor1.apply_binary_op(&tensor2, |a, b| a / b).unwrap();
         assert_eq!(result.to_vec(), vec![5.0, 5.0, 6.0, 4.0]);
     }
 
     #[test]
     fn test_apply_binary_op_non_commutative() {
-        let tensor1 = Tensor::from_vec(vec![2, 4, 6, 8], vec![2, 2]);
-        let tensor2 = Tensor::from_vec(vec![1, 2, 3, 4], vec![2, 2]);
+        let tensor1 = Tensor::from_vec(vec![2, 4, 6, 8], Some(vec![2, 2]));
+        let tensor2 = Tensor::from_vec(vec![1, 2, 3, 4], Some(vec![2, 2]));
         let result_forward = tensor1.apply_binary_op(&tensor2, |a, b| a - b).unwrap();
         let result_backward = tensor2.apply_binary_op(&tensor1, |a, b| a - b).unwrap();
         assert_eq!(result_forward.to_vec(), vec![1, 2, 3, 4]);

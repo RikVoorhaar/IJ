@@ -1,10 +1,9 @@
 use anyhow::Result;
-use ijzer::ArrayFunc;
 use ijzer_macro::ijzer;
-use ndarray::{array, Array1};
+use ijzer::tensor::Tensor;
 
 #[ijzer]
-fn test_function(x: Array1<f64>) -> Array1<f64> {
+fn test_function(x: Tensor<f64>) -> Tensor<f64> {
     r#"
     var x->1
     u = [3.0,4.0]
@@ -16,6 +15,8 @@ fn test_function(x: Array1<f64>) -> Array1<f64> {
 
 
 fn main() -> Result<()> {
-    println!("{:?}", test_function(array![1.0, 2.0]));
+    let x = Tensor::from_vec(vec![1.0, 2.0], Some(vec![2]));
+    let y = test_function(x);
+    println!("{}", y);
     Ok(())
 }

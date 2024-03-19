@@ -11,9 +11,9 @@ pub mod syntax_error;
 pub mod tokens;
 pub mod tensor;
 
-pub use arrays::*;
-pub use arrays::ArrayFunc;
-pub use ndarray::array;
+// pub use arrays::*;
+// pub use arrays::ArrayFunc;
+// pub use ndarray::array;
 
 pub fn compile(input: &str) -> Result<TokenStream> {
     let mut symbol_table = parser::ASTContext::new();

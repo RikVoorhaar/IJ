@@ -3,7 +3,7 @@ use std::rc::Rc;
 use anyhow::Result;
 use ijzer::{
     compiler::CompilerContext,
-    node::{parse_line, ASTContext, Node},
+    parser::{parse_line, ASTContext, Node},
     tokens::lexer,
 };
 
