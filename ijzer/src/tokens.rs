@@ -100,6 +100,9 @@ pub enum Token {
 
     #[token("return")]
     Return,
+
+    #[token("/")]
+    Reduction,
 }
 
 impl Debug for Token {
@@ -121,6 +124,7 @@ impl Debug for Token {
             Self::Comma => write!(f, ", "),
             Self::LSqBracket => write!(f, "["),
             Self::RSqBracket => write!(f, "]"),
+            Self::Reduction => write!(f, "/"),
         }
     }
 }
@@ -144,6 +148,7 @@ impl Display for Token {
             Self::Comma => write!(f, ","),
             Self::LSqBracket => write!(f, "["),
             Self::RSqBracket => write!(f, "]"),
+            Self::Reduction => write!(f, "/"),
         }
     }
 }

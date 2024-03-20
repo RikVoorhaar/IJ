@@ -38,4 +38,13 @@ pub enum SyntaxError {
 
     #[error("Invalid number format: {0}")]
     InvalidNumberFormat(String),
+
+    #[error("Expected functional operator but got {0}")]
+    ExpectedFunctionalOperator(String),
+
+    #[error("Expected binary operator but got {0}")]
+    ExpectedBinaryOperator(String),
+
+    #[error("Expected operator with output arity {0} but got {1}")]
+    ExpectedOperatorWithOutputArity(usize, String),
 }

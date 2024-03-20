@@ -608,6 +608,86 @@ fn _next_node_symbol(
     )
 }
 
+fn next_node_functional(
+    slice: TokenSlice,
+    context: &mut ASTContext,
+) -> Result<(Rc<Node>, TokenSlice)> {
+    let op = context.get_token_at_index(slice.start)?;
+    let rest = slice.move_start(1)?;
+    let functional_operand = match op {
+        Token::Plus => Node::new(Operation::Add, 2, vec![], context.get_increment_id()),
+        Token::Multiplication => {
+            Node::new(Operation::Multiply, 2, vec![], context.get_increment_id())
+        }
+
+        Token::Symbol(SymbolToken { name }) => {
+            let (variable, _) = context
+                .symbols
+                .get(name.as_str())
+                .ok_or(SyntaxError::UnknownSymbol(name.clone()))?;
+            if variable.input_arity == 0 {
+                return Err(SyntaxError::ExpectedFunctionalOperator(
+                    context.tokens_to_string(slice),
+                )
+                .into());
+            }
+            Node::new(
+                Operation::Function(name.clone()),
+                variable.output_arity,
+                vec![],
+                context.get_increment_id(),
+            )
+        }
+
+        _ => {
+            let (node, rest) = next_node(slice, context)?;
+            let input_arity_difference = node.input_arity.saturating_sub(node.operands.len());
+            if input_arity_difference == 0 {
+                return Err(SyntaxError::InsufficientArguments(
+                    node.input_arity,
+                    node.operands.len(),
+                )
+                .into());
+            }
+            return Ok((node, rest));
+        }
+    };
+    Ok((Rc::new(functional_operand), rest))
+}
+
+fn _next_node_reduction(
+    _op: Token,
+    slice: TokenSlice,
+    context: &mut ASTContext,
+) -> Result<(Rc<Node>, TokenSlice)> {
+    let (functional_operand, rest) = next_node(slice, context)?;
+    if functional_operand.output_arity != 1 {
+        return Err(context.add_context_to_syntax_error(
+            SyntaxError::ExpectedOperatorWithOutputArity(1, context.tokens_to_string(slice)),
+            slice,
+        ));
+    }
+    if functional_operand.input_arity != 2 {
+        return Err(context.add_context_to_syntax_error(
+            SyntaxError::ExpectedBinaryOperator(context.tokens_to_string(slice)),
+            slice,
+        ));
+    }
+
+    let (operands, rest) = gather_operands(1, 1, rest, context)?;
+    Ok((
+        Rc::new(Node {
+            op: Operation::Reduce,
+            output_arity: 1,
+            operands,
+            functional_operands: vec![functional_operand],
+            input_arity: 1,
+            id: context.get_increment_id(),
+        }),
+        rest,
+    ))
+}
+
 #[derive(Debug, PartialEq)]
 struct MinusOp;
 impl TokenImpl for MinusOp {
