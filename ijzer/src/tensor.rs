@@ -158,6 +158,10 @@ impl<T: Clone + Num> Tensor<T> {
 
         Some(result)
     }
+    pub fn reduce(&self, mut f: impl FnMut(&T, &T) -> T) -> Tensor<T> {
+        let result = self.data.iter().cloned().reduce(|x, y| f(&x, &y)).unwrap();
+        Tensor::scalar(result)
+    }
 }
 impl<T: Clone + Float> Tensor<T> {
     pub fn randn(shape: &[usize]) -> Tensor<T> {
@@ -337,7 +341,7 @@ mod tests {
     #[test]
     fn test_from_vec() {
         let data_u64 = vec![1u64, 2, 3, 4];
-        let tensor_u64 = Tensor::from_vec(data_u64,Some( vec![2, 2]));
+        let tensor_u64 = Tensor::from_vec(data_u64, Some(vec![2, 2]));
         assert_eq!(tensor_u64.shape, vec![2, 2]);
         assert_eq!(tensor_u64.data.to_vec(), vec![1u64, 2, 3, 4]);
 
@@ -347,7 +351,7 @@ mod tests {
         assert_eq!(tensor_f64.data.to_vec(), vec![1.0f64, 2.0, 3.0, 4.0]);
 
         let data_f32 = vec![1.0f32, 2.0, 3.0, 4.0];
-        let tensor_f32 = Tensor::from_vec(data_f32,Some( vec![2, 2]));
+        let tensor_f32 = Tensor::from_vec(data_f32, Some(vec![2, 2]));
         assert_eq!(tensor_f32.shape, vec![2, 2]);
         assert_eq!(tensor_f32.data.to_vec(), vec![1.0f32, 2.0, 3.0, 4.0]);
 
@@ -388,7 +392,7 @@ mod tests {
     #[test]
     fn test_map_division() {
         let data = vec![10.0, 20.0, 30.0, 40.0];
-        let tensor = Tensor::from_vec(data,Some( vec![2, 2]));
+        let tensor = Tensor::from_vec(data, Some(vec![2, 2]));
         let result = tensor.map(|x| x / 2.0);
         assert_eq!(result.to_vec(), vec![5.0, 10.0, 15.0, 20.0]);
     }
@@ -450,5 +454,19 @@ mod tests {
         assert!(tensor.to_vec().iter().all(|&x| x >= 0.0 && x <= 1.0));
         assert_eq!(tensor.shape(), &shape);
         assert_eq!(tensor.size(), 8);
+    }
+
+    #[test]
+    fn test_reduce_multiplication() {
+        let tensor = Tensor::from_vec(vec![2, 3, 4], Some(vec![3]));
+        let result = tensor.reduce(|a, b| a * b);
+        assert_eq!(result.to_vec(), vec![24]);
+    }
+
+    #[test]
+    fn test_reduce_summation() {
+        let tensor = Tensor::from_vec(vec![1, 2, 3, 4], Some(vec![4]));
+        let result = tensor.reduce(|a, b| a + b);
+        assert_eq!(result.to_vec(), vec![10]);
     }
 }

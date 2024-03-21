@@ -91,6 +91,10 @@ impl Node {
             })
         }
     }
+
+    pub fn all_operands(&self) -> impl Iterator<Item = Rc<Node>> + '_ {
+        self.functional_operands.iter().chain(&self.operands).cloned()
+    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -434,6 +438,7 @@ fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node>, T
         Token::LSqBracket => LSqBracket::_next_node(op.clone(), rest, context),
         Token::Symbol(op) => _next_node_symbol(op.clone(), rest, context),
         Token::Identity => IdentityOp::_next_node(op.clone(), rest, context),
+        Token::Reduction => _next_node_reduction(op.clone(), rest, context),
         _ => Err(anyhow!("Unexpected token {:?}", op)),
     }
 }
@@ -615,10 +620,16 @@ fn next_node_functional(
     let op = context.get_token_at_index(slice.start)?;
     let rest = slice.move_start(1)?;
     let functional_operand = match op {
-        Token::Plus => Node::new(Operation::Add, 2, vec![], context.get_increment_id()),
-        Token::Multiplication => {
-            Node::new(Operation::Multiply, 2, vec![], context.get_increment_id())
+        Token::Plus => {
+            Node::new_with_input_arity(Operation::Add, 1, vec![], context.get_increment_id(), 2)?
         }
+        Token::Multiplication => Node::new_with_input_arity(
+            Operation::Multiply,
+            1,
+            vec![],
+            context.get_increment_id(),
+            2,
+        )?,
 
         Token::Symbol(SymbolToken { name }) => {
             let (variable, _) = context
@@ -660,7 +671,7 @@ fn _next_node_reduction(
     slice: TokenSlice,
     context: &mut ASTContext,
 ) -> Result<(Rc<Node>, TokenSlice)> {
-    let (functional_operand, rest) = next_node(slice, context)?;
+    let (functional_operand, rest) = next_node_functional(slice, context)?;
     if functional_operand.output_arity != 1 {
         return Err(context.add_context_to_syntax_error(
             SyntaxError::ExpectedOperatorWithOutputArity(1, context.tokens_to_string(slice)),
