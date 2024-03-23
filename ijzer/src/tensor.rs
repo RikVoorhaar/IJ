@@ -162,6 +162,45 @@ impl<T: Clone + Num> Tensor<T> {
         let result = self.data.iter().cloned().reduce(|x, y| f(&x, &y)).unwrap();
         Tensor::scalar(result)
     }
+    pub fn sub_tensor(&self, indices: Vec<Option<usize>>) -> Result<Tensor<T>, &'static str> {
+        if indices.len() != self.shape.len() {
+            return Err("Indices length must match tensor shape length");
+        }
+
+        let mut sub_shape = Vec::new();
+        let mut sub_locations = Vec::new();
+
+        for (i, &index) in indices.iter().enumerate() {
+            match index {
+                Some(idx) => {
+                    if idx >= self.shape[i] {
+                        return Err("Index out of bounds for tensor shape");
+                    }
+                }
+                None => {
+                    sub_shape.push(self.shape[i]);
+                    sub_locations.push(i);
+                }
+            }
+        }
+
+        let iter_dims = sub_shape.iter().map(|&s| 0..s).multi_cartesian_product();
+        let mut final_idx = vec![0; self.shape.len()];
+        for (i, &val) in indices.iter().enumerate() {
+            if let Some(idx) = val {
+                final_idx[i] = idx;
+            }
+        }
+
+        let mut output: Tensor<T> = Tensor::zeros(&sub_shape);
+        for idx in iter_dims {
+            for (i, &val) in idx.iter().enumerate() {
+                final_idx[sub_locations[i]] = val;
+            }
+            output[&idx] = self[&final_idx].clone();
+        }
+        Ok(output)
+    }
 }
 impl<T: Clone + Float> Tensor<T> {
     pub fn randn(shape: &[usize]) -> Tensor<T> {
@@ -468,5 +507,25 @@ mod tests {
         let tensor = Tensor::from_vec(vec![1, 2, 3, 4], Some(vec![4]));
         let result = tensor.reduce(|a, b| a + b);
         assert_eq!(result.to_vec(), vec![10]);
+    }
+
+    #[test]
+    fn test_sub_tensor() {
+        let tensor = Tensor::from_vec((0..24).collect(), Some(vec![2, 3, 4]));
+
+        // Sub-tensor to get a 2x4 tensor
+        let sub_tensor_2x4 = tensor.sub_tensor(vec![None, Some(1), None]).unwrap();
+        assert_eq!(sub_tensor_2x4.shape(), &vec![2, 4]);
+        assert_eq!(sub_tensor_2x4.to_vec(), vec![4, 5, 6, 7, 16, 17, 18, 19]);
+
+        // Sub-tensor to get a 2 tensor
+        let sub_tensor_2 = tensor.sub_tensor(vec![None, Some(1), Some(2)]).unwrap();
+        assert_eq!(sub_tensor_2.shape(), &vec![2]);
+        assert_eq!(sub_tensor_2.to_vec(), vec![6, 18]);
+
+        // Sub-tensor to get a 3 tensor
+        let sub_tensor_3 = tensor.sub_tensor(vec![Some(0), None, Some(1)]).unwrap();
+        assert_eq!(sub_tensor_3.shape(), &vec![3]);
+        assert_eq!(sub_tensor_3.to_vec(), vec![1, 5, 9]);
     }
 }
