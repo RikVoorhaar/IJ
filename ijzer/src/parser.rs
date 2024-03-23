@@ -1,10 +1,10 @@
+use crate::ast_node::{ASTContext, FunctionSignature, IJType, Node, TokenSlice, Variable};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
 use crate::tokens::{Number, SymbolToken, Token};
 use anyhow::{anyhow, Context, Result};
 use std::fmt::Debug;
 use std::rc::Rc;
-use crate::ast_node::{ASTContext, Node, TokenSlice, Variable};
 
 trait TokenImpl {
     fn _next_node(
@@ -115,15 +115,20 @@ pub fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
     context.insert_variable(
         Variable {
             name: name.clone(),
-            output_arity,
-            input_arity,
+            typ: IJType::Function(FunctionSignature {
+                input: vec![IJType::Tensor; input_arity],
+                output: vec![IJType::Tensor; output_arity],
+            }),
         },
         None,
     );
 
     Ok(Rc::new(Node::new(
         Operation::Nothing,
-        0,
+        IJType::Function(FunctionSignature {
+            input: vec![],
+            output: vec![],
+        }),
         Vec::new(),
         context.get_increment_id(),
     )))
@@ -151,8 +156,12 @@ fn _get_variable_expression(context: &mut ASTContext) -> Result<Rc<Node>> {
 }
 
 fn _compute_input_arity(node: &Rc<Node>) -> usize {
-    let this_node: usize =
-        node.input_arity - node.operands.iter().map(|n| n.output_arity).sum::<usize>();
+    let this_node: usize = node.typ.input_arity()
+        - node
+            .operands
+            .iter()
+            .map(|n| n.typ.output_arity())
+            .sum::<usize>();
     let children: usize = node
         .operands
         .iter()
@@ -193,9 +202,12 @@ pub fn parse_assign(
                 _ => unreachable!(),
             })
             .collect();
-        if symbol_names.len() != expression.output_arity {
+        if symbol_names.len() != expression.typ.output_arity() {
             return Err(context.add_context_to_syntax_error(
-                SyntaxError::IncorrectNumVariables(symbol_names.len(), expression.output_arity),
+                SyntaxError::IncorrectNumVariables(
+                    symbol_names.len(),
+                    expression.typ.output_arity(),
+                ),
                 context.full_slice(),
             ));
         }
@@ -204,7 +216,7 @@ pub fn parse_assign(
             .map(|s| {
                 Rc::new(Node::new(
                     Operation::Symbol(s),
-                    1,
+                    IJType::Tensor,
                     Vec::new(),
                     context.get_increment_id(),
                 ))
@@ -214,19 +226,18 @@ pub fn parse_assign(
             context.insert_variable(
                 Variable {
                     name: variable_name.clone(),
-                    output_arity: 1,
-                    input_arity: 0,
+                    typ: IJType::Tensor,
                 },
                 Some(symbol_node.clone()),
             );
         }
         Ok(Rc::new(Node::new(
             Operation::Assign,
-            0,
+            IJType::Tensor,
             vec![
                 Rc::new(Node::new(
                     Operation::Group,
-                    expression.output_arity,
+                    IJType::tensor_function(0, expression.typ.output_arity()),
                     symbol_nodes,
                     context.get_increment_id(),
                 )),
@@ -236,25 +247,28 @@ pub fn parse_assign(
         )))
     } else {
         // is_function
-        let symbol_node = Node::new_with_input_arity(
+        let output_arity = expression.typ.output_arity();
+        let typ = IJType::tensor_function(input_arity, output_arity);
+        let symbol_node = Node::new(
             Operation::Function(variable_name.clone()),
-            expression.output_arity,
+            typ.clone(),
             Vec::new(),
             context.get_increment_id(),
-            input_arity,
-        )?;
+        );
         context.insert_variable(
             Variable {
                 name: variable_name.clone(),
-                output_arity: expression.output_arity,
-                input_arity,
+                typ: typ.clone(),
             },
             Some(expression.clone()),
         );
 
         Ok(Rc::new(Node::new(
             Operation::FunctionDeclaration,
-            0,
+            IJType::Function(FunctionSignature {
+                input: vec![typ],
+                output: vec![],
+            }),
             vec![Rc::new(symbol_node), expression],
             context.get_increment_id(),
         )))
@@ -290,11 +304,11 @@ fn gather_operands(
     let mut rest = slice;
     while !rest.is_empty() {
         let (node, new_rest) = next_node(rest, context)?;
-        if total_arity + node.output_arity > max_arity {
-            overflow = node.output_arity;
+        if total_arity + node.typ.output_arity() > max_arity {
+            overflow = node.typ.output_arity();
             break;
         }
-        total_arity += node.output_arity;
+        total_arity += node.typ.output_arity();
         match node.op {
             Operation::Group => {
                 operands.extend(node.operands.clone());
@@ -323,10 +337,12 @@ fn _next_node_normal_op(
 ) -> Result<(Rc<Node>, TokenSlice)> {
     let (operands, rest) = gather_operands(min_arity, max_arity, slice, context)
         .with_context(|| anyhow!("Error caused by {:?}", op))?;
+    let input_arity = operands.iter().map(|n| n.typ.output_arity()).sum();
+    let typ = IJType::tensor_function(input_arity, output_arity);
     Ok((
         Rc::new(Node::new(
             op,
-            output_arity,
+            typ,
             operands,
             context.get_increment_id(),
         )),

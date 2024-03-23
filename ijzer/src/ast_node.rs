@@ -9,10 +9,8 @@ use std::rc::Rc;
 #[derive(Clone)]
 pub struct Node {
     pub op: Operation,
-    pub output_arity: usize,
     pub operands: Vec<Rc<Node>>,
-    pub functional_operands: Vec<Rc<Node>>,
-    pub input_arity: usize,
+    pub typ: IJType,
     pub id: usize,
 }
 
@@ -25,8 +23,7 @@ pub struct TokenSlice {
 #[derive(Clone, PartialEq, Debug)]
 pub struct Variable {
     pub name: String,
-    pub output_arity: usize,
-    pub input_arity: usize,
+    pub typ: IJType,
 }
 
 #[derive(Debug, Default)]
@@ -35,6 +32,60 @@ pub struct ASTContext {
     pub tokens: Rc<Vec<Token>>,
     pub line_no: usize,
     pub id_counter: usize,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum IJType {
+    Scalar,
+    Tensor,
+    Function(FunctionSignature),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FunctionSignature {
+    pub input: Vec<IJType>,
+    pub output: Vec<IJType>,
+}
+
+impl FunctionSignature {
+    pub fn new(input: Vec<IJType>, output: Vec<IJType>) -> Self {
+        FunctionSignature { input, output }
+    }
+    pub fn tensor_function(inputs: usize, outputs: usize) -> Self {
+        Self {
+            input: vec![IJType::Tensor; inputs],
+            output: vec![IJType::Tensor; outputs],
+        }
+    }
+}
+
+impl IJType {
+    pub fn output_arity(&self) -> usize {
+        match self {
+            IJType::Scalar => 1,
+            IJType::Tensor => 1,
+            IJType::Function(sig) => sig.output.len(),
+        }
+    }
+    pub fn input_arity(&self) -> usize {
+        match self {
+            IJType::Scalar => 0,
+            IJType::Tensor => 0,
+            IJType::Function(sig) => sig.input.len(),
+        }
+    }
+    pub fn tensor_function(inputs: usize, outputs: usize) -> IJType {
+        IJType::Function(FunctionSignature {
+            input: vec![IJType::Scalar; inputs],
+            output: vec![IJType::Scalar; outputs],
+        })
+    }
+    pub fn tensor_to_scalar_function(inputs: usize) -> IJType {
+        IJType::Function(FunctionSignature {
+            input: vec![IJType::Tensor; inputs],
+            output: vec![IJType::Scalar; 1],
+        })
+    }
 }
 
 impl TokenSlice {
@@ -73,44 +124,13 @@ impl TokenSlice {
 }
 
 impl Node {
-    pub fn new(op: Operation, output_arity: usize, operands: Vec<Rc<Node>>, id: usize) -> Self {
+    pub fn new(op: Operation, typ: IJType, operands: Vec<Rc<Node>>, id: usize) -> Self {
         Node {
             op,
-            output_arity,
-            input_arity: operands.iter().map(|n| n.output_arity).sum(),
+            typ,
             operands,
-            functional_operands: Vec::new(),
             id,
         }
-    }
-
-    pub fn new_with_input_arity(
-        op: Operation,
-        output_arity: usize,
-        operands: Vec<Rc<Node>>,
-        id: usize,
-        input_arity: usize,
-    ) -> Result<Self, SyntaxError> {
-        let operand_arity: usize = operands.iter().map(|n| n.output_arity).sum();
-        if input_arity < operand_arity {
-            Err(SyntaxError::TooManyInputs)
-        } else {
-            Ok(Node {
-                op,
-                output_arity,
-                input_arity,
-                operands,
-                id,
-                functional_operands: Vec::new(),
-            })
-        }
-    }
-
-    pub fn all_operands(&self) -> impl Iterator<Item = Rc<Node>> + '_ {
-        self.functional_operands
-            .iter()
-            .chain(&self.operands)
-            .cloned()
     }
 }
 
