@@ -39,6 +39,7 @@ pub enum IJType {
     Scalar,
     Tensor,
     Function(FunctionSignature),
+    Group(Vec<IJType>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -65,6 +66,7 @@ impl IJType {
             IJType::Scalar => 1,
             IJType::Tensor => 1,
             IJType::Function(sig) => sig.output.len(),
+            IJType::Group(operands) => operands.iter().map(|item| item.output_arity()).sum()
         }
     }
     pub fn input_arity(&self) -> usize {
@@ -72,6 +74,7 @@ impl IJType {
             IJType::Scalar => 0,
             IJType::Tensor => 0,
             IJType::Function(sig) => sig.input.len(),
+            IJType::Group(operands) => operands.iter().map(|item| item.input_arity()).sum()
         }
     }
     pub fn tensor_function(inputs: usize, outputs: usize) -> IJType {

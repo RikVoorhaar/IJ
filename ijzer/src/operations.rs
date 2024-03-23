@@ -18,6 +18,7 @@ pub enum Operation {
     Function(String),
     Array(String),
     Reduce,
+    Scalar,
 }
 
 impl Debug for Operation {
@@ -37,6 +38,7 @@ impl Debug for Operation {
             Self::Function(s) => write!(f, "Function({})", s),
             Self::Array(s) => write!(f, "Array[{}]", s),
             Self::Reduce => write!(f, "Reduce"),
+            Self::Scalar => write!(f, "Scalar"),
         }
     }
 }

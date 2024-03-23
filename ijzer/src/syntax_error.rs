@@ -39,8 +39,8 @@ pub enum SyntaxError {
     #[error("Invalid number format: {0}")]
     InvalidNumberFormat(String),
 
-    #[error("Expected functional operator but got {0}")]
-    ExpectedFunctionalOperator(String),
+    #[error("Expected function but got {0}")]
+    ExpectedFunction(String),
 
     #[error("Expected binary operator but got {0}")]
     ExpectedBinaryOperator(String),

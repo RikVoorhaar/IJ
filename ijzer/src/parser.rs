@@ -340,12 +340,7 @@ fn _next_node_normal_op(
     let input_arity = operands.iter().map(|n| n.typ.output_arity()).sum();
     let typ = IJType::tensor_function(input_arity, output_arity);
     Ok((
-        Rc::new(Node::new(
-            op,
-            typ,
-            operands,
-            context.get_increment_id(),
-        )),
+        Rc::new(Node::new(op, typ, operands, context.get_increment_id())),
         rest,
     ))
 }
@@ -402,7 +397,7 @@ impl TokenImpl for LParen {
             _ => Ok((
                 Rc::new(Node::new(
                     Operation::Group,
-                    operands.iter().map(|n| n.output_arity).sum(),
+                    IJType::Group(operands.iter().map(|n| n.typ.clone()).collect()),
                     operands,
                     context.get_increment_id(),
                 )),
@@ -430,7 +425,7 @@ impl TokenImpl for LSqBracket {
         Ok((
             Rc::new(Node::new(
                 Operation::Array(contents),
-                1,
+                IJType::Tensor,
                 Vec::new(),
                 context.get_increment_id(),
             )),
@@ -449,16 +444,18 @@ fn _next_node_symbol(
         .get(&op.name)
         .ok_or(SyntaxError::UnknownSymbol(op.name.clone()))?;
 
-    let node_op = match variable.input_arity {
-        0 => Operation::Symbol(op.name),
-        _ => Operation::Function(op.name),
+    let node_op = match variable.typ {
+        IJType::Tensor => Operation::Symbol(op.name),
+        IJType::Function(_) => Operation::Function(op.name),
+        IJType::Group(_) => Operation::Group,
+        IJType::Scalar => Operation::Scalar,
     };
 
     _next_node_normal_op(
         node_op,
-        variable.input_arity,
-        variable.input_arity,
-        variable.output_arity,
+        variable.typ.input_arity(),
+        variable.typ.input_arity(),
+        variable.typ.output_arity(),
         slice,
         context,
     )
@@ -471,48 +468,40 @@ fn next_node_functional(
     let op = context.get_token_at_index(slice.start)?;
     let rest = slice.move_start(1)?;
     let functional_operand = match op {
-        Token::Plus => {
-            Node::new_with_input_arity(Operation::Add, 1, vec![], context.get_increment_id(), 2)?
-        }
-        Token::Multiplication => Node::new_with_input_arity(
-            Operation::Multiply,
-            1,
+        Token::Plus => Node::new(
+            Operation::Add,
+            IJType::tensor_function(2, 1),
             vec![],
             context.get_increment_id(),
-            2,
-        )?,
+        ),
+        Token::Multiplication => Node::new(
+            Operation::Multiply,
+            IJType::tensor_function(2, 1),
+            vec![],
+            context.get_increment_id(),
+        ),
 
         Token::Symbol(SymbolToken { name }) => {
             let (variable, _) = context
                 .symbols
                 .get(name.as_str())
                 .ok_or(SyntaxError::UnknownSymbol(name.clone()))?;
-            if variable.input_arity == 0 {
-                return Err(SyntaxError::ExpectedFunctionalOperator(
-                    context.tokens_to_string(slice),
-                )
-                .into());
+            match variable.typ {
+                IJType::Function(_) => Node::new(
+                    Operation::Function(name.clone()),
+                    variable.typ.clone(),
+                    vec![],
+                    context.get_increment_id(),
+                ),
+                _ => {
+                    return Err(
+                        SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into(),
+                    )
+                }
             }
-            Node::new(
-                Operation::Function(name.clone()),
-                variable.output_arity,
-                vec![],
-                context.get_increment_id(),
-            )
         }
 
-        _ => {
-            let (node, rest) = next_node(slice, context)?;
-            let input_arity_difference = node.input_arity.saturating_sub(node.operands.len());
-            if input_arity_difference == 0 {
-                return Err(SyntaxError::InsufficientArguments(
-                    node.input_arity,
-                    node.operands.len(),
-                )
-                .into());
-            }
-            return Ok((node, rest));
-        }
+        _ => return Err(SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into()),
     };
     Ok((Rc::new(functional_operand), rest))
 }
