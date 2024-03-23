@@ -1,5 +1,6 @@
 use crate::tokens::Token;
 
+
 use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum SyntaxError {
@@ -47,4 +48,10 @@ pub enum SyntaxError {
 
     #[error("Expected operator with output arity {0} but got {1}")]
     ExpectedOperatorWithOutputArity(usize, String),
+
+    #[error("Expected type {0} but got {1}")]
+    TypeError(String, String),
+
+    #[error("Operation with multiple outputs is not supported here.")]
+    MultipleOutputs,
 }

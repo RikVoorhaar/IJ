@@ -279,8 +279,10 @@ fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node>, T
     let op = context.get_token_at_index(slice.start)?;
     let rest = slice.move_start(1)?;
     match op {
-        Token::Plus => _next_node_normal_op(Operation::Add, 2, 2, 1, rest, context),
-        Token::Multiplication => _next_node_normal_op(Operation::Multiply, 2, 2, 1, rest, context),
+        Token::Plus => _next_node_simple_tensor_function(Operation::Add, 2, 2, rest, context),
+        Token::Multiplication => {
+            _next_node_simple_tensor_function(Operation::Multiply, 2, 2, rest, context)
+        }
         Token::Number(_) => Number::_next_node(op.clone(), rest, context),
         Token::Minus => MinusOp::_next_node(op.clone(), rest, context),
         Token::LParen => LParen::_next_node(op.clone(), rest, context),
@@ -327,20 +329,22 @@ fn gather_operands(
     Ok((operands, rest))
 }
 
-fn _next_node_normal_op(
+fn _next_node_simple_tensor_function(
     op: Operation,
     min_arity: usize,
     max_arity: usize,
-    output_arity: usize,
     slice: TokenSlice,
     context: &mut ASTContext,
 ) -> Result<(Rc<Node>, TokenSlice)> {
     let (operands, rest) = gather_operands(min_arity, max_arity, slice, context)
         .with_context(|| anyhow!("Error caused by {:?}", op))?;
-    let input_arity = operands.iter().map(|n| n.typ.output_arity()).sum();
-    let typ = IJType::tensor_function(input_arity, output_arity);
     Ok((
-        Rc::new(Node::new(op, typ, operands, context.get_increment_id())),
+        Rc::new(Node::new(
+            op,
+            IJType::Tensor,
+            operands,
+            context.get_increment_id(),
+        )),
         rest,
     ))
 }
@@ -450,12 +454,14 @@ fn _next_node_symbol(
         IJType::Group(_) => Operation::Group,
         IJType::Scalar => Operation::Scalar,
     };
+    if variable.typ.output_arity() > 1 {
+        return Err(SyntaxError::MultipleOutputs.into());
+    }
 
-    _next_node_normal_op(
+    _next_node_simple_tensor_function(
         node_op,
         variable.typ.input_arity(),
         variable.typ.input_arity(),
-        variable.typ.output_arity(),
         slice,
         context,
     )
@@ -511,30 +517,25 @@ fn _next_node_reduction(
     slice: TokenSlice,
     context: &mut ASTContext,
 ) -> Result<(Rc<Node>, TokenSlice)> {
-    let (functional_operand, rest) = next_node_functional(slice, context)?;
-    if functional_operand.output_arity != 1 {
-        return Err(context.add_context_to_syntax_error(
-            SyntaxError::ExpectedOperatorWithOutputArity(1, context.tokens_to_string(slice)),
-            slice,
-        ));
-    }
-    if functional_operand.input_arity != 2 {
-        return Err(context.add_context_to_syntax_error(
-            SyntaxError::ExpectedBinaryOperator(context.tokens_to_string(slice)),
-            slice,
-        ));
+    let (function, rest) = next_node_functional(slice, context)?;
+    let expected_type = IJType::Function(FunctionSignature::new(
+        vec![IJType::Tensor; 2],
+        vec![IJType::Tensor],
+    ));
+    if function.typ != expected_type {
+        return Err(
+            SyntaxError::TypeError(expected_type.to_string(), function.typ.to_string()).into(),
+        );
     }
 
     let (operands, rest) = gather_operands(1, 1, rest, context)?;
     Ok((
-        Rc::new(Node {
-            op: Operation::Reduce,
-            output_arity: 1,
-            operands,
-            functional_operands: vec![functional_operand],
-            input_arity: 1,
-            id: context.get_increment_id(),
-        }),
+        Rc::new(Node::new(
+            Operation::Reduce,
+            IJType::Scalar,
+            [function].into_iter().chain(operands.into_iter()).collect(),
+            context.get_increment_id(),
+        )),
         rest,
     ))
 }
@@ -548,11 +549,11 @@ impl TokenImpl for MinusOp {
         context: &mut ASTContext,
     ) -> Result<(Rc<Node>, TokenSlice)> {
         let (operands, rest) = gather_operands(1, 2, slice, context)?;
-        match operands.iter().map(|node| node.output_arity).sum() {
+        match operands.iter().map(|node| node.typ.output_arity()).sum() {
             1 => Ok((
                 Rc::new(Node::new(
                     Operation::Negate,
-                    1,
+                    IJType::Tensor,
                     operands,
                     context.get_increment_id(),
                 )),
@@ -561,7 +562,7 @@ impl TokenImpl for MinusOp {
             2 => Ok((
                 Rc::new(Node::new(
                     Operation::Subtract,
-                    1,
+                    IJType::Tensor,
                     operands,
                     context.get_increment_id(),
                 )),
@@ -583,14 +584,12 @@ impl TokenImpl for IdentityOp {
         if !operands.is_empty() {
             Ok((operands.remove(0), rest))
         } else {
-            let node = Node::new_with_input_arity(
+            let node = Node::new(
                 Operation::Identity,
-                1,
+                IJType::tensor_function(1, 1),
                 operands,
                 context.get_increment_id(),
-                1,
-            )
-            .map_err(|e| context.add_context_to_syntax_error(e, tokens))?;
+            );
             Ok((Rc::new(node), rest))
         }
     }
@@ -608,7 +607,12 @@ impl TokenImpl for Number {
         };
 
         Ok((
-            Rc::new(Node::new(node_op, 1, vec![], context.get_increment_id())),
+            Rc::new(Node::new(
+                node_op,
+                IJType::Scalar,
+                vec![],
+                context.get_increment_id(),
+            )),
             tokens,
         ))
     }
@@ -627,8 +631,8 @@ impl Node {
             "{}{:?} | ({}->{})",
             _tab_nested(nesting),
             self.op,
-            self.input_arity,
-            self.output_arity
+            self.typ.input_arity(),
+            self.typ.output_arity()
         )?;
         if !&self.operands.is_empty() {
             write!(f, "[")?;
@@ -640,13 +644,6 @@ impl Node {
             write!(f, "\n{}]", _tab_nested(nesting))?;
         }
 
-        if !&self.functional_operands.is_empty() {
-            write!(f, "<")?;
-            for operand in &self.functional_operands {
-                operand.fmt_nested(f, nesting + 1)?;
-            }
-            write!(f, ">")?;
-        }
         Ok(())
     }
 }

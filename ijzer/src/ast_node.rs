@@ -60,6 +60,7 @@ impl FunctionSignature {
     }
 }
 
+
 impl IJType {
     pub fn output_arity(&self) -> usize {
         match self {
@@ -90,6 +91,29 @@ impl IJType {
         })
     }
 }
+
+impl std::fmt::Display for IJType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IJType::Scalar => write!(f, "Scalar"),
+            IJType::Tensor => write!(f, "Tensor"),
+            IJType::Function(sig) => write!(f, "Function({})", sig),
+            IJType::Group(operands) => {
+                let operand_strings: Vec<String> = operands.iter().map(|op| op.to_string()).collect();
+                write!(f, "Group({})", operand_strings.join(", "))
+            }
+        }
+    }
+}
+
+impl std::fmt::Display for FunctionSignature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let input_strings: Vec<String> = self.input.iter().map(|i| i.to_string()).collect();
+        let output_strings: Vec<String> = self.output.iter().map(|o| o.to_string()).collect();
+        write!(f, "({}) -> ({})", input_strings.join(", "), output_strings.join(", "))
+    }
+}
+
 
 impl TokenSlice {
     pub fn new(start: usize, end: usize, max: usize) -> Self {
