@@ -5,7 +5,7 @@ use syn::Ident;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 
-use crate::{operations::Operation, parser::Node};
+use crate::{ast_node::Node, operations::Operation};
 
 pub struct CompilerContext {
     pub node_map: HashMap<usize, Rc<Node>>,
@@ -410,7 +410,7 @@ struct Reduce;
 impl CompileNode for Reduce {
     fn compile(
         node: Rc<Node>,
-        compiler: &mut CompilerContext,
+        _compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::Reduce = &node.op {

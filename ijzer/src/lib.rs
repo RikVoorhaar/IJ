@@ -2,22 +2,21 @@ use anyhow::Result;
 use proc_macro2::TokenStream;
 use std::rc::Rc;
 
-pub mod arrays;
 pub mod compiler;
 pub mod parser;
 pub mod operations;
-pub mod pretty_print;
 pub mod syntax_error;
 pub mod tokens;
 pub mod tensor;
+pub mod ast_node;
 
 // pub use arrays::*;
 // pub use arrays::ArrayFunc;
 // pub use ndarray::array;
 
 pub fn compile(input: &str) -> Result<TokenStream> {
-    let mut symbol_table = parser::ASTContext::new();
-    let mut parsed_lines: Vec<Rc<parser::Node>> = Vec::new();
+    let mut symbol_table = ast_node::ASTContext::new();
+    let mut parsed_lines: Vec<Rc<ast_node::Node>> = Vec::new();
 
     for line in input.lines() {
         let tokens = tokens::lexer(line)?;
