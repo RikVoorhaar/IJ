@@ -24,10 +24,10 @@ impl CompilerContext {
 
         while let Some(node_rc) = stack.pop() {
             node_map.insert(node_rc.id, node_rc.clone());
-            if node_rc.all_operands().count() == 0 {
+            if node_rc.operands.is_empty() {
                 leaves.push(node_rc.id);
             }
-            for child in node_rc.all_operands() {
+            for child in &node_rc.operands {
                 parent.insert(child.id, node_rc.id);
                 stack.push(child.clone());
             }
@@ -51,7 +51,8 @@ impl CompilerContext {
                 .node_map
                 .get(&parent)
                 .unwrap()
-                .all_operands()
+                .operands
+                .iter()
                 .map(|n| n.id)
                 .collect::<Vec<_>>();
             if siblings.iter().all(|s| self.parsed.contains_key(s)) {
@@ -67,7 +68,7 @@ impl CompilerContext {
     pub fn compile_node(&mut self, node_id: usize) -> Result<TokenStream> {
         let node = self.node_map.get(&node_id).unwrap().clone();
 
-        let children = node.all_operands().map(|n| n.id).collect::<Vec<_>>();
+        let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
         let child_streams: HashMap<usize, TokenStream> = children
             .iter()
             .map(|id| (*id, self.parsed.remove(id).unwrap()))
@@ -91,6 +92,7 @@ impl CompilerContext {
             Operation::Negate => Negate::compile(node, self, child_streams)?,
             Operation::Array(_) => Array::compile(node, self, child_streams)?,
             Operation::Reduce => Reduce::compile(node, self, child_streams)?,
+            Operation::Scalar => NotImplemented::compile(node, self, child_streams)?,
             // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
@@ -418,28 +420,17 @@ impl CompileNode for Reduce {
             panic!("Expected reduce node, found {:?}", node.op);
         }
         let operands = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
-        if operands.len() != 1 {
+        if operands.len() != 2 {
             panic!(
-                "Expected 1 operands for reduce operation, found {}",
+                "Expected 2 operands for reduce operation, found {}",
                 operands.len()
             );
         }
 
         let data_stream = child_streams.get(&operands[0]).unwrap();
 
-        let functional_operands = node
-            .functional_operands
-            .iter()
-            .map(|n| n.id)
-            .collect::<Vec<_>>();
-        if functional_operands.len() != 1 {
-            panic!(
-                "Expected 1 functional operands for reduce operation, found {}",
-                functional_operands.len()
-            );
-        }
-        let functional_operand = &node.functional_operands.first().unwrap();
-        let functional_operand_stream = child_streams.get(&functional_operand.id).unwrap();
+        let functional_operand = &operands[1];
+        let functional_operand_stream = child_streams.get(&functional_operand).unwrap();
 
         Ok(quote! {
             #data_stream.reduce(#functional_operand_stream)

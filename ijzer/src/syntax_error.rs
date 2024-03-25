@@ -54,4 +54,13 @@ pub enum SyntaxError {
 
     #[error("Operation with multiple outputs is not supported here.")]
     MultipleOutputs,
+
+    #[error("Input arity {0} of node {1} exceeds summed output arity {2} of children: {3}")]
+    InputArityExceedsOutputArity(usize, String, usize, String),
+
+    #[error("Function signature {0} does not match expected signature {1}")]
+    FunctionSignatureMismatch(String, String),
+
+    #[error("Function with multiple outputs is not supported yet. Use a group as output instead.")]
+    FunctionWithMultipleOutputs(usize),
 }

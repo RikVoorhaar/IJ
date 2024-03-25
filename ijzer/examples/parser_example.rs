@@ -1,14 +1,17 @@
 use anyhow::Result;
-use ijzer::parser::{parse_line, ASTContext};
+use ijzer::ast_node::ASTContext;
+use ijzer::parser::parse_line;
 use ijzer::tokens::lexer;
 
 static INPUT: &str = r#"
 var x -> 1
-y = (+ (x 1))
+(+ x [1])
+y = (+ x [1])
 z = - x y
 fn z = * y I
-x y = (1 2)
+x y = 1 2
 u = [1,2,3]
+ /+ u
 v = /+ u
 * (z 1 -2)
 "#;
@@ -27,4 +30,4 @@ fn main() -> Result<()> {
     }
 
     Ok(())
-} 
+}

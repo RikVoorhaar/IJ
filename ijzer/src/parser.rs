@@ -134,7 +134,8 @@ pub fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
     )))
 }
 
-fn _get_variable_expression(context: &mut ASTContext) -> Result<Rc<Node>> {
+/// Get the nodes expressed on the right hand side of an assignment token.
+fn _get_variable_expression(context: &mut ASTContext) -> Result<Vec<Rc<Node>>> {
     let tokens = context.get_tokens();
     let mut split = tokens.split(|t| t == &Token::Assign);
     let assign_index: usize = split
@@ -144,30 +145,44 @@ fn _get_variable_expression(context: &mut ASTContext) -> Result<Rc<Node>> {
             context.full_slice(),
         ))?
         .len();
-    let slice = context.full_slice().move_start(assign_index + 1)?;
-    let (expression, rest) = next_node(slice, context)?;
-    if !rest.is_empty() {
-        return Err(context.add_context_to_syntax_error(
-            SyntaxError::UnhandledTokens(context.tokens_to_string(rest)),
-            rest,
-        ));
+    let mut slice = context.full_slice().move_start(assign_index + 1)?;
+
+    let mut expressions = Vec::new();
+    while !slice.is_empty() {
+        let (expression, rest) = next_node(slice, context)?;
+        expressions.push(expression);
+        slice = rest;
     }
-    Ok(expression)
+    Ok(expressions)
 }
 
-fn _compute_input_arity(node: &Rc<Node>) -> usize {
-    let this_node: usize = node.typ.input_arity()
-        - node
-            .operands
-            .iter()
-            .map(|n| n.typ.output_arity())
-            .sum::<usize>();
+fn _compute_input_arity(node: &Rc<Node>) -> Result<usize, SyntaxError> {
+    let input_arity = node.typ.input_arity();
+    let output_arity_sum: usize = node.operands.iter().map(|n| n.typ.output_arity()).sum();
+    if input_arity < output_arity_sum {
+        return Err(SyntaxError::InputArityExceedsOutputArity(
+            input_arity,
+            node.to_string(),
+            output_arity_sum,
+            node.operands
+                .iter()
+                .map(|n| n.to_string())
+                .collect::<Vec<String>>()
+                .join(", "),
+        )
+        .into());
+    }
+    let this_node_arity: usize = input_arity - output_arity_sum;
     let children: usize = node
         .operands
         .iter()
         .map(_compute_input_arity)
-        .sum::<usize>();
-    this_node + children
+        .try_fold(0, |acc, x| x.map(|y| acc + y))?;
+    Ok(this_node_arity + children)
+}
+
+/// Recursively walk down the AST. For each node compare the signature to the output of its operands. Any non-machtching operand is considered an input. A functoin with no inputs is equal to its output type. (()-> Tensor = Tensor)
+pub fn compute_input_type(node: &Rc<Node>) -> Result<IJType, SyntaxError> {
 }
 
 pub fn parse_assign(
@@ -175,8 +190,12 @@ pub fn parse_assign(
     context: &mut ASTContext,
     is_function: bool,
 ) -> Result<Rc<Node>> {
-    let expression = _get_variable_expression(context)?;
-    let input_arity = _compute_input_arity(&expression);
+    let expressions = _get_variable_expression(context)?;
+    let input_arity = expressions
+        .iter()
+        .map(|expr| _compute_input_arity(expr))
+        .try_fold(0, |acc, x| x.map(|y| acc + y))
+        .map_err(|e| context.add_context_to_syntax_error(e, context.full_slice()))?;
     if is_function && input_arity == 0 {
         return Err(context.add_context_to_syntax_error(
             SyntaxError::FunctionWithoutInputs,
@@ -202,12 +221,9 @@ pub fn parse_assign(
                 _ => unreachable!(),
             })
             .collect();
-        if symbol_names.len() != expression.typ.output_arity() {
+        if symbol_names.len() != expressions.len() {
             return Err(context.add_context_to_syntax_error(
-                SyntaxError::IncorrectNumVariables(
-                    symbol_names.len(),
-                    expression.typ.output_arity(),
-                ),
+                SyntaxError::IncorrectNumVariables(symbol_names.len(), expressions.len()),
                 context.full_slice(),
             ));
         }
@@ -233,22 +249,36 @@ pub fn parse_assign(
         }
         Ok(Rc::new(Node::new(
             Operation::Assign,
-            IJType::Tensor,
+            IJType::Function(FunctionSignature {
+                input: vec![IJType::Group(vec![IJType::Tensor; symbol_nodes.len()]); 2],
+                output: vec![],
+            }),
             vec![
                 Rc::new(Node::new(
                     Operation::Group,
-                    IJType::tensor_function(0, expression.typ.output_arity()),
+                    IJType::Group(vec![IJType::Tensor; symbol_nodes.len()]),
                     symbol_nodes,
                     context.get_increment_id(),
                 )),
-                expression,
+                Rc::new(Node::new(
+                    Operation::Group,
+                    IJType::Group(vec![IJType::Tensor; expressions.len()]),
+                    expressions,
+                    context.get_increment_id(),
+                )),
             ],
             context.get_increment_id(),
         )))
     } else {
         // is_function
-        let output_arity = expression.typ.output_arity();
-        let typ = IJType::tensor_function(input_arity, output_arity);
+        if expressions.len() != 1 {
+            return Err(context.add_context_to_syntax_error(
+                SyntaxError::FunctionWithMultipleOutputs(expressions.len()),
+                context.full_slice(),
+            ));
+        }
+        let expression = expressions.into_iter().next().unwrap();
+        let typ = IJType::tensor_function(input_arity, 1);
         let symbol_node = Node::new(
             Operation::Function(variable_name.clone()),
             typ.clone(),
@@ -289,11 +319,13 @@ fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node>, T
         Token::LSqBracket => LSqBracket::_next_node(op.clone(), rest, context),
         Token::Symbol(op) => _next_node_symbol(op.clone(), rest, context),
         Token::Identity => IdentityOp::_next_node(op.clone(), rest, context),
-        Token::Reduction => _next_node_reduction(op.clone(), rest, context),
+        Token::Reduction => Reduction::_next_node(op.clone(), rest, context),
         _ => Err(anyhow!("Unexpected token {:?}", op)),
     }
 }
 
+/// TODO: This should not just take min_arity and max_arity; but also type.
+/// I think it would be ok to restrict to either only tensors or only scalars
 fn gather_operands(
     min_arity: usize,
     max_arity: usize,
@@ -329,6 +361,8 @@ fn gather_operands(
     Ok((operands, rest))
 }
 
+/// Parses a simple tensor function, such as addition or multiplication. These all have
+/// a range of input aritys. All inputs are tensors, the output is a single tensor.
 fn _next_node_simple_tensor_function(
     op: Operation,
     min_arity: usize,
@@ -341,7 +375,7 @@ fn _next_node_simple_tensor_function(
     Ok((
         Rc::new(Node::new(
             op,
-            IJType::Tensor,
+            IJType::tensor_function(operands.len(), 1),
             operands,
             context.get_increment_id(),
         )),
@@ -374,6 +408,8 @@ fn _find_matching_parenthesis(
     ))
 }
 
+/// Left parenthesis denotes the start of a group.
+/// This node is therefore a function with operands as inputs and a group as output.
 #[derive(Debug, PartialEq)]
 struct LParen;
 impl TokenImpl for LParen {
@@ -398,15 +434,24 @@ impl TokenImpl for LParen {
         match operands.len() {
             0 => unreachable!(),
             1 => Ok((operands[0].clone(), remainder)),
-            _ => Ok((
-                Rc::new(Node::new(
-                    Operation::Group,
-                    IJType::Group(operands.iter().map(|n| n.typ.clone()).collect()),
-                    operands,
-                    context.get_increment_id(),
-                )),
-                remainder,
-            )),
+            _ => {
+                let operands_types = operands
+                    .iter()
+                    .map(|n| n.typ.clone())
+                    .collect::<Vec<IJType>>();
+                Ok((
+                    Rc::new(Node::new(
+                        Operation::Group,
+                        IJType::Function(FunctionSignature::new(
+                            operands_types.clone(),
+                            vec![IJType::Group(operands_types)],
+                        )),
+                        operands,
+                        context.get_increment_id(),
+                    )),
+                    remainder,
+                ))
+            }
         }
     }
 }
@@ -438,6 +483,8 @@ impl TokenImpl for LSqBracket {
     }
 }
 
+// TODO: not sure this is correct in general.
+// I think that there should be a `_next_node_function` method that takes a function signature as input. Then in this case when we have a function that's what we output. In the case of a Tensor or Scalar, we directly create the node. (Which is a symbol node). The group variant should be impossible by construction and throw a syntax error.
 fn _next_node_symbol(
     op: SymbolToken,
     slice: TokenSlice,
@@ -467,25 +514,40 @@ fn _next_node_symbol(
     )
 }
 
+/// Parses a functional operand. This must be a function or a symbol (encoding a function).
+/// No arguments are parsed for the operand, since this function is passed on to something modifying the function's behavior.
 fn next_node_functional(
     slice: TokenSlice,
     context: &mut ASTContext,
+    signature: &FunctionSignature,
 ) -> Result<(Rc<Node>, TokenSlice)> {
-    let op = context.get_token_at_index(slice.start)?;
+    let token = context.get_token_at_index(slice.start)?;
     let rest = slice.move_start(1)?;
-    let functional_operand = match op {
-        Token::Plus => Node::new(
-            Operation::Add,
-            IJType::tensor_function(2, 1),
-            vec![],
-            context.get_increment_id(),
-        ),
-        Token::Multiplication => Node::new(
-            Operation::Multiply,
-            IJType::tensor_function(2, 1),
-            vec![],
-            context.get_increment_id(),
-        ),
+    let op = match token {
+        Token::Plus => {
+            if signature != &FunctionSignature::tensor_function(2, 1)
+                && signature != &FunctionSignature::scalar_function(2, 1)
+            {
+                return Err(SyntaxError::FunctionSignatureMismatch(
+                    signature.to_string(),
+                    "Tensor -> Tensor -> Tensor or Scalar -> Scalar -> Scalar".to_string(),
+                )
+                .into());
+            }
+            Operation::Add
+        }
+        Token::Multiplication => {
+            if signature != &FunctionSignature::tensor_function(2, 1)
+                && signature != &FunctionSignature::scalar_function(2, 1)
+            {
+                return Err(SyntaxError::FunctionSignatureMismatch(
+                    signature.to_string(),
+                    "Tensor -> Tensor -> Tensor or Scalar -> Scalar -> Scalar".to_string(),
+                )
+                .into());
+            }
+            Operation::Multiply
+        }
 
         Token::Symbol(SymbolToken { name }) => {
             let (variable, _) = context
@@ -493,12 +555,9 @@ fn next_node_functional(
                 .get(name.as_str())
                 .ok_or(SyntaxError::UnknownSymbol(name.clone()))?;
             match variable.typ {
-                IJType::Function(_) => Node::new(
-                    Operation::Function(name.clone()),
-                    variable.typ.clone(),
-                    vec![],
-                    context.get_increment_id(),
-                ),
+                IJType::Function(ref func_signature) if func_signature == signature => {
+                    Operation::Function(name.clone())
+                }
                 _ => {
                     return Err(
                         SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into(),
@@ -509,35 +568,50 @@ fn next_node_functional(
 
         _ => return Err(SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into()),
     };
-    Ok((Rc::new(functional_operand), rest))
-}
-
-fn _next_node_reduction(
-    _op: Token,
-    slice: TokenSlice,
-    context: &mut ASTContext,
-) -> Result<(Rc<Node>, TokenSlice)> {
-    let (function, rest) = next_node_functional(slice, context)?;
-    let expected_type = IJType::Function(FunctionSignature::new(
-        vec![IJType::Tensor; 2],
-        vec![IJType::Tensor],
-    ));
-    if function.typ != expected_type {
-        return Err(
-            SyntaxError::TypeError(expected_type.to_string(), function.typ.to_string()).into(),
-        );
-    }
-
-    let (operands, rest) = gather_operands(1, 1, rest, context)?;
     Ok((
         Rc::new(Node::new(
-            Operation::Reduce,
-            IJType::Scalar,
-            [function].into_iter().chain(operands.into_iter()).collect(),
+            op,
+            IJType::Function(signature.clone()),
+            vec![],
             context.get_increment_id(),
         )),
         rest,
     ))
+}
+
+struct Reduction;
+impl TokenImpl for Reduction {
+    fn _next_node(
+        _op: Token,
+        slice: TokenSlice,
+        context: &mut ASTContext,
+    ) -> Result<(Rc<Node>, TokenSlice)> {
+        let function_signature =
+            FunctionSignature::new(vec![IJType::Scalar; 2], vec![IJType::Scalar]);
+        let function_type = IJType::Function(function_signature.clone());
+        let (function, rest) = next_node_functional(slice, context, &function_signature)?;
+        if function.typ != function_type {
+            return Err(SyntaxError::TypeError(
+                function_type.to_string(),
+                function.typ.to_string(),
+            )
+            .into());
+        }
+
+        let (operands, rest) = gather_operands(1, 1, rest, context)?;
+        Ok((
+            Rc::new(Node::new(
+                Operation::Reduce,
+                IJType::Function(FunctionSignature::new(
+                    vec![function_type, IJType::Tensor],
+                    vec![IJType::Scalar],
+                )),
+                [function].into_iter().chain(operands.into_iter()).collect(),
+                context.get_increment_id(),
+            )),
+            rest,
+        ))
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -553,7 +627,7 @@ impl TokenImpl for MinusOp {
             1 => Ok((
                 Rc::new(Node::new(
                     Operation::Negate,
-                    IJType::Tensor,
+                    IJType::tensor_function(1, 1),
                     operands,
                     context.get_increment_id(),
                 )),
@@ -562,7 +636,7 @@ impl TokenImpl for MinusOp {
             2 => Ok((
                 Rc::new(Node::new(
                     Operation::Subtract,
-                    IJType::Tensor,
+                    IJType::tensor_function(2, 1),
                     operands,
                     context.get_increment_id(),
                 )),
@@ -621,39 +695,5 @@ impl TokenImpl for Number {
 impl Debug for Number {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self.value)
-    }
-}
-
-impl Node {
-    fn fmt_nested(&self, f: &mut std::fmt::Formatter<'_>, nesting: usize) -> std::fmt::Result {
-        write!(
-            f,
-            "{}{:?} | ({}->{})",
-            _tab_nested(nesting),
-            self.op,
-            self.typ.input_arity(),
-            self.typ.output_arity()
-        )?;
-        if !&self.operands.is_empty() {
-            write!(f, "[")?;
-
-            for operand in &self.operands {
-                writeln!(f)?;
-                operand.fmt_nested(f, nesting + 1)?;
-            }
-            write!(f, "\n{}]", _tab_nested(nesting))?;
-        }
-
-        Ok(())
-    }
-}
-
-fn _tab_nested(nesting: usize) -> String {
-    "    ".repeat(nesting)
-}
-
-impl Debug for Node {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.fmt_nested(f, 0)
     }
 }
