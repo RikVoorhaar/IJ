@@ -63,4 +63,7 @@ pub enum SyntaxError {
 
     #[error("Function with multiple outputs is not supported yet. Use a group as output instead.")]
     FunctionWithMultipleOutputs(usize),
+
+    #[error("Tried to match multiple types {0} but none of them matched. Longest string has type {1}")]
+    GatherMismatch(String, String),
 }

@@ -125,10 +125,8 @@ pub fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
 
     Ok(Rc::new(Node::new(
         Operation::Nothing,
-        IJType::Function(FunctionSignature {
-            input: vec![],
-            output: vec![],
-        }),
+        Vec::new(),
+        IJType::Void,
         Vec::new(),
         context.get_increment_id(),
     )))
@@ -156,33 +154,16 @@ fn _get_variable_expression(context: &mut ASTContext) -> Result<Vec<Rc<Node>>> {
     Ok(expressions)
 }
 
-fn _compute_input_arity(node: &Rc<Node>) -> Result<usize, SyntaxError> {
-    let input_arity = node.typ.input_arity();
-    let output_arity_sum: usize = node.operands.iter().map(|n| n.typ.output_arity()).sum();
-    if input_arity < output_arity_sum {
-        return Err(SyntaxError::InputArityExceedsOutputArity(
-            input_arity,
-            node.to_string(),
-            output_arity_sum,
-            node.operands
-                .iter()
-                .map(|n| n.to_string())
-                .collect::<Vec<String>>()
-                .join(", "),
-        )
-        .into());
+/// Revusrively walk down AST. If we reach a leaf node without an operand, add it to the input types. Otherwise concatenate the input types of its operands.
+pub fn compute_input_type(node: &Rc<Node>) -> Result<Vec<IJType>, SyntaxError> {
+    if node.operands.is_empty() {
+        return Ok(node.input_types.clone());
     }
-    let this_node_arity: usize = input_arity - output_arity_sum;
-    let children: usize = node
-        .operands
-        .iter()
-        .map(_compute_input_arity)
-        .try_fold(0, |acc, x| x.map(|y| acc + y))?;
-    Ok(this_node_arity + children)
-}
-
-/// Recursively walk down the AST. For each node compare the signature to the output of its operands. Any non-machtching operand is considered an input. A functoin with no inputs is equal to its output type. (()-> Tensor = Tensor)
-pub fn compute_input_type(node: &Rc<Node>) -> Result<IJType, SyntaxError> {
+    let mut input_types = Vec::new();
+    for operand in node.operands.iter() {
+        input_types.extend(compute_input_type(operand)?);
+    }
+    Ok(input_types)
 }
 
 pub fn parse_assign(
@@ -191,18 +172,23 @@ pub fn parse_assign(
     is_function: bool,
 ) -> Result<Rc<Node>> {
     let expressions = _get_variable_expression(context)?;
-    let input_arity = expressions
+    let input_types = expressions
         .iter()
-        .map(|expr| _compute_input_arity(expr))
-        .try_fold(0, |acc, x| x.map(|y| acc + y))
+        .map(|expr| compute_input_type(expr))
+        .try_fold(vec![], |mut acc, x| {
+            x.map(|y| {
+                acc.extend(y);
+                acc
+            })
+        })
         .map_err(|e| context.add_context_to_syntax_error(e, context.full_slice()))?;
-    if is_function && input_arity == 0 {
+    if is_function && input_types.is_empty() {
         return Err(context.add_context_to_syntax_error(
             SyntaxError::FunctionWithoutInputs,
             context.full_slice(),
         ));
     }
-    if !is_function && input_arity != 0 {
+    if !is_function && input_types.len() != 0 {
         return Err(context
             .add_context_to_syntax_error(SyntaxError::VariableWithInput, context.full_slice()));
     }
@@ -232,6 +218,7 @@ pub fn parse_assign(
             .map(|s| {
                 Rc::new(Node::new(
                     Operation::Symbol(s),
+                    Vec::new(),
                     IJType::Tensor,
                     Vec::new(),
                     context.get_increment_id(),
@@ -249,19 +236,19 @@ pub fn parse_assign(
         }
         Ok(Rc::new(Node::new(
             Operation::Assign,
-            IJType::Function(FunctionSignature {
-                input: vec![IJType::Group(vec![IJType::Tensor; symbol_nodes.len()]); 2],
-                output: vec![],
-            }),
+            vec![IJType::Group(vec![IJType::Tensor; symbol_nodes.len()]); 2],
+            IJType::Void,
             vec![
                 Rc::new(Node::new(
                     Operation::Group,
+                    vec![],
                     IJType::Group(vec![IJType::Tensor; symbol_nodes.len()]),
                     symbol_nodes,
                     context.get_increment_id(),
                 )),
                 Rc::new(Node::new(
                     Operation::Group,
+                    vec![],
                     IJType::Group(vec![IJType::Tensor; expressions.len()]),
                     expressions,
                     context.get_increment_id(),
@@ -278,9 +265,13 @@ pub fn parse_assign(
             ));
         }
         let expression = expressions.into_iter().next().unwrap();
-        let typ = IJType::tensor_function(input_arity, 1);
+        let typ = IJType::Function(FunctionSignature {
+            input: input_types,
+            output: vec![IJType::Tensor],
+        });
         let symbol_node = Node::new(
             Operation::Function(variable_name.clone()),
+            vec![],
             typ.clone(),
             Vec::new(),
             context.get_increment_id(),
@@ -295,10 +286,8 @@ pub fn parse_assign(
 
         Ok(Rc::new(Node::new(
             Operation::FunctionDeclaration,
-            IJType::Function(FunctionSignature {
-                input: vec![typ],
-                output: vec![],
-            }),
+            vec![typ; 2],
+            IJType::Void,
             vec![Rc::new(symbol_node), expression],
             context.get_increment_id(),
         )))
@@ -324,42 +313,61 @@ fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node>, T
     }
 }
 
-/// TODO: This should not just take min_arity and max_arity; but also type.
-/// I think it would be ok to restrict to either only tensors or only scalars
+/// Given a list of list of types, gather operands whose type together matches any of the variants.
+/// Returns the nodes matching the longest variant.
 fn gather_operands(
-    min_arity: usize,
-    max_arity: usize,
+    types: Vec<Vec<IJType>>,
     slice: TokenSlice,
     context: &mut ASTContext,
 ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
-    let mut total_arity = 0;
-    let mut overflow = 0;
     let mut operands = Vec::new();
+    let longest_variant_length = types.iter().map(|t| t.len()).max().unwrap();
     let mut rest = slice;
-    while !rest.is_empty() {
-        let (node, new_rest) = next_node(rest, context)?;
-        if total_arity + node.typ.output_arity() > max_arity {
-            overflow = node.typ.output_arity();
-            break;
+    let mut longest_match_length = 0;
+    for _ in 0..longest_variant_length {
+        let (node, rest) = next_node(rest, context)?;
+        operands.push(node);
+        let operands_types = operands
+            .iter()
+            .map(|n| n.output_type.clone())
+            .collect::<Vec<IJType>>();
+        if types.iter().any(|t| t == &operands_types) {
+            longest_match_length = operands.len();
         }
-        total_arity += node.typ.output_arity();
-        match node.op {
-            Operation::Group => {
-                operands.extend(node.operands.clone());
-            }
-            _ => operands.push(node),
-        }
-        rest = new_rest;
     }
-    if total_arity < min_arity {
+    if longest_match_length == 0 {
         return Err(context.add_context_to_syntax_error(
-            SyntaxError::InsufficientArguments(min_arity, total_arity + overflow),
+            SyntaxError::GatherMismatch(
+                types
+                    .iter()
+                    .map(|t| {
+                        format!(
+                            "[{}]",
+                            t.iter()
+                                .map(|inner_t| inner_t.to_string())
+                                .collect::<Vec<String>>()
+                                .join(", ")
+                        )
+                    })
+                    .collect::<Vec<String>>()
+                    .join(", "),
+                operands
+                    .iter()
+                    .map(|n| n.output_type.to_string())
+                    .collect::<String>(),
+            ),
             slice,
         ));
     }
+    let operands = operands[..longest_match_length]
+        .into_iter()
+        .map(|n| n.clone())
+        .collect();
 
     Ok((operands, rest))
 }
+////// TODO: Need to check from below heere
+
 
 /// Parses a simple tensor function, such as addition or multiplication. These all have
 /// a range of input aritys. All inputs are tensors, the output is a single tensor.

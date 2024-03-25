@@ -10,7 +10,8 @@ use std::rc::Rc;
 pub struct Node {
     pub op: Operation,
     pub operands: Vec<Rc<Node>>,
-    pub typ: IJType,
+    pub output_type: IJType,
+    pub input_types: Vec<IJType>,
     pub id: usize,
 }
 
@@ -36,6 +37,7 @@ pub struct ASTContext {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum IJType {
+    Void,
     Scalar,
     Tensor,
     Function(FunctionSignature),
@@ -67,34 +69,30 @@ impl FunctionSignature {
 }
 
 impl IJType {
-    pub fn output_arity(&self) -> usize {
-        match self {
-            IJType::Scalar => 1,
-            IJType::Tensor => 1,
-            IJType::Function(sig) => sig.output.len(),
-            IJType::Group(operands) => operands.iter().map(|item| item.output_arity()).sum(),
-        }
-    }
-    pub fn input_arity(&self) -> usize {
-        match self {
-            IJType::Scalar => 0,
-            IJType::Tensor => 0,
-            IJType::Function(sig) => sig.input.len(),
-            IJType::Group(operands) => operands.iter().map(|item| item.input_arity()).sum(),
-        }
-    }
-    pub fn output_types(&self) -> Vec<IJType> {
-        match self {
-            IJType::Scalar => vec![IJType::Scalar],
-            IJType::Tensor => vec![IJType::Tensor],
-            IJType::Function(sig) => sig.output.clone(),
-            IJType::Group(operands) => operands
-                .iter()
-                .map(|item| item.output_types())
-                .flat_map(|item| item)
-                .collect(),
-        }
-    }
+    // pub fn output_arity(&self) -> usize {
+    //     match self {
+    //         IJType::Scalar => 1,
+    //         IJType::Tensor => 1,
+    //         IJType::Function(sig) => sig.output.len(),
+    //         IJType::Void => 0,
+    //     }
+    // }
+    // pub fn input_arity(&self) -> usize {
+    //     match self {
+    //         IJType::Scalar => 0,
+    //         IJType::Tensor => 0,
+    //         IJType::Function(sig) => sig.input.len(),
+    //         IJType::Void => 0,
+    //     }
+    // }
+    // pub fn output_types(&self) -> Vec<IJType> {
+    //     match self {
+    //         IJType::Scalar => vec![IJType::Scalar],
+    //         IJType::Tensor => vec![IJType::Tensor],
+    //         IJType::Function(sig) => sig.output.clone(),
+    //         IJType::Void => vec![],
+    //     }
+    // }
     pub fn tensor_function(inputs: usize, outputs: usize) -> IJType {
         IJType::Function(FunctionSignature {
             input: vec![IJType::Tensor; inputs],
@@ -121,11 +119,8 @@ impl std::fmt::Display for IJType {
             IJType::Scalar => write!(f, "Scalar"),
             IJType::Tensor => write!(f, "Tensor"),
             IJType::Function(sig) => write!(f, "Function({})", sig),
-            IJType::Group(operands) => {
-                let operand_strings: Vec<String> =
-                    operands.iter().map(|op| op.to_string()).collect();
-                write!(f, "Group({})", operand_strings.join(", "))
-            }
+            IJType::Void => write!(f, "Void"),
+            IJType::Group(types) => write!(f, "Group({})", types.iter().map(|t| t.to_string()).collect::<Vec<String>>().join(", ")),
         }
     }
 }
@@ -179,10 +174,17 @@ impl TokenSlice {
 }
 
 impl Node {
-    pub fn new(op: Operation, typ: IJType, operands: Vec<Rc<Node>>, id: usize) -> Self {
+    pub fn new(
+        op: Operation,
+        input_types: Vec<IJType>,
+        output_type: IJType,
+        operands: Vec<Rc<Node>>,
+        id: usize,
+    ) -> Self {
         Node {
             op,
-            typ,
+            output_type,
+            input_types,
             operands,
             id,
         }
@@ -250,7 +252,7 @@ impl ASTContext {
 
 impl Node {
     fn fmt_nested(&self, f: &mut std::fmt::Formatter<'_>, nesting: usize) -> std::fmt::Result {
-        write!(f, "{}{:?}<{}>", _tab_nested(nesting), self.op, self.typ)?;
+        write!(f, "{}{:?}<{}>", _tab_nested(nesting), self.op, self.output_type)?;
         if !&self.operands.is_empty() {
             write!(f, "[")?;
 
@@ -277,12 +279,12 @@ impl Debug for Node {
 
 impl std::fmt::Display for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}<{}>", self.op, self.typ)?;
+        write!(f, "{:?}<{}>", self.op, self.output_type)?;
         if !self.operands.is_empty() {
             let operand_types: Vec<String> = self
                 .operands
                 .iter()
-                .map(|operand| format!("{}", operand.typ))
+                .map(|operand| format!("{}", operand.output_type))
                 .collect();
             write!(f, "({})", operand_types.join(", "))?;
         }
