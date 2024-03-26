@@ -33,7 +33,7 @@ fn parse_ast(context: &mut ASTContext) -> Result<Rc<Node>> {
             let (node, remainder) = next_node(context.full_slice(), context)?;
             if !remainder.is_empty() {
                 return Err(context.add_context_to_syntax_error(
-                    SyntaxError::UnhandledTokens(context.tokens_to_string(remainder)),
+                    SyntaxError::UnhandledTokens(context.tokens_to_string(remainder)).into(),
                     remainder,
                 ));
             }
@@ -48,7 +48,7 @@ pub fn parse_fn_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
         Some(Token::Symbol(symbol)) => symbol.name.clone(),
         Some(&token) => {
             return Err(context.add_context_to_syntax_error(
-                SyntaxError::UnexpectedToken(token.clone()),
+                SyntaxError::UnexpectedToken(token.clone()).into(),
                 context.full_slice(),
             ))
         }
@@ -63,7 +63,7 @@ pub fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
         Some(Token::Symbol(symbol)) => symbol.name.clone(),
         Some(&token) => {
             return Err(context.add_context_to_syntax_error(
-                SyntaxError::UnexpectedToken(token.clone()),
+                SyntaxError::UnexpectedToken(token.clone()).into(),
                 context.full_slice(),
             ))
         }
@@ -75,7 +75,7 @@ pub fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
                 Some(&Token::Arrow) => {}
                 Some(&token) => {
                     return Err(context.add_context_to_syntax_error(
-                        SyntaxError::UnexpectedToken(token.clone()),
+                        SyntaxError::UnexpectedToken(token.clone()).into(),
                         context.full_slice(),
                     ))
                 }
@@ -83,7 +83,7 @@ pub fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
             }
             number.value.parse::<usize>().map_err(|_| {
                 context.add_context_to_syntax_error(
-                    SyntaxError::InvalidNumberFormat(number.value.clone()),
+                    SyntaxError::InvalidNumberFormat(number.value.clone()).into(),
                     context.full_slice(),
                 )
             })?
@@ -91,7 +91,7 @@ pub fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
         Some(&Token::Arrow) => 0,
         Some(&token) => {
             return Err(context.add_context_to_syntax_error(
-                SyntaxError::UnexpectedToken(token.clone()),
+                SyntaxError::UnexpectedToken(token.clone()).into(),
                 context.full_slice(),
             ))
         }
@@ -100,13 +100,13 @@ pub fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
     let output_arity = match token_iter.next().as_ref() {
         Some(Token::Number(number)) => number.value.parse::<usize>().map_err(|_| {
             context.add_context_to_syntax_error(
-                SyntaxError::InvalidNumberFormat(number.value.clone()),
+                SyntaxError::InvalidNumberFormat(number.value.clone()).into(),
                 context.full_slice(),
             )
         })?,
         Some(&token) => {
             return Err(context.add_context_to_syntax_error(
-                SyntaxError::UnexpectedToken(token.clone()),
+                SyntaxError::UnexpectedToken(token.clone()).into(),
                 context.full_slice(),
             ))
         }
@@ -139,7 +139,7 @@ fn _get_variable_expression(context: &mut ASTContext) -> Result<Vec<Rc<Node>>> {
     let assign_index: usize = split
         .next()
         .ok_or(context.add_context_to_syntax_error(
-            SyntaxError::UnresolvedGroup("=".to_string()),
+            SyntaxError::UnresolvedGroup("=".to_string()).into(),
             context.full_slice(),
         ))?
         .len();
@@ -155,7 +155,7 @@ fn _get_variable_expression(context: &mut ASTContext) -> Result<Vec<Rc<Node>>> {
 }
 
 /// Revusrively walk down AST. If we reach a leaf node without an operand, add it to the input types. Otherwise concatenate the input types of its operands.
-pub fn compute_input_type(node: &Rc<Node>) -> Result<Vec<IJType>, SyntaxError> {
+pub fn compute_input_type(node: &Rc<Node>) -> Result<Vec<IJType>> {
     if node.operands.is_empty() {
         return Ok(node.input_types.clone());
     }
@@ -184,18 +184,20 @@ pub fn parse_assign(
         .map_err(|e| context.add_context_to_syntax_error(e, context.full_slice()))?;
     if is_function && input_types.is_empty() {
         return Err(context.add_context_to_syntax_error(
-            SyntaxError::FunctionWithoutInputs,
+            SyntaxError::FunctionWithoutInputs.into(),
             context.full_slice(),
         ));
     }
     if !is_function && input_types.len() != 0 {
-        return Err(context
-            .add_context_to_syntax_error(SyntaxError::VariableWithInput, context.full_slice()));
+        return Err(context.add_context_to_syntax_error(
+            SyntaxError::VariableWithInput.into(),
+            context.full_slice(),
+        ));
     }
     if !is_function {
         let left_of_assign = context.tokens.split(|t| t == &Token::Assign).next().ok_or(
             context.add_context_to_syntax_error(
-                SyntaxError::UnresolvedGroup("=".to_string()),
+                SyntaxError::UnresolvedGroup("=".to_string()).into(),
                 context.full_slice(),
             ),
         )?;
@@ -209,7 +211,7 @@ pub fn parse_assign(
             .collect();
         if symbol_names.len() != expressions.len() {
             return Err(context.add_context_to_syntax_error(
-                SyntaxError::IncorrectNumVariables(symbol_names.len(), expressions.len()),
+                SyntaxError::IncorrectNumVariables(symbol_names.len(), expressions.len()).into(),
                 context.full_slice(),
             ));
         }
@@ -260,7 +262,7 @@ pub fn parse_assign(
         // is_function
         if expressions.len() != 1 {
             return Err(context.add_context_to_syntax_error(
-                SyntaxError::FunctionWithMultipleOutputs(expressions.len()),
+                SyntaxError::FunctionWithMultipleOutputs(expressions.len()).into(),
                 context.full_slice(),
             ));
         }
@@ -309,7 +311,7 @@ fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node>, T
         Token::Symbol(op) => _next_node_symbol(op.clone(), rest, context),
         Token::Identity => IdentityOp::_next_node(op.clone(), rest, context),
         Token::Reduction => Reduction::_next_node(op.clone(), rest, context),
-        _ => Err(anyhow!("Unexpected token {:?}", op)),
+        _ => Err(SyntaxError::UnexpectedToken(op.clone()).into()),
     }
 }
 
@@ -325,7 +327,18 @@ fn gather_operands(
     let mut rest = slice;
     let mut longest_match_length = 0;
     for _ in 0..longest_variant_length {
-        let (node, rest) = next_node(rest, context)?;
+        let result = next_node(rest, context);
+        match result {
+            Err(e) => {
+                if longest_match_length == 0 {
+                    return Err(e);
+                }
+                break;
+            }
+            _ => {}
+        }
+        let (node, new_rest) = result.unwrap();
+        rest = new_rest;
         operands.push(node);
         let operands_types = operands
             .iter()
@@ -336,28 +349,25 @@ fn gather_operands(
         }
     }
     if longest_match_length == 0 {
-        return Err(context.add_context_to_syntax_error(
-            SyntaxError::GatherMismatch(
-                types
-                    .iter()
-                    .map(|t| {
-                        format!(
-                            "[{}]",
-                            t.iter()
-                                .map(|inner_t| inner_t.to_string())
-                                .collect::<Vec<String>>()
-                                .join(", ")
-                        )
-                    })
-                    .collect::<Vec<String>>()
-                    .join(", "),
-                operands
-                    .iter()
-                    .map(|n| n.output_type.to_string())
-                    .collect::<String>(),
-            ),
-            slice,
-        ));
+        let input_types_str = types
+            .iter()
+            .map(|t| {
+                format!(
+                    "[{}]",
+                    t.iter()
+                        .map(|inner_t| inner_t.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )
+            })
+            .collect::<Vec<String>>()
+            .join(", ");
+        let found_types_str = operands
+            .iter()
+            .map(|n| n.output_type.to_string())
+            .collect::<String>();
+        let syntax_error = SyntaxError::GatherMismatch(input_types_str, found_types_str);
+        return Err(context.add_context_to_syntax_error(syntax_error.into(), slice));
     }
     let operands = operands[..longest_match_length]
         .into_iter()
@@ -366,8 +376,20 @@ fn gather_operands(
 
     Ok((operands, rest))
 }
-////// TODO: Need to check from below heere
 
+/// Match as many tokens of any kind as possible.
+/// Always consumes the entire token slice
+fn gather_all(slice: TokenSlice, context: &mut ASTContext) -> Result<Vec<Rc<Node>>> {
+    let mut operands = Vec::new();
+    let mut rest = slice;
+    while !rest.is_empty() {
+        let (node, new_rest) = next_node(rest, context)
+            .map_err(|e| context.add_context_to_syntax_error(e.into(), rest))?;
+        operands.push(node);
+        rest = new_rest;
+    }
+    Ok(operands)
+}
 
 /// Parses a simple tensor function, such as addition or multiplication. These all have
 /// a range of input aritys. All inputs are tensors, the output is a single tensor.
@@ -378,12 +400,16 @@ fn _next_node_simple_tensor_function(
     slice: TokenSlice,
     context: &mut ASTContext,
 ) -> Result<(Rc<Node>, TokenSlice)> {
-    let (operands, rest) = gather_operands(min_arity, max_arity, slice, context)
+    let types = (min_arity..=max_arity)
+        .map(|arity| vec![IJType::Tensor; arity])
+        .collect::<Vec<_>>();
+    let (operands, rest) = gather_operands(types, slice, context)
         .with_context(|| anyhow!("Error caused by {:?}", op))?;
     Ok((
         Rc::new(Node::new(
             op,
-            IJType::tensor_function(operands.len(), 1),
+            vec![IJType::Tensor; operands.len()],
+            IJType::Tensor,
             operands,
             context.get_increment_id(),
         )),
@@ -396,7 +422,7 @@ fn _find_matching_parenthesis(
     slice: TokenSlice,
     lparen: &Token,
     rparen: &Token,
-) -> Result<usize, SyntaxError> {
+) -> Result<usize> {
     let tokens = &context.get_tokens()[slice.start..slice.end];
     let mut depth = 1;
     for (i, token) in tokens.iter().enumerate() {
@@ -411,9 +437,7 @@ fn _find_matching_parenthesis(
             _ => (),
         }
     }
-    Err(SyntaxError::UnmatchedParenthesis(
-        context.tokens_to_string(slice),
-    ))
+    Err(SyntaxError::UnmatchedParenthesis(context.tokens_to_string(slice)).into())
 }
 
 /// Left parenthesis denotes the start of a group.
@@ -433,11 +457,8 @@ impl TokenImpl for LParen {
         // let slice = TokenSlice::new(slice.start, rparen_index, slice.max);
         let slice = slice.move_end(rparen_index)?;
 
-        let (operands, rest) = gather_operands(1, usize::MAX, slice, context)
+        let operands = gather_all(slice, context)
             .with_context(|| anyhow!("Error created by bracket parsing"))?;
-        if !rest.is_empty() {
-            return Err(SyntaxError::UnhandledTokens(context.tokens_to_string(rest)).into());
-        }
 
         match operands.len() {
             0 => unreachable!(),
@@ -445,15 +466,13 @@ impl TokenImpl for LParen {
             _ => {
                 let operands_types = operands
                     .iter()
-                    .map(|n| n.typ.clone())
+                    .map(|n| n.output_type.clone())
                     .collect::<Vec<IJType>>();
                 Ok((
                     Rc::new(Node::new(
                         Operation::Group,
-                        IJType::Function(FunctionSignature::new(
-                            operands_types.clone(),
-                            vec![IJType::Group(operands_types)],
-                        )),
+                        operands_types.clone(),
+                        IJType::Group(operands_types),
                         operands,
                         context.get_increment_id(),
                     )),
@@ -482,8 +501,9 @@ impl TokenImpl for LSqBracket {
         Ok((
             Rc::new(Node::new(
                 Operation::Array(contents),
+                vec![],
                 IJType::Tensor,
-                Vec::new(),
+                vec![],
                 context.get_increment_id(),
             )),
             remainder,
@@ -491,8 +511,6 @@ impl TokenImpl for LSqBracket {
     }
 }
 
-// TODO: not sure this is correct in general.
-// I think that there should be a `_next_node_function` method that takes a function signature as input. Then in this case when we have a function that's what we output. In the case of a Tensor or Scalar, we directly create the node. (Which is a symbol node). The group variant should be impossible by construction and throw a syntax error.
 fn _next_node_symbol(
     op: SymbolToken,
     slice: TokenSlice,
@@ -503,24 +521,48 @@ fn _next_node_symbol(
         .get(&op.name)
         .ok_or(SyntaxError::UnknownSymbol(op.name.clone()))?;
 
-    let node_op = match variable.typ {
-        IJType::Tensor => Operation::Symbol(op.name),
-        IJType::Function(_) => Operation::Function(op.name),
-        IJType::Group(_) => Operation::Group,
-        IJType::Scalar => Operation::Scalar,
+    let (node, rest) = match variable.typ.clone() {
+        IJType::Tensor => (
+            Node::new(
+                Operation::Symbol(op.name),
+                vec![],
+                IJType::Tensor,
+                vec![],
+                context.get_increment_id(),
+            ),
+            slice,
+        ),
+        IJType::Function(signature) => {
+            let (operands, rest) = gather_operands(vec![signature.input.clone()], slice, context)?;
+            let output_type = match signature.output.len() {
+                1 => signature.clone().output.into_iter().next().unwrap(),
+                _ => IJType::Group(signature.clone().output),
+            };
+            let node = Node::new(
+                Operation::Function(op.name),
+                signature.clone().input,
+                output_type,
+                operands,
+                context.get_increment_id(),
+            );
+            (node, rest)
+        }
+        IJType::Scalar => (
+            Node::new(
+                Operation::Symbol(op.name),
+                vec![],
+                IJType::Scalar,
+                vec![],
+                context.get_increment_id(),
+            ),
+            slice,
+        ),
+        _ => unreachable!(),
     };
-    if variable.typ.output_arity() > 1 {
-        return Err(SyntaxError::MultipleOutputs.into());
-    }
-
-    _next_node_simple_tensor_function(
-        node_op,
-        variable.typ.input_arity(),
-        variable.typ.input_arity(),
-        slice,
-        context,
-    )
+    Ok((Rc::new(node), rest))
 }
+
+/////////////// TODO CHECK BELOW HERE
 
 /// Parses a functional operand. This must be a function or a symbol (encoding a function).
 /// No arguments are parsed for the operand, since this function is passed on to something modifying the function's behavior.

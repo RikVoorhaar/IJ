@@ -66,4 +66,8 @@ pub enum SyntaxError {
 
     #[error("Tried to match multiple types {0} but none of them matched. Longest string has type {1}")]
     GatherMismatch(String, String),
+
+    #[error("Created invalid slice")]
+    InvalidSlice,
+    
 }

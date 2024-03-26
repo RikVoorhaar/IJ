@@ -147,25 +147,25 @@ impl TokenSlice {
         self.start == self.end
     }
 
-    pub fn check_valid(&self) -> Result<()> {
+    pub fn check_valid(&self) -> Result<(), SyntaxError> {
         if self.start > self.end {
-            return Err(anyhow!("Invalid slice"));
+            return Err(SyntaxError::InvalidSlice);
         }
         if self.end > self.max {
-            return Err(anyhow!("Invalid slice"));
+            return Err(SyntaxError::InvalidSlice);
         }
         Ok(())
     }
 
-    pub fn move_start(&self, amount: usize) -> Result<Self> {
+    pub fn move_start(&self, amount: usize) -> Result<Self, SyntaxError> {
         let out = TokenSlice::new(self.start + amount, self.end, self.max);
         out.check_valid()?;
         Ok(out)
     }
 
-    pub fn move_end(&self, new_length: usize) -> Result<Self> {
+    pub fn move_end(&self, new_length: usize) -> Result<Self, SyntaxError> {
         if self.start + new_length > self.max {
-            return Err(anyhow!("Invalid slice"));
+            return Err(SyntaxError::InvalidSlice);
         }
         let out = TokenSlice::new(self.start, self.start + new_length, self.max);
         out.check_valid()?;
@@ -227,13 +227,13 @@ impl ASTContext {
             .join(" ")
     }
 
-    pub fn get_token_at_index(&self, index: usize) -> Result<&Token> {
+    pub fn get_token_at_index(&self, index: usize) -> Result<&Token, SyntaxError> {
         self.tokens
             .get(index)
             .ok_or(SyntaxError::EmptyStream.into())
     }
 
-    pub fn add_context_to_syntax_error(&self, error: SyntaxError, slice: TokenSlice) -> Error {
+    pub fn add_context_to_syntax_error(&self, error: Error, slice: TokenSlice) -> Error {
         let token_str = self.get_tokens()[slice.start..slice.end]
             .iter()
             .map(|t| format!("{:?}", t))
