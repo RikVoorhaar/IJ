@@ -95,7 +95,7 @@ pub fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
                 context.full_slice(),
             ))
         }
-        None => return Err(SyntaxError::EmptyStream.into()),
+        None => 0,
     };
     let output_arity = match token_iter.next().as_ref() {
         Some(Token::Number(number)) => number.value.parse::<usize>().map_err(|_| {
@@ -110,18 +110,39 @@ pub fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
                 context.full_slice(),
             ))
         }
-        None => return Err(SyntaxError::EmptyStream.into()),
+        None => {
+            if input_arity != 0 {
+                return Err(SyntaxError::EmptyStream.into());
+            }
+            1
+        }
     };
-    context.insert_variable(
-        Variable {
-            name: name.clone(),
-            typ: IJType::Function(FunctionSignature {
-                input: vec![IJType::Tensor; input_arity],
-                output: vec![IJType::Tensor; output_arity],
-            }),
-        },
-        None,
-    );
+    if output_arity != 1 {
+        return Err(context.add_context_to_syntax_error(
+            SyntaxError::FunctionWithMultipleOutputs(output_arity).into(),
+            context.full_slice(),
+        ));
+    }
+    if input_arity == 0 {
+        context.insert_variable(
+            Variable {
+                name: name.clone(),
+                typ: IJType::Tensor,
+            },
+            None,
+        );
+    } else {
+        context.insert_variable(
+            Variable {
+                name: name.clone(),
+                typ: IJType::Function(FunctionSignature {
+                    input: vec![IJType::Tensor; input_arity],
+                    output: vec![IJType::Tensor],
+                }),
+            },
+            None,
+        );
+    }
 
     Ok(Rc::new(Node::new(
         Operation::Nothing,
@@ -324,19 +345,18 @@ fn gather_operands(
 ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
     let mut operands = Vec::new();
     let longest_variant_length = types.iter().map(|t| t.len()).max().unwrap();
+    let shortest_variant_length = types.iter().map(|t| t.len()).min().unwrap();
     let mut rest = slice;
     let mut longest_match_length = 0;
     for _ in 0..longest_variant_length {
         let result = next_node(rest, context);
-        match result {
-            Err(e) => {
-                if longest_match_length == 0 {
-                    return Err(e);
-                }
-                break;
+        if let Err(e) = result {
+            if longest_match_length < shortest_variant_length {
+                return Err(e);
             }
-            _ => {}
+            break;
         }
+
         let (node, new_rest) = result.unwrap();
         rest = new_rest;
         operands.push(node);
@@ -348,7 +368,7 @@ fn gather_operands(
             longest_match_length = operands.len();
         }
     }
-    if longest_match_length == 0 {
+    if longest_match_length < shortest_variant_length {
         let input_types_str = types
             .iter()
             .map(|t| {
@@ -562,8 +582,6 @@ fn _next_node_symbol(
     Ok((Rc::new(node), rest))
 }
 
-/////////////// TODO CHECK BELOW HERE
-
 /// Parses a functional operand. This must be a function or a symbol (encoding a function).
 /// No arguments are parsed for the operand, since this function is passed on to something modifying the function's behavior.
 fn next_node_functional(
@@ -604,15 +622,15 @@ fn next_node_functional(
                 .symbols
                 .get(name.as_str())
                 .ok_or(SyntaxError::UnknownSymbol(name.clone()))?;
-            match variable.typ {
-                IJType::Function(ref func_signature) if func_signature == signature => {
-                    Operation::Function(name.clone())
-                }
-                _ => {
+            if let IJType::Function(ref func_signature) = variable.typ {
+                if func_signature != signature {
                     return Err(
                         SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into(),
-                    )
+                    );
                 }
+                Operation::Function(name.clone())
+            } else {
+                return Err(SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into());
             }
         }
 
@@ -621,6 +639,7 @@ fn next_node_functional(
     Ok((
         Rc::new(Node::new(
             op,
+            vec![],
             IJType::Function(signature.clone()),
             vec![],
             context.get_increment_id(),
@@ -640,23 +659,23 @@ impl TokenImpl for Reduction {
             FunctionSignature::new(vec![IJType::Scalar; 2], vec![IJType::Scalar]);
         let function_type = IJType::Function(function_signature.clone());
         let (function, rest) = next_node_functional(slice, context, &function_signature)?;
-        if function.typ != function_type {
+        if function.output_type != function_type {
             return Err(SyntaxError::TypeError(
                 function_type.to_string(),
-                function.typ.to_string(),
+                function.output_type.to_string(),
             )
             .into());
         }
 
-        let (operands, rest) = gather_operands(1, 1, rest, context)?;
+        let operand_type = IJType::Tensor;
+        let (operands, rest) = gather_operands(vec![vec![operand_type.clone()]], rest, context)?;
+        let operand = operands.into_iter().next().unwrap();
         Ok((
             Rc::new(Node::new(
                 Operation::Reduce,
-                IJType::Function(FunctionSignature::new(
-                    vec![function_type, IJType::Tensor],
-                    vec![IJType::Scalar],
-                )),
-                [function].into_iter().chain(operands.into_iter()).collect(),
+                vec![function_type, operand_type],
+                IJType::Tensor,
+                vec![function, operand],
                 context.get_increment_id(),
             )),
             rest,
@@ -672,12 +691,19 @@ impl TokenImpl for MinusOp {
         slice: TokenSlice,
         context: &mut ASTContext,
     ) -> Result<(Rc<Node>, TokenSlice)> {
-        let (operands, rest) = gather_operands(1, 2, slice, context)?;
-        match operands.iter().map(|node| node.typ.output_arity()).sum() {
+        let single_tensor = vec![IJType::Tensor];
+        let two_tensors = vec![IJType::Tensor; 2];
+        let (operands, rest) = gather_operands(
+            vec![single_tensor.clone(), two_tensors.clone()],
+            slice,
+            context,
+        )?;
+        match operands.len() {
             1 => Ok((
                 Rc::new(Node::new(
                     Operation::Negate,
-                    IJType::tensor_function(1, 1),
+                    single_tensor,
+                    IJType::Tensor,
                     operands,
                     context.get_increment_id(),
                 )),
@@ -686,7 +712,8 @@ impl TokenImpl for MinusOp {
             2 => Ok((
                 Rc::new(Node::new(
                     Operation::Subtract,
-                    IJType::tensor_function(2, 1),
+                    two_tensors,
+                    IJType::Tensor,
                     operands,
                     context.get_increment_id(),
                 )),
@@ -704,13 +731,15 @@ impl TokenImpl for IdentityOp {
         tokens: TokenSlice,
         context: &mut ASTContext,
     ) -> Result<(Rc<Node>, TokenSlice)> {
-        let (mut operands, rest) = gather_operands(0, 1, tokens, context)?;
+        let (mut operands, rest) =
+            gather_operands(vec![vec![], vec![IJType::Tensor]], tokens, context)?;
         if !operands.is_empty() {
             Ok((operands.remove(0), rest))
         } else {
             let node = Node::new(
                 Operation::Identity,
-                IJType::tensor_function(1, 1),
+                vec![IJType::Tensor],
+                IJType::Tensor,
                 operands,
                 context.get_increment_id(),
             );
@@ -733,6 +762,7 @@ impl TokenImpl for Number {
         Ok((
             Rc::new(Node::new(
                 node_op,
+                vec![],
                 IJType::Scalar,
                 vec![],
                 context.get_increment_id(),
