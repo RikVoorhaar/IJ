@@ -103,6 +103,18 @@ pub enum Token {
 
     #[token("/")]
     Reduction,
+
+    #[token("Fn")]
+    FunctionType,
+
+    #[token("S", priority = 3)]
+    Scalar,
+
+    #[token("T", priority = 3)]
+    Tensor,
+
+    #[token(":")]
+    TypeDeclaration,
 }
 
 impl Debug for Token {
@@ -125,6 +137,10 @@ impl Debug for Token {
             Self::LSqBracket => write!(f, "["),
             Self::RSqBracket => write!(f, "]"),
             Self::Reduction => write!(f, "/"),
+            Self::FunctionType => write!(f, "Fn"),
+            Self::Scalar => write!(f, "S"),
+            Self::Tensor => write!(f, "T"),
+            Self::TypeDeclaration => write!(f, ":"),
         }
     }
 }
@@ -149,6 +165,10 @@ impl Display for Token {
             Self::LSqBracket => write!(f, "["),
             Self::RSqBracket => write!(f, "]"),
             Self::Reduction => write!(f, "/"),
+            Self::FunctionType => write!(f, "Fn"),
+            Self::Scalar => write!(f, "S"),
+            Self::Tensor => write!(f, "T"),
+            Self::TypeDeclaration => write!(f, ":"),
         }
     }
 }

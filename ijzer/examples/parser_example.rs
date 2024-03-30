@@ -4,7 +4,7 @@ use ijzer::parser::parse_line;
 use ijzer::tokens::lexer;
 
 static INPUT: &str = r#"
-var x -> 1
+var x: T
 (+ x [1])
 y = (+ x [1])
 z = - x y

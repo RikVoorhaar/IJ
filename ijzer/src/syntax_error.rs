@@ -69,5 +69,13 @@ pub enum SyntaxError {
 
     #[error("Created invalid slice")]
     InvalidSlice,
-    
+
+    #[error("Invalid type '{0}'")]
+    InvalidType(String),
+
+    #[error("Error inside of lexer: {0}")]
+    LexerError(String),
+
+    #[error("Invalid var statement: {0}")]
+    InvalidVarStatement(String),
 }

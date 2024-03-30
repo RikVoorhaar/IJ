@@ -58,100 +58,28 @@ pub fn parse_fn_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
 }
 
 pub fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
-    let mut token_iter = context.tokens.iter().skip(1);
-    let name = match token_iter.next().as_ref() {
-        Some(Token::Symbol(symbol)) => symbol.name.clone(),
-        Some(&token) => {
-            return Err(context.add_context_to_syntax_error(
-                SyntaxError::UnexpectedToken(token.clone()).into(),
-                context.full_slice(),
-            ))
+    match context.tokens.as_slice() {
+        [Token::Variable, Token::Symbol(symbol), Token::TypeDeclaration, rest @ ..] => {
+            let typ = IJType::from_tokens(rest)?;
+            let var = Variable {
+                name: symbol.name.clone(),
+                typ: typ.clone(),
+            };
+            context.insert_variable(var, None);
+            Ok(Rc::new(Node::new(
+                Operation::Nothing,
+                vec![],
+                typ,
+                vec![],
+                context.get_increment_id(),
+            )))
         }
-        None => return Err(SyntaxError::EmptyStream.into()),
-    };
-    let input_arity = match token_iter.next().as_ref() {
-        Some(Token::Number(number)) => {
-            match token_iter.next().as_ref() {
-                Some(&Token::Arrow) => {}
-                Some(&token) => {
-                    return Err(context.add_context_to_syntax_error(
-                        SyntaxError::UnexpectedToken(token.clone()).into(),
-                        context.full_slice(),
-                    ))
-                }
-                None => return Err(SyntaxError::EmptyStream.into()),
-            }
-            number.value.parse::<usize>().map_err(|_| {
-                context.add_context_to_syntax_error(
-                    SyntaxError::InvalidNumberFormat(number.value.clone()).into(),
-                    context.full_slice(),
-                )
-            })?
-        }
-        Some(&Token::Arrow) => 0,
-        Some(&token) => {
-            return Err(context.add_context_to_syntax_error(
-                SyntaxError::UnexpectedToken(token.clone()).into(),
-                context.full_slice(),
-            ))
-        }
-        None => 0,
-    };
-    let output_arity = match token_iter.next().as_ref() {
-        Some(Token::Number(number)) => number.value.parse::<usize>().map_err(|_| {
-            context.add_context_to_syntax_error(
-                SyntaxError::InvalidNumberFormat(number.value.clone()).into(),
-                context.full_slice(),
-            )
-        })?,
-        Some(&token) => {
-            return Err(context.add_context_to_syntax_error(
-                SyntaxError::UnexpectedToken(token.clone()).into(),
-                context.full_slice(),
-            ))
-        }
-        None => {
-            if input_arity != 0 {
-                return Err(SyntaxError::EmptyStream.into());
-            }
-            1
-        }
-    };
-    if output_arity != 1 {
-        return Err(context.add_context_to_syntax_error(
-            SyntaxError::FunctionWithMultipleOutputs(output_arity).into(),
-            context.full_slice(),
-        ));
+        _ => Err(
+            SyntaxError::InvalidVarStatement(context.tokens_to_string(context.full_slice())).into(),
+        ),
     }
-    if input_arity == 0 {
-        context.insert_variable(
-            Variable {
-                name: name.clone(),
-                typ: IJType::Tensor,
-            },
-            None,
-        );
-    } else {
-        context.insert_variable(
-            Variable {
-                name: name.clone(),
-                typ: IJType::Function(FunctionSignature {
-                    input: vec![IJType::Tensor; input_arity],
-                    output: vec![IJType::Tensor],
-                }),
-            },
-            None,
-        );
-    }
-
-    Ok(Rc::new(Node::new(
-        Operation::Nothing,
-        Vec::new(),
-        IJType::Void,
-        Vec::new(),
-        context.get_increment_id(),
-    )))
 }
+
 
 /// Get the nodes expressed on the right hand side of an assignment token.
 fn _get_variable_expression(context: &mut ASTContext) -> Result<Vec<Rc<Node>>> {

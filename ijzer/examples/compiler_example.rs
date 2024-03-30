@@ -12,16 +12,16 @@ use proc_macro2::TokenStream;
 
 fn main() -> Result<()> {
     let input: &str = "
-    var x -> 1
-    (+ x [1])
-    y = (+ x [1])
+    var x: T
+    (+ x [1.0])
+    y = (+ x [1.0])
     z = - x y
     fn z = * y I
-    x y = 1 2
-    u = [1,2,3]
+    x y = 1.0 2.0
+    u = [1.0,2.0,3.0]
     /+ u
     v = /+ u
-    (* z [1] [-2])
+    (* z [1.0] [-2.0])
     ";
     let mut symbol_table = ASTContext::new();
     let mut parsed_lines: Vec<Rc<Node>> = Vec::new();

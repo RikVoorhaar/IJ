@@ -1,6 +1,6 @@
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
-use crate::tokens::Token;
+use crate::tokens::{lexer, Token};
 use anyhow::{anyhow, Error, Result};
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -66,33 +66,38 @@ impl FunctionSignature {
             output: vec![IJType::Scalar; outputs],
         }
     }
+    pub fn from_tokens(tokens: &[Token]) -> Result<Self> {
+        let parts: Vec<&[Token]> = tokens
+            .split(|t| *t == Token::Arrow || *t == Token::Comma)
+            .collect();
+
+        if parts.len() != 2 {
+            return Err(SyntaxError::InvalidType(
+                tokens
+                    .iter()
+                    .map(|t| format!("{:?}", t))
+                    .collect::<String>(),
+            )
+            .into());
+        }
+        let input = parts[0]
+            .split(|t| *t == Token::Comma)
+            .map(IJType::from_tokens)
+            .collect::<Result<_, _>>()?;
+        let output = parts[1]
+            .split(|t| *t == Token::Comma)
+            .map(IJType::from_tokens)
+            .collect::<Result<_, _>>()?;
+
+        Ok(FunctionSignature { input, output })
+    }
+    pub fn from_string(s: &str) -> Result<Self> {
+        let tokens = lexer(s).map_err(|e| SyntaxError::LexerError(e.to_string()))?;
+        Self::from_tokens(&tokens)
+    }
 }
 
 impl IJType {
-    // pub fn output_arity(&self) -> usize {
-    //     match self {
-    //         IJType::Scalar => 1,
-    //         IJType::Tensor => 1,
-    //         IJType::Function(sig) => sig.output.len(),
-    //         IJType::Void => 0,
-    //     }
-    // }
-    // pub fn input_arity(&self) -> usize {
-    //     match self {
-    //         IJType::Scalar => 0,
-    //         IJType::Tensor => 0,
-    //         IJType::Function(sig) => sig.input.len(),
-    //         IJType::Void => 0,
-    //     }
-    // }
-    // pub fn output_types(&self) -> Vec<IJType> {
-    //     match self {
-    //         IJType::Scalar => vec![IJType::Scalar],
-    //         IJType::Tensor => vec![IJType::Tensor],
-    //         IJType::Function(sig) => sig.output.clone(),
-    //         IJType::Void => vec![],
-    //     }
-    // }
     pub fn tensor_function(inputs: usize, outputs: usize) -> IJType {
         IJType::Function(FunctionSignature {
             input: vec![IJType::Tensor; inputs],
@@ -111,16 +116,70 @@ impl IJType {
             output: vec![IJType::Scalar; 1],
         })
     }
+    pub fn from_tokens(tokens: &[Token]) -> Result<Self> {
+        match tokens {
+            [Token::Scalar] => Ok(IJType::Scalar),
+            [Token::Tensor] => Ok(IJType::Tensor),
+            [Token::FunctionType, Token::LParen, rest @ ..] => {
+                let mut depth = 1;
+                let mut inside = Vec::new();
+                for token in rest {
+                    match token {
+                        Token::LParen => depth += 1,
+                        Token::RParen => {
+                            if depth == 1 {
+                                break;
+                            } else {
+                                depth -= 1;
+                            }
+                        }
+                        _ => {
+                            if depth > 0 {
+                                inside.push(token.clone());
+                            }
+                        }
+                    }
+                }
+                if depth != 1 {
+                    return Err(SyntaxError::UnmatchedParenthesis(
+                        "Mismatched parentheses in function type".to_string(),
+                    )
+                    .into());
+                }
+                let sig = FunctionSignature::from_tokens(&inside)?;
+                Ok(IJType::Function(sig))
+            }
+            _ => Err(SyntaxError::InvalidType(
+                tokens
+                    .iter()
+                    .map(|t| format!("{:?}", t))
+                    .collect::<String>(),
+            )
+            .into()),
+        }
+    }
+    pub fn from_string(s: &str) -> Result<Self> {
+        let tokens = lexer(s).map_err(|e| SyntaxError::LexerError(e.to_string()))?;
+        Self::from_tokens(&tokens)
+    }
 }
 
 impl std::fmt::Display for IJType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            IJType::Scalar => write!(f, "Scalar"),
-            IJType::Tensor => write!(f, "Tensor"),
-            IJType::Function(sig) => write!(f, "Function({})", sig),
+            IJType::Scalar => write!(f, "S"),
+            IJType::Tensor => write!(f, "T"),
+            IJType::Function(sig) => write!(f, "Fn({})", sig),
             IJType::Void => write!(f, "Void"),
-            IJType::Group(types) => write!(f, "Group({})", types.iter().map(|t| t.to_string()).collect::<Vec<String>>().join(", ")),
+            IJType::Group(types) => write!(
+                f,
+                "Group({})",
+                types
+                    .iter()
+                    .map(|t| t.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
         }
     }
 }
@@ -131,7 +190,7 @@ impl std::fmt::Display for FunctionSignature {
         let output_strings: Vec<String> = self.output.iter().map(|o| o.to_string()).collect();
         write!(
             f,
-            "({}) -> ({})",
+            "{} -> {}",
             input_strings.join(", "),
             output_strings.join(", ")
         )
@@ -252,7 +311,13 @@ impl ASTContext {
 
 impl Node {
     fn fmt_nested(&self, f: &mut std::fmt::Formatter<'_>, nesting: usize) -> std::fmt::Result {
-        write!(f, "{}{:?}<{}>", _tab_nested(nesting), self.op, self.output_type)?;
+        write!(
+            f,
+            "{}{:?}<{}>",
+            _tab_nested(nesting),
+            self.op,
+            self.output_type
+        )?;
         if !&self.operands.is_empty() {
             write!(f, "[")?;
 
