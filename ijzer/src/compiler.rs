@@ -5,7 +5,10 @@ use syn::Ident;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 
-use crate::{ast_node::Node, operations::Operation};
+use crate::{
+    ast_node::{IJType, Node},
+    operations::Operation,
+};
 
 pub struct CompilerContext {
     pub node_map: HashMap<usize, Rc<Node>>,
@@ -286,22 +289,30 @@ impl CompileNode for Add {
         _compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
-        if let Operation::Add = &node.op {
-            let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
-            if children.len() != 2 {
-                panic!("Expected 2 children for add, found {:?}", children.len());
+        let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
+
+        let res = match node.output_type {
+            IJType::Tensor => {
+                if children.len() != 2 {
+                    panic!("Expected 2 children for add, found {:?}", children.len());
+                }
+
+                let childstream1 = child_streams.get(&children[0]).unwrap();
+                let childstream2 = child_streams.get(&children[1]).unwrap();
+
+                quote! {
+                    #childstream1.apply_binary_op(&#childstream2, |a, b| a + b).unwrap()
+                }
             }
-
-            let childstream1 = child_streams.get(&children[0]).unwrap();
-            let childstream2 = child_streams.get(&children[1]).unwrap();
-
-            let res = quote! {
-                #childstream1.apply_binary_op(&#childstream2, |a, b| a + b).unwrap()
-            };
-            Ok(res)
-        } else {
-            Ok(quote! {|a,b| a+b})
-        }
+            IJType::Function(_) => {
+                quote! { |a, b| a + b }
+            }
+            _ => panic!(
+                "Found add node with unimplemented output type: {:?}",
+                node.output_type
+            ),
+        };
+        Ok(res)
     }
 }
 struct Subtract;
@@ -427,10 +438,11 @@ impl CompileNode for Reduce {
             );
         }
 
-        let data_stream = child_streams.get(&operands[0]).unwrap();
 
-        let functional_operand = &operands[1];
+        let functional_operand = &operands[0];
         let functional_operand_stream = child_streams.get(&functional_operand).unwrap();
+        
+        let data_stream = child_streams.get(&operands[1]).unwrap();
 
         Ok(quote! {
             #data_stream.reduce(#functional_operand_stream)

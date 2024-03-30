@@ -2,8 +2,9 @@ use std::rc::Rc;
 
 use anyhow::Result;
 use ijzer::{
+    ast_node::{ASTContext, Node},
     compiler::CompilerContext,
-    parser::{parse_line, ASTContext, Node},
+    parser::parse_line,
     tokens::lexer,
 };
 
@@ -12,11 +13,15 @@ use proc_macro2::TokenStream;
 fn main() -> Result<()> {
     let input: &str = "
     var x -> 1
-    y = (+ (x 1))
+    (+ x [1])
+    y = (+ x [1])
     z = - x y
     fn z = * y I
-    x y = (1 2)
-    * (z 1 -2)
+    x y = 1 2
+    u = [1,2,3]
+    /+ u
+    v = /+ u
+    (* z [1] [-2])
     ";
     let mut symbol_table = ASTContext::new();
     let mut parsed_lines: Vec<Rc<Node>> = Vec::new();
