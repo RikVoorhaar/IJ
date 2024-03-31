@@ -6,12 +6,10 @@ use ijzer::tokens::lexer;
 static INPUT: &str = r#"
 var x: T
 (+ x [1])
-y = (+ x [1])
-z = - x y
-fn z = * y I
-x y = 1 2
+y: T = (+ x [1])
+z: T = - x y
+z: Fn(T->T) = * y I
 u = [1,2,3]
- /+ u
 v = /+ u
 (* z [1] [-2])
 "#;

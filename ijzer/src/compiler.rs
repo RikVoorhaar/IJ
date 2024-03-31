@@ -84,9 +84,6 @@ impl CompilerContext {
             Operation::Function(_) => Function::compile(node, self, child_streams)?,
             Operation::Group => Group::compile(node, self, child_streams)?,
             Operation::Assign => Assign::compile(node, self, child_streams)?,
-            Operation::FunctionDeclaration => {
-                FunctionDeclaration::compile(node, self, child_streams)?
-            }
             Operation::Add => Add::compile(node, self, child_streams)?,
             Operation::Multiply => Multiply::compile(node, self, child_streams)?,
             Operation::Identity => Identity::compile(node, self, child_streams)?,
@@ -235,7 +232,7 @@ struct Assign;
 impl CompileNode for Assign {
     fn compile(
         node: Rc<Node>,
-        _compiler: &mut CompilerContext,
+        compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::Assign = &node.op {
@@ -247,38 +244,25 @@ impl CompileNode for Assign {
         let right_member = &node.operands[1];
         let right_stream = child_streams[&right_member.id].clone();
 
-        Ok(quote!(
-            let #left_stream = #right_stream;
-        ))
-    }
-}
+        match node.input_types.first() {
+            Some(IJType::Function(_)) => {
+                let input_varnames = compiler
+                    .inputs
+                    .iter()
+                    .map(|id| compiler.get_varname(*id))
+                    .collect::<Vec<_>>();
 
-struct FunctionDeclaration;
-impl CompileNode for FunctionDeclaration {
-    fn compile(
-        node: Rc<Node>,
-        compiler: &mut CompilerContext,
-        child_streams: HashMap<usize, TokenStream>,
-    ) -> Result<TokenStream> {
-        match &node.op {
-            Operation::FunctionDeclaration => {}
-            _ => unreachable!("Expected function node, found {:?}", node),
+                Ok(quote!(
+                    let #left_stream = {|#(#input_varnames),*| #right_stream};
+                ))
+            }
+            Some(_) => Ok(quote!(
+                let #left_stream = #right_stream;
+            )),
+            None => {
+                panic!("Expected function node, found {:?}", node);
+            }
         }
-
-        let left_member = &node.operands[0];
-        let left_stream = child_streams[&left_member.id].clone();
-        let right_member = &node.operands[1];
-        let right_stream = child_streams[&right_member.id].clone();
-
-        let input_varnames = compiler
-            .inputs
-            .iter()
-            .map(|id| compiler.get_varname(*id))
-            .collect::<Vec<_>>();
-
-        Ok(quote!(
-            let #left_stream = {|#(#input_varnames),*| #right_stream};
-        ))
     }
 }
 
@@ -438,10 +422,9 @@ impl CompileNode for Reduce {
             );
         }
 
-
         let functional_operand = &operands[0];
         let functional_operand_stream = child_streams.get(&functional_operand).unwrap();
-        
+
         let data_stream = child_streams.get(&operands[1]).unwrap();
 
         Ok(quote! {

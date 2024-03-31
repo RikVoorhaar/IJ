@@ -27,8 +27,7 @@ fn parse_ast(context: &mut ASTContext) -> Result<Rc<Node>> {
         .ok_or(SyntaxError::EmptyStream)?;
     match op {
         Token::Variable => parse_var_statement(context),
-        Token::Function => parse_fn_statement(context),
-        Token::Symbol(symbol) => parse_assign(symbol.name.clone(), context, false),
+        Token::Symbol(symbol) => parse_assign(symbol.name.clone(), context),
         _ => {
             let (node, remainder) = next_node(context.full_slice(), context)?;
             if !remainder.is_empty() {
@@ -40,21 +39,6 @@ fn parse_ast(context: &mut ASTContext) -> Result<Rc<Node>> {
             Ok(node)
         }
     }
-}
-
-pub fn parse_fn_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
-    let mut token_iter = context.tokens.iter().skip(1);
-    let name = match token_iter.next().as_ref() {
-        Some(Token::Symbol(symbol)) => symbol.name.clone(),
-        Some(&token) => {
-            return Err(context.add_context_to_syntax_error(
-                SyntaxError::UnexpectedToken(token.clone()).into(),
-                context.full_slice(),
-            ))
-        }
-        None => return Err(SyntaxError::EmptyStream.into()),
-    };
-    parse_assign(name, context, true)
 }
 
 pub fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
@@ -79,7 +63,6 @@ pub fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
         ),
     }
 }
-
 
 /// Get the nodes expressed on the right hand side of an assignment token.
 fn _get_variable_expression(context: &mut ASTContext) -> Result<Vec<Rc<Node>>> {
@@ -114,135 +97,78 @@ pub fn compute_input_type(node: &Rc<Node>) -> Result<Vec<IJType>> {
     }
     Ok(input_types)
 }
-
-pub fn parse_assign(
-    variable_name: String,
-    context: &mut ASTContext,
-    is_function: bool,
-) -> Result<Rc<Node>> {
+pub fn parse_assign(variable_name: String, context: &mut ASTContext) -> Result<Rc<Node>> {
     let expressions = _get_variable_expression(context)?;
-    let input_types = expressions
-        .iter()
-        .map(|expr| compute_input_type(expr))
-        .try_fold(vec![], |mut acc, x| {
-            x.map(|y| {
-                acc.extend(y);
-                acc
-            })
-        })
-        .map_err(|e| context.add_context_to_syntax_error(e, context.full_slice()))?;
-    if is_function && input_types.is_empty() {
+    if expressions.len() != 1 {
         return Err(context.add_context_to_syntax_error(
-            SyntaxError::FunctionWithoutInputs.into(),
+            SyntaxError::InvalidAssignmentStatement(context.tokens_to_string(context.full_slice()))
+                .into(),
             context.full_slice(),
         ));
     }
-    if !is_function && input_types.len() != 0 {
-        return Err(context.add_context_to_syntax_error(
-            SyntaxError::VariableWithInput.into(),
+    let expression = expressions.into_iter().next().unwrap();
+    let left_of_assign = context.tokens.split(|t| t == &Token::Assign).next().ok_or(
+        context.add_context_to_syntax_error(
+            SyntaxError::UnresolvedGroup("=".to_string()).into(),
             context.full_slice(),
-        ));
-    }
-    if !is_function {
-        let left_of_assign = context.tokens.split(|t| t == &Token::Assign).next().ok_or(
-            context.add_context_to_syntax_error(
-                SyntaxError::UnresolvedGroup("=".to_string()).into(),
-                context.full_slice(),
-            ),
-        )?;
-        let symbol_names: Vec<String> = left_of_assign
-            .iter()
-            .filter(|&t| matches!(t, Token::Symbol(_)))
-            .map(|t| match t {
-                Token::Symbol(s) => s.name.clone(),
-                _ => unreachable!(),
-            })
-            .collect();
-        if symbol_names.len() != expressions.len() {
+        ),
+    )?;
+    let expected_type = match left_of_assign {
+        [Token::Symbol(_), Token::TypeDeclaration, rest @ ..] => Some(IJType::from_tokens(rest)?),
+        [Token::Symbol(_)] => None,
+        _ => {
             return Err(context.add_context_to_syntax_error(
-                SyntaxError::IncorrectNumVariables(symbol_names.len(), expressions.len()).into(),
+                SyntaxError::InvalidAssignmentStatement(
+                    context.tokens_to_string(context.full_slice()),
+                )
+                .into(),
                 context.full_slice(),
-            ));
+            ))
         }
-        let symbol_nodes: Vec<_> = symbol_names
-            .into_iter()
-            .map(|s| {
-                Rc::new(Node::new(
-                    Operation::Symbol(s),
-                    Vec::new(),
-                    IJType::Tensor,
-                    Vec::new(),
-                    context.get_increment_id(),
-                ))
-            })
-            .collect();
-        for symbol_node in symbol_nodes.iter() {
-            context.insert_variable(
-                Variable {
-                    name: variable_name.clone(),
-                    typ: IJType::Tensor,
-                },
-                Some(symbol_node.clone()),
-            );
-        }
-        Ok(Rc::new(Node::new(
-            Operation::Assign,
-            vec![IJType::Group(vec![IJType::Tensor; symbol_nodes.len()]); 2],
-            IJType::Void,
-            vec![
-                Rc::new(Node::new(
-                    Operation::Group,
-                    vec![],
-                    IJType::Group(vec![IJType::Tensor; symbol_nodes.len()]),
-                    symbol_nodes,
-                    context.get_increment_id(),
-                )),
-                Rc::new(Node::new(
-                    Operation::Group,
-                    vec![],
-                    IJType::Group(vec![IJType::Tensor; expressions.len()]),
-                    expressions,
-                    context.get_increment_id(),
-                )),
-            ],
-            context.get_increment_id(),
-        )))
-    } else {
-        // is_function
-        if expressions.len() != 1 {
-            return Err(context.add_context_to_syntax_error(
-                SyntaxError::FunctionWithMultipleOutputs(expressions.len()).into(),
-                context.full_slice(),
-            ));
-        }
-        let expression = expressions.into_iter().next().unwrap();
-        let typ = IJType::Function(FunctionSignature {
-            input: input_types,
-            output: vec![IJType::Tensor],
-        });
-        let symbol_node = Node::new(
-            Operation::Function(variable_name.clone()),
-            vec![],
-            typ.clone(),
-            Vec::new(),
-            context.get_increment_id(),
-        );
-        context.insert_variable(
-            Variable {
-                name: variable_name.clone(),
-                typ: typ.clone(),
-            },
-            Some(expression.clone()),
-        );
+    };
 
-        Ok(Rc::new(Node::new(
-            Operation::FunctionDeclaration,
-            vec![typ; 2],
-            IJType::Void,
-            vec![Rc::new(symbol_node), expression],
-            context.get_increment_id(),
-        )))
+    let input_type = compute_input_type(&expression)?;
+    let output_type = expression.output_type.clone();
+    let expression_type = match input_type.is_empty() {
+        true => output_type,
+        false => IJType::Function(FunctionSignature {
+            input: input_type,
+            output: vec![output_type],
+        }),
+    };
+
+    if let Some(expected_type) = expected_type {
+        if expression_type != expected_type {
+            return Err(context.add_context_to_syntax_error(
+                SyntaxError::TypeError(expression_type.to_string(), expected_type.to_string())
+                    .into(),
+                context.full_slice(),
+            ));
+        }
     }
+    context.insert_variable(
+        Variable {
+            name: variable_name.clone(),
+            typ: expression_type.clone(),
+        },
+        Some(expression.clone()),
+    );
+    let symbol_node = Rc::new(Node::new(
+        Operation::Symbol(variable_name.clone()),
+        vec![],
+        expression_type.clone(),
+        Vec::new(),
+        context.get_increment_id(),
+    ));
+    let operand_node = expression.clone();
+    let assign_node = Rc::new(Node::new(
+        Operation::Assign,
+        vec![expression_type; 2],
+        IJType::Void,
+        vec![symbol_node, operand_node],
+        context.get_increment_id(),
+    ));
+    Ok(assign_node)
 }
 
 fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node>, TokenSlice)> {

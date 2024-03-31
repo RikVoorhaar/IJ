@@ -78,4 +78,7 @@ pub enum SyntaxError {
 
     #[error("Invalid var statement: {0}")]
     InvalidVarStatement(String),
+
+    #[error("Invalid assignment statement: {0}")]
+    InvalidAssignmentStatement(String),
 }

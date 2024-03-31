@@ -95,9 +95,6 @@ pub enum Token {
     #[token("I", priority = 3)]
     Identity,
 
-    #[token("fn")]
-    Function,
-
     #[token("return")]
     Return,
 
@@ -131,7 +128,6 @@ impl Debug for Token {
             Self::Arrow => write!(f, "->"),
             Self::Assign => write!(f, "="),
             Self::Identity => write!(f, "I"),
-            Self::Function => write!(f, "fn"),
             Self::Return => write!(f, "return"),
             Self::Comma => write!(f, ", "),
             Self::LSqBracket => write!(f, "["),
@@ -159,7 +155,6 @@ impl Display for Token {
             Self::Arrow => write!(f, "->"),
             Self::Assign => write!(f, "="),
             Self::Identity => write!(f, "I"),
-            Self::Function => write!(f, "fn"),
             Self::Return => write!(f, "return"),
             Self::Comma => write!(f, ","),
             Self::LSqBracket => write!(f, "["),

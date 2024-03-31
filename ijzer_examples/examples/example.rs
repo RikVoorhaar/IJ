@@ -8,8 +8,7 @@ fn test_function(x: Tensor<f64>) -> Tensor<f64> {
     var x: T
     y = (+ x [1.0])
     z = - x y
-    fn z = * y I
-    x y = 1.0 2.0
+    z = * y I
     u = [1.0,2.0,3.0]
     v = /+ u
     (* z [1.0] [-2.0])
