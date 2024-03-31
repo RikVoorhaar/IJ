@@ -7,9 +7,6 @@ edition = "2021"
 name = "parser_example"
 
 [[example]]
-name = "arrays_example"
-
-[[example]]
 name = "compiler_example"
 
 [[example]]

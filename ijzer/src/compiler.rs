@@ -423,7 +423,7 @@ impl CompileNode for Reduce {
         }
 
         let functional_operand = &operands[0];
-        let functional_operand_stream = child_streams.get(&functional_operand).unwrap();
+        let functional_operand_stream = child_streams.get(functional_operand).unwrap();
 
         let data_stream = child_streams.get(&operands[1]).unwrap();
 

@@ -65,40 +65,40 @@ impl<T: Clone + Num> Tensor<T> {
         let shape = shape.to_vec();
         let strides = strides_from_shape(&shape);
         let data = vec![T::zero(); shape.iter().product()].into_boxed_slice();
-        return Tensor {
+        Tensor {
             shape,
             strides,
             data,
-        };
+        }
     }
     pub fn ones(shape: &[usize]) -> Tensor<T> {
         let shape = shape.to_vec();
         let strides = strides_from_shape(&shape);
         let data = vec![T::one(); shape.iter().product()].into_boxed_slice();
-        return Tensor {
+        Tensor {
             shape,
             strides,
             data,
-        };
+        }
     }
     pub fn scalar(value: T) -> Tensor<T> {
         let shape = vec![1];
         let strides = vec![1];
         let data = vec![value].into_boxed_slice();
-        return Tensor {
+        Tensor {
             shape,
             strides,
             data,
-        };
+        }
     }
     pub fn from_vec(data: Vec<T>, shape: Option<Vec<usize>>) -> Tensor<T> {
         let shape = shape.unwrap_or_else(|| vec![data.len()]);
         let strides = strides_from_shape(&shape);
-        return Tensor {
+        Tensor {
             shape,
             strides,
             data: data.into_boxed_slice(),
-        };
+        }
     }
     pub fn to_vec(&self) -> Vec<T> {
         self.data.clone().into_vec()
@@ -208,7 +208,7 @@ impl<T: Clone + Float> Tensor<T> {
         let normal = rand_distr::Normal::new(0.0, 1.0).unwrap();
         let data: Vec<T> = shape
             .iter()
-            .map(|_| T::from(rng.sample(&normal)).unwrap())
+            .map(|_| T::from(rng.sample(normal)).unwrap())
             .collect();
         let shape = shape.to_vec();
         let strides = strides_from_shape(&shape);
@@ -224,7 +224,7 @@ impl<T: Clone + Float> Tensor<T> {
         let uniform = rand_distr::Uniform::new(0.0, 1.0);
         let data: Vec<T> = shape
             .iter()
-            .map(|_| T::from(rng.sample(&uniform)).unwrap())
+            .map(|_| T::from(rng.sample(uniform)).unwrap())
             .collect();
         let shape = shape.to_vec();
         let strides = strides_from_shape(&shape);
@@ -286,10 +286,8 @@ impl<T: fmt::Display + Clone + Num> fmt::Display for Tensor<T> {
             if num_full < self.shape.len() {
                 output.push_str(", ");
             }
-            if num_full > 0 {
-                if num_full < self.shape.len() {
-                    output.push_str("\n");
-                }
+            if num_full > 0 && num_full < self.shape.len() {
+                output.push('\n');
             }
         }
         write!(f, "{}", output)
@@ -490,7 +488,7 @@ mod tests {
     fn test_randu_constructor() {
         let shape = vec![4, 2];
         let tensor = Tensor::<f64>::randu(&shape);
-        assert!(tensor.to_vec().iter().all(|&x| x >= 0.0 && x <= 1.0));
+        assert!(tensor.to_vec().iter().all(|&x| (0.0..=1.0).contains(&x)));
         assert_eq!(tensor.shape(), &shape);
         assert_eq!(tensor.size(), 8);
     }

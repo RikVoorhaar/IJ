@@ -29,7 +29,7 @@ pub struct Variable {
 
 #[derive(Debug, Default)]
 pub struct ASTContext {
-    pub symbols: HashMap<String, (Variable, Option<Rc<Node>>)>,
+    pub symbols: HashMap<String, Variable>,
     pub tokens: Rc<Vec<Token>>,
     pub line_no: usize,
     pub id_counter: usize,
@@ -75,8 +75,7 @@ impl FunctionSignature {
             return Err(SyntaxError::InvalidType(
                 tokens
                     .iter()
-                    .map(|t| format!("{:?}", t))
-                    .collect::<String>(),
+                    .fold(String::new(), |acc, t| acc + format!("{:?}", t).as_str()),
             )
             .into());
         }
@@ -152,8 +151,7 @@ impl IJType {
             _ => Err(SyntaxError::InvalidType(
                 tokens
                     .iter()
-                    .map(|t| format!("{:?}", t))
-                    .collect::<String>(),
+                    .fold(String::new(), |acc, t| acc + format!("{:?}", t).as_str())
             )
             .into()),
         }
@@ -260,8 +258,8 @@ impl ASTContext {
         }
     }
 
-    pub fn insert_variable(&mut self, var: Variable, expression: Option<Rc<Node>>) {
-        self.symbols.insert(var.name.clone(), (var, expression));
+    pub fn insert_variable(&mut self, var: Variable) {
+        self.symbols.insert(var.name.clone(), var);
     }
 
     pub fn get_increment_id(&mut self) -> usize {
@@ -289,7 +287,7 @@ impl ASTContext {
     pub fn get_token_at_index(&self, index: usize) -> Result<&Token, SyntaxError> {
         self.tokens
             .get(index)
-            .ok_or(SyntaxError::EmptyStream.into())
+            .ok_or(SyntaxError::EmptyStream)
     }
 
     pub fn add_context_to_syntax_error(&self, error: Error, slice: TokenSlice) -> Error {

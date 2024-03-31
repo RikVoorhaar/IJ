@@ -2,7 +2,7 @@ use crate::tokens::Token;
 
 
 use thiserror::Error;
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum SyntaxError {
     #[error("Excpected {0} arguments but got {1}.")]
     InsufficientArguments(usize, usize),
@@ -81,4 +81,7 @@ pub enum SyntaxError {
 
     #[error("Invalid assignment statement: {0}")]
     InvalidAssignmentStatement(String),
+
+    #[error("Empty input")]
+    EmptyInput,
 }
