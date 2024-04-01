@@ -21,13 +21,12 @@ pub fn parse_line(tokens: Vec<Token>, context: &mut ASTContext) -> Result<Rc<Nod
 }
 
 fn parse_ast(context: &mut ASTContext) -> Result<Rc<Node>> {
-    let (op, _) = &context
-        .tokens
-        .split_first()
-        .ok_or(SyntaxError::EmptyStream)?;
-    match op {
-        Token::Variable => parse_var_statement(context),
-        Token::Symbol(symbol) => parse_assign(symbol.name.clone(), context),
+    match context.tokens.as_slice() {
+        [] => Err(SyntaxError::EmptyInput.into()),
+        [Token::Variable, ..] => parse_var_statement(context),
+        [Token::Symbol(symbol), rest @ ..] if rest.contains(&Token::Assign) => {
+            parse_assign(symbol.name.clone(), context)
+        }
         _ => {
             let (node, remainder) = next_node(context.full_slice(), context)?;
             if !remainder.is_empty() {
@@ -132,10 +131,10 @@ pub fn parse_assign(variable_name: String, context: &mut ASTContext) -> Result<R
     let input_type = compute_input_type(&expression)?;
     let output_type = expression.output_type.clone();
     let expression_type = match input_type.is_empty() {
-        true => output_type,
+        true => output_type.clone(),
         false => IJType::Function(FunctionSignature {
             input: input_type,
-            output: vec![output_type],
+            output: vec![output_type.clone()],
         }),
     };
 
@@ -162,7 +161,7 @@ pub fn parse_assign(variable_name: String, context: &mut ASTContext) -> Result<R
     let operand_node = expression.clone();
     let assign_node = Rc::new(Node::new(
         Operation::Assign,
-        vec![expression_type; 2],
+        vec![expression_type, output_type],
         IJType::Void,
         vec![symbol_node, operand_node],
         context.get_increment_id(),
@@ -175,10 +174,8 @@ fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node>, T
     let op = context.get_token_at_index(slice.start)?;
     let rest = slice.move_start(1)?;
     match op {
-        Token::Plus => next_node_simple_tensor_function(Operation::Add, 2, 2, rest, context),
-        Token::Multiplication => {
-            next_node_simple_tensor_function(Operation::Multiply, 2, 2, rest, context)
-        }
+        Token::Plus => next_node_simple_binary_op(Operation::Add, rest, context),
+        Token::Multiplication => next_node_simple_binary_op(Operation::Multiply, rest, context),
         Token::Number(_) => Number::next_node(op.clone(), rest, context),
         Token::Minus => MinusOp::next_node(op.clone(), rest, context),
         Token::LParen => LParen::next_node(op.clone(), rest, context),
@@ -263,24 +260,51 @@ fn gather_all(slice: TokenSlice, context: &mut ASTContext) -> Result<Vec<Rc<Node
 }
 
 /// Parses a simple tensor function, such as addition or multiplication. These all have
-/// a range of input aritys. All inputs are tensors, the output is a single tensor.
-fn next_node_simple_tensor_function(
+/// a range of input aritys. All inputs tensors or scalars.
+fn next_node_simple_binary_op(
     op: Operation,
-    min_arity: usize,
-    max_arity: usize,
     slice: TokenSlice,
     context: &mut ASTContext,
 ) -> Result<(Rc<Node>, TokenSlice)> {
-    let types = (min_arity..=max_arity)
-        .map(|arity| vec![IJType::Tensor; arity])
-        .collect::<Vec<_>>();
+    // let types = (min_arity..=max_arity)
+    //     .map(|arity| vec![IJType::Tensor; arity])
+    //     .collect::<Vec<_>>();
+    let types = vec![
+        vec![IJType::Tensor, IJType::Tensor],
+        vec![IJType::Scalar, IJType::Tensor],
+        vec![IJType::Tensor, IJType::Scalar],
+        vec![IJType::Scalar, IJType::Scalar],
+    ];
     let (operands, rest) = gather_operands(types, slice, context)
         .with_context(|| anyhow!("Error caused by {:?}", op))?;
+    let input_types = operands
+        .iter()
+        .map(|n| n.output_type.clone())
+        .collect::<Vec<IJType>>();
+    let output_type = match input_types.as_slice() {
+        [IJType::Tensor, IJType::Tensor] => IJType::Tensor,
+        [IJType::Scalar, IJType::Tensor] => IJType::Tensor,
+        [IJType::Tensor, IJType::Scalar] => IJType::Tensor,
+        [IJType::Scalar, IJType::Scalar] => IJType::Scalar,
+        _ => {
+            return Err(context.add_context_to_syntax_error(
+                SyntaxError::TypeError(
+                    input_types
+                        .iter()
+                        .map(|t| t.to_string())
+                        .collect::<String>(),
+                    "Tensor -> Tensor or Scalar -> Scalar".to_string(),
+                )
+                .into(),
+                slice,
+            ))
+        }
+    };
     Ok((
         Rc::new(Node::new(
             op,
-            vec![IJType::Tensor; operands.len()],
-            IJType::Tensor,
+            input_types,
+            output_type,
             operands,
             context.get_increment_id(),
         )),
@@ -553,19 +577,35 @@ impl ParseNode for MinusOp {
         slice: TokenSlice,
         context: &mut ASTContext,
     ) -> Result<(Rc<Node>, TokenSlice)> {
-        let single_tensor = vec![IJType::Tensor];
-        let two_tensors = vec![IJType::Tensor; 2];
-        let (operands, rest) = gather_operands(
-            vec![single_tensor.clone(), two_tensors.clone()],
-            slice,
-            context,
-        )?;
+        // let single_tensor = vec![IJType::Tensor];
+        // let two_tensors = vec![IJType::Tensor; 2];
+        let allowed_types = vec![
+            vec![IJType::Tensor],
+            vec![IJType::Scalar],
+            vec![IJType::Tensor, IJType::Tensor],
+            vec![IJType::Scalar, IJType::Scalar],
+            vec![IJType::Tensor, IJType::Scalar],
+            vec![IJType::Scalar, IJType::Tensor],
+        ];
+        let (operands, rest) = gather_operands(allowed_types, slice, context)?;
+        let input_types = operands
+            .iter()
+            .map(|n| n.output_type.clone())
+            .collect::<Vec<IJType>>();
+        let output_type = if input_types
+            .iter()
+            .all(|t| t == &IJType::Scalar)
+        {
+            IJType::Scalar
+        } else {
+            IJType::Tensor
+        };
         match operands.len() {
             1 => Ok((
                 Rc::new(Node::new(
                     Operation::Negate,
-                    single_tensor,
-                    IJType::Tensor,
+                    input_types,
+                    output_type,
                     operands,
                     context.get_increment_id(),
                 )),
@@ -574,8 +614,8 @@ impl ParseNode for MinusOp {
             2 => Ok((
                 Rc::new(Node::new(
                     Operation::Subtract,
-                    two_tensors,
-                    IJType::Tensor,
+                    input_types,
+                    output_type,
                     operands,
                     context.get_increment_id(),
                 )),
@@ -640,18 +680,26 @@ impl Debug for Number {
     }
 }
 
+/// Test to do:
+/// - Test Negate
+/// - Test Subtract
+/// - Test what happens with undefined group behavior ( a group must have a single output for now, but we can also think about group parsing )
+/// - Test nested parentheses
+/// - Test reduce with a var and assign binding, and with plus and multiplication
+/// -  Test add and multiply with scalars
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tokens::lexer;
+    use crate::tokens::{self, lexer};
+
+    fn parse_str(input: &str, context: &mut ASTContext) -> Result<Rc<Node>, anyhow::Error> {
+        let tokens = lexer(input).map_err(|e| SyntaxError::LexerError(e.to_string()))?;
+        parse_line(tokens, context)
+    }
 
     fn parse_str_no_context(input: &str) -> Result<(Rc<Node>, ASTContext)> {
         let mut context = ASTContext::new();
-        let tokens = lexer(input).map_err(|e| SyntaxError::LexerError(e.to_string()))?;
-        if tokens.is_empty() {
-            return Err(SyntaxError::EmptyInput.into());
-        }
-        let node = parse_line(tokens, &mut context)?;
+        let node = parse_str(input, &mut context)?;
         Ok((node, context))
     }
 
@@ -733,5 +781,254 @@ mod tests {
         };
         let actual_var = context.symbols.get("scale").unwrap();
         assert_eq!(actual_var, &expected_var);
+    }
+
+    #[test]
+    fn test_tensor_assignment() {
+        let result = parse_str_no_context("x: T = [1]");
+        assert!(result.is_ok());
+        let (node, context) = result.unwrap();
+        assert_eq!(node.op, Operation::Assign);
+        assert_eq!(node.input_types, vec![IJType::Tensor; 2]);
+        assert_eq!(node.output_type, IJType::Void);
+        let first_operand = &node.operands[0];
+        assert_eq!(first_operand.op, Operation::Symbol("x".to_string()));
+        assert_eq!(first_operand.output_type, IJType::Tensor);
+        let second_operand = &node.operands[1];
+        assert_eq!(second_operand.output_type, IJType::Tensor);
+        assert_eq!(second_operand.op, Operation::Array("1".to_string()));
+
+        let expected_var = Variable {
+            typ: IJType::Tensor,
+            name: "x".to_string(),
+        };
+        let actual_var = context.symbols.get("x").unwrap();
+        assert_eq!(actual_var, &expected_var);
+    }
+
+    #[test]
+    fn test_scalar_assignment() {
+        let result = parse_str_no_context("x: S = 1");
+        assert!(result.is_ok());
+        let (node, context) = result.unwrap();
+        assert_eq!(node.op, Operation::Assign);
+        assert_eq!(node.input_types, vec![IJType::Scalar; 2]);
+        assert_eq!(node.output_type, IJType::Void);
+        let first_operand = &node.operands[0];
+        assert_eq!(first_operand.op, Operation::Symbol("x".to_string()));
+        assert_eq!(first_operand.output_type, IJType::Scalar);
+        let second_operand = &node.operands[1];
+        assert_eq!(second_operand.output_type, IJType::Scalar);
+        assert_eq!(
+            second_operand.op,
+            Operation::Number(tokens::Number {
+                value: "1".to_string()
+            })
+        );
+
+        let expected_var = Variable {
+            typ: IJType::Scalar,
+            name: "x".to_string(),
+        };
+        let actual_var = context.symbols.get("x").unwrap();
+        assert_eq!(actual_var, &expected_var);
+    }
+
+    #[test]
+    fn test_wrongly_annotated_assignment() {
+        let result = parse_str_no_context("x: T = 1");
+        assert!(result.is_err());
+        assert!(is_specific_syntax_error(
+            &result.unwrap_err(),
+            &SyntaxError::TypeError(IJType::Scalar.to_string(), IJType::Tensor.to_string())
+        ));
+    }
+
+    #[test]
+    fn test_function_assignment() {
+        let result = parse_str_no_context("x: Fn(T->T) = + [1] I");
+        assert!(result.is_ok());
+        let (node, context) = result.unwrap();
+        assert_eq!(node.op, Operation::Assign);
+        let expected_signature = FunctionSignature {
+            input: vec![IJType::Tensor],
+            output: vec![IJType::Tensor],
+        };
+        assert_eq!(
+            node.input_types,
+            vec![IJType::Function(expected_signature.clone()), IJType::Tensor]
+        );
+        assert_eq!(node.output_type, IJType::Void);
+        let first_operand = &node.operands[0];
+        assert_eq!(first_operand.op, Operation::Symbol("x".to_string()));
+
+        assert_eq!(
+            first_operand.output_type,
+            IJType::Function(expected_signature.clone())
+        );
+        let second_operand = &node.operands[1];
+        assert_eq!(second_operand.op, Operation::Add);
+        assert_eq!(second_operand.output_type, IJType::Tensor);
+
+        assert_eq!(
+            compute_input_type(second_operand).unwrap(),
+            expected_signature.input.clone()
+        );
+
+        let expected_var = Variable {
+            typ: IJType::Function(FunctionSignature {
+                input: vec![IJType::Tensor],
+                output: vec![IJType::Tensor],
+            }),
+            name: "x".to_string(),
+        };
+        let actual_var = context.symbols.get("x").unwrap();
+        assert_eq!(actual_var, &expected_var);
+    }
+
+    #[test]
+    fn test_undefined_variable() {
+        let result = parse_str_no_context("x + 1");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        println!("{:?}", err);
+        assert!(is_specific_syntax_error(
+            &err,
+            &SyntaxError::UnknownSymbol("x".to_string())
+        ));
+    }
+
+    #[test]
+    fn test_var_definition_and_use() {
+        let mut context = ASTContext::new();
+        parse_str("var x: Fn(S->T)", &mut context).unwrap();
+        let result = parse_str("x 1", &mut context);
+        assert!(result.is_ok());
+        let node = result.unwrap();
+        assert_eq!(node.op, Operation::Function("x".to_string()));
+        assert_eq!(node.input_types, vec![IJType::Scalar]);
+        assert_eq!(node.output_type, IJType::Tensor);
+    }
+
+    #[test]
+    fn test_assign_definition_and_use() {
+        let mut context = ASTContext::new();
+        parse_str("add2: Fn(T->T) = + (I) [2]", &mut context).unwrap();
+        let result = parse_str("add2 [1]", &mut context);
+        assert!(result.is_ok());
+        let node = result.unwrap();
+        assert_eq!(node.op, Operation::Function("add2".to_string()));
+        assert_eq!(node.input_types, vec![IJType::Tensor]);
+        assert_eq!(node.output_type, IJType::Tensor);
+    }
+
+    #[test]
+    fn test_add_with_tensors() {
+        let result = parse_str_no_context("+ [1] [2]");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Add);
+        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Tensor]);
+        assert_eq!(node.output_type, IJType::Tensor);
+    }
+
+    #[test]
+    fn test_add_with_tensors_and_scalar() {
+        let result = parse_str_no_context("+ [1] 2");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Add);
+        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Scalar]);
+        assert_eq!(node.output_type, IJType::Tensor);
+    }
+
+    #[test]
+    fn test_add_with_scalars() {
+        let result = parse_str_no_context("+ 1 2");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Add);
+        assert_eq!(node.input_types, vec![IJType::Scalar, IJType::Scalar]);
+        assert_eq!(node.output_type, IJType::Scalar);
+    }
+
+    #[test]
+    fn test_multiply_with_tensors() {
+        let result = parse_str_no_context("* [1] [2]");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Multiply);
+        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Tensor]);
+        assert_eq!(node.output_type, IJType::Tensor);
+    }
+
+    #[test]
+    fn test_multiply_with_tensors_and_scalar() {
+        let result = parse_str_no_context("* [1] 2");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Multiply);
+        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Scalar]);
+        assert_eq!(node.output_type, IJType::Tensor);
+    }
+
+    #[test]
+    fn test_multiply_with_scalars() {
+        let result = parse_str_no_context("* 1 2");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Multiply);
+        assert_eq!(node.input_types, vec![IJType::Scalar, IJType::Scalar]);
+        assert_eq!(node.output_type, IJType::Scalar);
+    }
+
+    #[test]
+    fn test_negate_with_scalar() {
+        let result = parse_str_no_context("- 1.0");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Negate);
+        assert_eq!(node.input_types, vec![IJType::Scalar]);
+        assert_eq!(node.output_type, IJType::Scalar);
+    }
+
+    #[test]
+    fn test_negate_with_tensor() {
+        let result = parse_str_no_context("- [1]");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Negate);
+        assert_eq!(node.input_types, vec![IJType::Tensor]);
+        assert_eq!(node.output_type, IJType::Tensor);
+    }
+
+    #[test]
+    fn test_subtract_with_tensors() {
+        let result = parse_str_no_context("- [1] [2]");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Subtract);
+        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Tensor]);
+        assert_eq!(node.output_type, IJType::Tensor);
+    }
+
+    #[test]
+    fn test_subtract_with_tensor_and_scalar() {
+        let result = parse_str_no_context("- [1] 1");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Subtract);
+        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Scalar]);
+        assert_eq!(node.output_type, IJType::Tensor);
+    }
+
+    #[test]
+    fn test_subtract_with_scalars() {
+        let result = parse_str_no_context("- 1 2");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Subtract);
+        assert_eq!(node.input_types, vec![IJType::Scalar, IJType::Scalar]);
+        assert_eq!(node.output_type, IJType::Scalar);
     }
 }
