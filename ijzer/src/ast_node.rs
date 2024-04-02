@@ -68,7 +68,7 @@ impl FunctionSignature {
     }
     pub fn from_tokens(tokens: &[Token]) -> Result<Self> {
         let parts: Vec<&[Token]> = tokens
-            .split(|t| *t == Token::Arrow || *t == Token::Comma)
+            .split(|t| *t == Token::Arrow)
             .collect();
 
         if parts.len() != 2 {
@@ -352,5 +352,72 @@ impl std::fmt::Display for Node {
             write!(f, "({})", operand_types.join(", "))?;
         }
         Ok(())
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ijtype_from_string_scalar() {
+        let result = IJType::from_string("S");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), IJType::Scalar);
+    }
+
+    #[test]
+    fn test_ijtype_from_string_tensor() {
+        let result = IJType::from_string("T");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), IJType::Tensor);
+    }
+
+    #[test]
+    fn test_ijtype_from_string_function() {
+        let result = IJType::from_string("Fn(T,T->S)");
+        let s = "Fn(T,T->S)";
+        let tokens = lexer(s).map_err(|e| SyntaxError::LexerError(e.to_string())).unwrap();
+        println!("{:?}", tokens);
+
+        assert!(result.is_ok());
+        let expected = IJType::Function(FunctionSignature { 
+            input: vec![IJType::Tensor, IJType::Tensor],
+            output: vec![IJType::Scalar]
+        });
+        assert_eq!(result.unwrap(), expected);
+    }
+
+    #[test]
+    fn test_ijtype_from_string_invalid() {
+        let result = IJType::from_string("X");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_function_signature_from_string_tensor_to_scalar() {
+        let result = FunctionSignature::from_string("T->S");
+        assert!(result.is_ok());
+        let expected = FunctionSignature {
+            input: vec![IJType::Tensor],
+            output: vec![IJType::Scalar]
+        };
+        assert_eq!(result.unwrap(), expected);
+    }
+
+    #[test]
+    fn test_function_signature_from_string_tensors_to_tensor() {
+        let result = FunctionSignature::from_string("T,T->T");
+        assert!(result.is_ok());
+        let expected = FunctionSignature {
+            input: vec![IJType::Tensor, IJType::Tensor],
+            output: vec![IJType::Tensor]
+        };
+        assert_eq!(result.unwrap(), expected);
+    }
+
+    #[test]
+    fn test_function_signature_from_string_invalid() {
+        let result = FunctionSignature::from_string("T,T");
+        assert!(result.is_err());
     }
 }

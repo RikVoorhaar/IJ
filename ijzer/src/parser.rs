@@ -553,14 +553,13 @@ impl ParseNode for Reduction {
             .into());
         }
 
-        let operand_type = IJType::Tensor;
-        let (operands, rest) = gather_operands(vec![vec![operand_type.clone()]], rest, context)?;
+        let (operands, rest) = gather_operands(vec![vec![IJType::Tensor]], rest, context)?;
         let operand = operands.into_iter().next().unwrap();
         Ok((
             Rc::new(Node::new(
                 Operation::Reduce,
-                vec![function_type, operand_type],
-                IJType::Tensor,
+                vec![function_type, IJType::Tensor],
+                IJType::Scalar,
                 vec![function, operand],
                 context.get_increment_id(),
             )),
@@ -592,10 +591,7 @@ impl ParseNode for MinusOp {
             .iter()
             .map(|n| n.output_type.clone())
             .collect::<Vec<IJType>>();
-        let output_type = if input_types
-            .iter()
-            .all(|t| t == &IJType::Scalar)
-        {
+        let output_type = if input_types.iter().all(|t| t == &IJType::Scalar) {
             IJType::Scalar
         } else {
             IJType::Tensor
@@ -680,13 +676,6 @@ impl Debug for Number {
     }
 }
 
-/// Test to do:
-/// - Test Negate
-/// - Test Subtract
-/// - Test what happens with undefined group behavior ( a group must have a single output for now, but we can also think about group parsing )
-/// - Test nested parentheses
-/// - Test reduce with a var and assign binding, and with plus and multiplication
-/// -  Test add and multiply with scalars
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -751,13 +740,13 @@ mod tests {
 
     #[test]
     fn test_function_declaration_tensor_to_tensor() {
-        let result = parse_str_no_context("var add: Fn(T -> T)");
+        let result = parse_str_no_context("var add: Fn(T,T -> T)");
         assert!(result.is_ok());
         let (node, context) = result.unwrap();
         assert_eq!(node.op, Operation::Nothing);
         let expected_var = Variable {
             typ: IJType::Function(FunctionSignature {
-                input: vec![IJType::Tensor],
+                input: vec![IJType::Tensor, IJType::Tensor],
                 output: vec![IJType::Tensor],
             }),
             name: "add".to_string(),
@@ -1029,6 +1018,46 @@ mod tests {
         let (node, _) = result.unwrap();
         assert_eq!(node.op, Operation::Subtract);
         assert_eq!(node.input_types, vec![IJType::Scalar, IJType::Scalar]);
+        assert_eq!(node.output_type, IJType::Scalar);
+    }
+
+    #[test]
+    fn test_nested_parentheses() {
+        let result = parse_str_no_context("(- (+ (1) 2))");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Negate);
+        assert_eq!(node.input_types, vec![IJType::Scalar]);
+        assert_eq!(node.output_type, IJType::Scalar);
+    }
+
+    #[test]
+    fn test_reduce_plus_with_tensor() {
+        let result = parse_str_no_context("/+ [1,2]");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Reduce);
+
+        assert_eq!(
+            node.input_types,
+            vec![IJType::scalar_function(2, 1), IJType::Tensor]
+        );
+        assert_eq!(node.output_type, IJType::Scalar);
+    }
+
+    #[test]
+    fn test_reduce_with_function_and_tensor() {
+        let mut context = ASTContext::new();
+        let var_declaration = parse_str("var f: Fn(S,S->S)", &mut context);
+        assert!(var_declaration.is_ok());
+        let result = parse_str("/f [1,2]", &mut context);
+        assert!(result.is_ok());
+        let node = result.unwrap();
+        assert_eq!(node.op, Operation::Reduce);
+        assert_eq!(
+            node.input_types,
+            vec![IJType::scalar_function(2, 1), IJType::Tensor]
+        );
         assert_eq!(node.output_type, IJType::Scalar);
     }
 }
