@@ -683,7 +683,9 @@ mod tests {
 
     fn parse_str(input: &str, context: &mut ASTContext) -> Result<Rc<Node>, anyhow::Error> {
         let tokens = lexer(input).map_err(|e| SyntaxError::LexerError(e.to_string()))?;
-        parse_line(tokens, context)
+        let result = parse_line(tokens, context)?;
+        verify_types_tree(&result)?;
+        Ok(result)
     }
 
     fn parse_str_no_context(input: &str) -> Result<(Rc<Node>, ASTContext)> {
@@ -698,6 +700,22 @@ mod tests {
         } else {
             false
         }
+    }
+
+    fn verify_types_tree(node: &Node) -> Result<(), anyhow::Error> {
+        if node.operands.is_empty() {
+            return Ok(());
+        }
+        if node.operands.len() != node.input_types.len() {
+            return Err(anyhow!("Operands and input types length mismatch"));
+        }
+        for (operand, input_type) in node.operands.iter().zip(node.input_types.iter()) {
+            if operand.output_type != *input_type {
+                return Err(anyhow!("Operand and input type mismatch"));
+            }
+        }
+
+        node.operands.iter().try_for_each(|n| verify_types_tree(n))
     }
 
     #[test]
