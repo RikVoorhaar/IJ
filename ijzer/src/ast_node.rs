@@ -15,6 +15,12 @@ pub struct Node {
     pub id: usize,
 }
 
+#[derive(Copy, Clone, PartialEq)]
+pub enum LineHasSemicolon {
+    Yes,
+    No,
+}
+
 #[derive(Copy, Clone)]
 pub struct TokenSlice {
     pub start: usize,

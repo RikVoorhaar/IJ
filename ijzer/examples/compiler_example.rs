@@ -3,8 +3,9 @@ use std::rc::Rc;
 use anyhow::Result;
 use ijzer::{
     ast_node::{ASTContext, Node},
-    compiler::CompilerContext,
-    parser::parse_line,
+    compile,
+    compiler::compile_line_from_node,
+    parser::parse_lines,
     tokens::lexer,
 };
 
@@ -13,37 +14,26 @@ use proc_macro2::TokenStream;
 fn main() -> Result<()> {
     let input: &str = "
     var x: T
-    (+ x [1.0])
+    (+ x [1.0]);
     y = (+ x [1.0])
     z = - x y
     z = * y I
     u = [1.0,2.0,3.0]
-    /+ u
+    /+ u;
     v = /+ u
     (* z [1.0] [-2.0])
     ";
+    let tokens = lexer(input)?;
+    println!("{:?}", tokens);
+    let stream = compile(input)?;
+    println!("{:?}", stream.to_string());
+
     let mut symbol_table = ASTContext::new();
-    let mut parsed_lines: Vec<Rc<Node>> = Vec::new();
+    let parsed_lines = parse_lines(tokens, &mut symbol_table)?;
 
-    for line in input.lines() {
-        let tokens = lexer(line)?;
-        if tokens.is_empty() {
-            continue;
-        }
-        let root = parse_line(tokens, &mut symbol_table)?;
-        parsed_lines.push(root);
-    }
-
-    for root in parsed_lines.iter() {
-        let mut compiler = CompilerContext::new(root.clone());
-        let mut stream: TokenStream = TokenStream::new();
-
-        while let Some(node_id) = compiler.pop_next_parseable() {
-            stream = compiler.compile_node(node_id)?;
-
-            compiler.submit_as_parsed(node_id, stream.clone())
-        }
-        println!("{:?}", stream.to_string());
+    for (root, has_semicolon) in parsed_lines.into_iter() {
+        let line_stream = compile_line_from_node(root, has_semicolon)?;
+        println!("{:?}", line_stream.to_string());
     }
     Ok(())
 }

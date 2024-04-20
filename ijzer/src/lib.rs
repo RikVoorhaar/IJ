@@ -1,44 +1,21 @@
 use anyhow::Result;
 use proc_macro2::TokenStream;
-use std::rc::Rc;
 
-pub mod compiler;
-pub mod parser;
-pub mod operations;
-pub mod syntax_error;
-pub mod tokens;
-pub mod tensor;
 pub mod ast_node;
-
-// pub use arrays::*;
-// pub use arrays::ArrayFunc;
-// pub use ndarray::array;
+pub mod compiler;
+pub mod operations;
+pub mod parser;
+pub mod syntax_error;
+pub mod tensor;
+pub mod tokens;
 
 pub fn compile(input: &str) -> Result<TokenStream> {
-    let mut symbol_table = ast_node::ASTContext::new();
-    let mut parsed_lines: Vec<Rc<ast_node::Node>> = Vec::new();
+    let mut ast_context = ast_node::ASTContext::new();
+    let tokens = tokens::lexer(input)?;
+    let parsed_lines = parser::parse_lines(tokens, &mut ast_context)?;
 
-    for line in input.lines() {
-        let tokens = tokens::lexer(line)?;
-        if tokens.is_empty() {
-            continue;
-        }
-        let root = parser::parse_line(tokens, &mut symbol_table)?;
-        parsed_lines.push(root);
-    }
-
-    let mut stream = TokenStream::new();
-    for root in parsed_lines.iter() {
-        let mut compiler = compiler::CompilerContext::new(root.clone());
-        let mut line_stream: TokenStream = TokenStream::new();
-
-        while let Some(node_id) = compiler.pop_next_parseable() {
-            line_stream = compiler.compile_node(node_id)?;
-
-            compiler.submit_as_parsed(node_id, line_stream.clone())
-        }
-        stream.extend(line_stream);
-    }
-
-    Ok(stream)
+    parsed_lines
+        .into_iter()
+        .map(|(root, has_semicolon)| compiler::compile_line_from_node(root, has_semicolon))
+        .collect::<Result<TokenStream>>()
 }

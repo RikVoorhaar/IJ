@@ -53,6 +53,9 @@ pub fn lexer(input: &str) -> Result<Vec<Token>> {
 #[derive(Logos, PartialEq, Clone)]
 #[logos(skip r"[ ]+")]
 pub enum Token {
+    #[token("\n")]
+    Newline,
+
     #[token("+")]
     Plus,
 
@@ -120,6 +123,7 @@ pub enum Token {
 impl Debug for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Newline => write!(f, "\\n"),
             Self::Plus => write!(f, "+"),
             Self::Multiplication => write!(f, "*"),
             Self::Minus => write!(f, "-"),
@@ -148,6 +152,7 @@ impl Debug for Token {
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Newline => write!(f, "\\n"),
             Self::Plus => write!(f, "+"),
             Self::Multiplication => write!(f, "*"),
             Self::Minus => write!(f, "-"),

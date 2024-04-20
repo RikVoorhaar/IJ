@@ -6,9 +6,28 @@ use proc_macro2::{Span, TokenStream};
 use quote::quote;
 
 use crate::{
-    ast_node::{IJType, Node},
+    ast_node::{IJType, LineHasSemicolon, Node},
     operations::Operation,
 };
+
+pub fn compile_line_from_node(
+    node: Rc<Node>,
+    has_semicolon: LineHasSemicolon,
+) -> Result<TokenStream> {
+    let mut compiler = CompilerContext::new(node.clone());
+    let mut line_stream: TokenStream = TokenStream::new();
+
+    while let Some(node_id) = compiler.pop_next_parseable() {
+        line_stream = compiler.compile(node_id)?;
+
+        compiler.submit_as_parsed(node_id, line_stream.clone())
+    }
+    if has_semicolon == LineHasSemicolon::Yes {
+        line_stream = quote! {#line_stream;};
+    }
+
+    Ok(line_stream)
+}
 
 pub struct CompilerContext {
     pub node_map: HashMap<usize, Rc<Node>>,
@@ -68,7 +87,7 @@ impl CompilerContext {
         self.parseable.pop()
     }
 
-    pub fn compile_node(&mut self, node_id: usize) -> Result<TokenStream> {
+    pub fn compile(&mut self, node_id: usize) -> Result<TokenStream> {
         let node = self.node_map.get(&node_id).unwrap().clone();
 
         let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
@@ -472,10 +491,10 @@ impl CompileNode for NotImplemented {
 /// x = + [1] I
 /// + x 1 (error; undefined)
 /// x = 1; + x 1
-/// var x: Fn(S->T); x 1 
+/// var x: Fn(S->T); x 1
 /// + [1] [2]
 /// + [1] 2
-/// + 1 2 
+/// + 1 2
 /// * [1] [2]
 /// * [1] 2
 /// * 1 2
@@ -487,8 +506,6 @@ impl CompileNode for NotImplemented {
 /// (- (+ (1) 2))
 /// /+ [1,2]
 /// var f: Fn(S,S->S); /f [1,2]
-/// Some more complicated multiline statement 
+/// Some more complicated multiline statement
 #[cfg(test)]
-mod tests {
-}
-
+mod tests {}

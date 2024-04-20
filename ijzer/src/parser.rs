@@ -1,4 +1,6 @@
-use crate::ast_node::{ASTContext, FunctionSignature, IJType, Node, TokenSlice, Variable};
+use crate::ast_node::{
+    ASTContext, FunctionSignature, IJType, LineHasSemicolon, Node, TokenSlice, Variable,
+};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
 use crate::tokens::{Number, SymbolToken, Token};
@@ -12,6 +14,30 @@ trait ParseNode {
         tokens: TokenSlice,
         context: &mut ASTContext,
     ) -> Result<(Rc<Node>, TokenSlice)>;
+}
+
+pub fn parse_lines(
+    tokens: Vec<Token>,
+    context: &mut ASTContext,
+) -> Result<Vec<(Rc<Node>, LineHasSemicolon)>> {
+    let mut parsed_lines = Vec::new();
+    let mut line_tokens = Vec::new();
+    for token in tokens {
+        if token == Token::Newline || token == Token::Semicolon {
+            if line_tokens.is_empty() {
+                continue;
+            }
+            let root = parse_line(std::mem::take(&mut line_tokens), context)?;
+            let has_semicolon = match token {
+                Token::Semicolon => LineHasSemicolon::Yes,
+                _ => LineHasSemicolon::No,
+            };
+            parsed_lines.push((root, has_semicolon));
+        } else {
+            line_tokens.push(token);
+        }
+    }
+    Ok(parsed_lines)
 }
 
 pub fn parse_line(tokens: Vec<Token>, context: &mut ASTContext) -> Result<Rc<Node>> {
