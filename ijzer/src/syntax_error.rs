@@ -22,6 +22,9 @@ pub enum SyntaxError {
     #[error("Unexpected token {0:?}")]
     UnexpectedToken(Token),
 
+    #[error("Unexpected semicolon")]
+    UnexpectedSemicolon,
+
     #[error("Unknown symbol {0}")]
     UnknownSymbol(String),
 

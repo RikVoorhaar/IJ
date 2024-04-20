@@ -15,7 +15,14 @@ trait ParseNode {
 }
 
 pub fn parse_line(tokens: Vec<Token>, context: &mut ASTContext) -> Result<Rc<Node>> {
-    context.set_tokens(tokens);
+    if let Some(pos) = tokens.iter().position(|t| *t == Token::Semicolon) {
+        if pos != tokens.len() - 1 {
+            return Err(SyntaxError::UnexpectedSemicolon.into());
+        }
+        context.set_tokens(tokens[..pos].to_vec());
+    } else {
+        context.set_tokens(tokens);
+    }
     context.line_no += 1;
     parse_ast(context)
 }
@@ -895,7 +902,7 @@ mod tests {
 
     #[test]
     fn test_undefined_variable() {
-        let result = parse_str_no_context("x + 1");
+        let result = parse_str_no_context("+ x 1");
         assert!(result.is_err());
         let err = result.unwrap_err();
         println!("{:?}", err);
@@ -1077,5 +1084,32 @@ mod tests {
             vec![IJType::scalar_function(2, 1), IJType::Tensor]
         );
         assert_eq!(node.output_type, IJType::Scalar);
+    }
+
+    #[test]
+    fn test_semicolon_handling() {
+        // Test with semicolon at the end - should pass
+        let result_with_semicolon = parse_str_no_context("var x: S;");
+        assert!(result_with_semicolon.is_ok());
+
+        // Test without semicolon at the end - should also pass and be equivalent
+        let result_without_semicolon = parse_str_no_context("var x: S");
+        assert!(result_without_semicolon.is_ok());
+
+        // Compare the results to ensure they are equivalent
+        let (_, context_with_semicolon) = result_with_semicolon.unwrap();
+        let (_, context_without_semicolon) = result_without_semicolon.unwrap();
+        assert_eq!(
+            context_with_semicolon.symbols.get("x"),
+            context_without_semicolon.symbols.get("x")
+        );
+
+        // Test with semicolon not at the end - should fail
+        let result_error = parse_str_no_context("var x: S; var y: T");
+        assert!(result_error.is_err());
+        assert!(is_specific_syntax_error(
+            &result_error.unwrap_err(),
+            &SyntaxError::UnexpectedSemicolon
+        ));
     }
 }

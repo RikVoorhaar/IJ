@@ -462,3 +462,33 @@ impl CompileNode for NotImplemented {
         })
     }
 }
+
+/// TODO tests to write. Check output for statements:
+/// empty
+/// var
+/// x: T = [1]
+/// x = [1]
+/// x: S = 1
+/// x = + [1] I
+/// + x 1 (error; undefined)
+/// x = 1; + x 1
+/// var x: Fn(S->T); x 1 
+/// + [1] [2]
+/// + [1] 2
+/// + 1 2 
+/// * [1] [2]
+/// * [1] 2
+/// * 1 2
+/// - 1.0
+/// - [1]
+/// - [1] [2]
+/// - [1] 2
+/// - 1 2
+/// (- (+ (1) 2))
+/// /+ [1,2]
+/// var f: Fn(S,S->S); /f [1,2]
+/// Some more complicated multiline statement 
+#[cfg(test)]
+mod tests {
+}
+

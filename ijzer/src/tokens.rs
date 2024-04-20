@@ -112,6 +112,9 @@ pub enum Token {
 
     #[token(":")]
     TypeDeclaration,
+
+    #[token(";")]
+    Semicolon,
 }
 
 impl Debug for Token {
@@ -137,6 +140,7 @@ impl Debug for Token {
             Self::Scalar => write!(f, "S"),
             Self::Tensor => write!(f, "T"),
             Self::TypeDeclaration => write!(f, ":"),
+            Self::Semicolon => write!(f, ";"),
         }
     }
 }
@@ -164,6 +168,7 @@ impl Display for Token {
             Self::Scalar => write!(f, "S"),
             Self::Tensor => write!(f, "T"),
             Self::TypeDeclaration => write!(f, ":"),
+            Self::Semicolon => write!(f, ";"),
         }
     }
 }
