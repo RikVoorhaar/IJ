@@ -27,9 +27,10 @@ pub fn compile_line_from_node(
     if has_semicolon == LineHasSemicolon::Yes {
         let mut ts_iter = line_stream.clone().into_iter().collect::<Vec<_>>();
         let last_token = ts_iter.pop();
-        let ends_with_semicolon = matches!(last_token, Some(proc_macro2::TokenTree::Punct(ref p)) if p.as_char() == ';' && p.spacing() == proc_macro2::Spacing::Alone);
+        let needs_semicolon = !matches!(last_token, Some(proc_macro2::TokenTree::Punct(ref p)) if p.as_char() == ';' && p.spacing() == proc_macro2::Spacing::Alone)
+            && last_token.is_some();
 
-        if !ends_with_semicolon {
+        if needs_semicolon {
             line_stream = quote! {#line_stream;};
         }
     }
@@ -491,9 +492,6 @@ impl CompileNode for NotImplemented {
 }
 
 /// TODO tests to write. Check output for statements:
-/// x = + [1] I
-/// + x 1 (error; undefined)
-/// x = 1; + x 1
 /// var x: Fn(S->T); x 1
 /// + [1] [2]
 /// + [1] 2
@@ -574,5 +572,24 @@ mod tests {
         compiler_compare(input1, expexted);
         compiler_compare(input2, expexted);
         compiler_compare(input3, expexted);
+    }
+
+    #[test]
+    fn test_simple_function() {
+        let input1 = "x: Fn(T->T) = + [1] I";
+        let input2 = "x = + [1] I";
+        let expexted = "let x = { | _1 | ijzer :: tensor :: Tensor :: from_vec (vec ! [1] , None) . apply_binary_op (& _1 , | a , b | a + b) . unwrap () } ;";
+        compiler_compare(input1, expexted);
+        compiler_compare(input2, expexted);
+    }
+
+    #[test]
+    fn test_function_apply() {
+        let input1 = "var x: Fn(S->T); x 1";
+        let input2 = "var x: Fn(S->T)
+         x 1";
+        let expexted = "x (ijzer :: tensor :: Tensor :: scalar (1))";
+        compiler_compare(input1, expexted);
+        compiler_compare(input2, expexted);
     }
 }
