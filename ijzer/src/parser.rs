@@ -37,6 +37,17 @@ pub fn parse_lines(
             line_tokens.push(token);
         }
     }
+    if !line_tokens.is_empty() {
+        let last_token = line_tokens.last().unwrap();
+        let has_semicolon = match last_token {
+            Token::Semicolon => LineHasSemicolon::Yes,
+            _ => LineHasSemicolon::No,
+        };
+        parsed_lines.push((
+            parse_line(std::mem::take(&mut line_tokens), context)?,
+            has_semicolon,
+        ));
+    }
     Ok(parsed_lines)
 }
 

@@ -1,32 +1,29 @@
-use std::rc::Rc;
-
 use anyhow::Result;
 use ijzer::{
-    ast_node::{ASTContext, Node},
-    compile,
-    compiler::compile_line_from_node,
-    parser::parse_lines,
+    ast_node::ASTContext, compile, compiler::compile_line_from_node, parser::parse_lines,
     tokens::lexer,
 };
 
-use proc_macro2::TokenStream;
-
 fn main() -> Result<()> {
+    // let input: &str = "
+    // var x: T
+    // (+ x [1.0]);
+    // y = (+ x [1.0])
+    // z = - x y
+    // z = * y I
+    // u = [1.0,2.0,3.0]
+    // /+ u;
+    // v = /+ u
+    // (* z [1.0] [-2.0])
+    // ";
     let input: &str = "
-    var x: T
-    (+ x [1.0]);
-    y = (+ x [1.0])
-    z = - x y
-    z = * y I
-    u = [1.0,2.0,3.0]
-    /+ u;
-    v = /+ u
-    (* z [1.0] [-2.0])
+    x: T = [1]
     ";
     let tokens = lexer(input)?;
     println!("{:?}", tokens);
     let stream = compile(input)?;
     println!("{:?}", stream.to_string());
+    println!("------------------------");
 
     let mut symbol_table = ASTContext::new();
     let parsed_lines = parse_lines(tokens, &mut symbol_table)?;

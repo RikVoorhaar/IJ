@@ -483,8 +483,6 @@ impl CompileNode for NotImplemented {
 }
 
 /// TODO tests to write. Check output for statements:
-/// empty
-/// var
 /// x: T = [1]
 /// x = [1]
 /// x: S = 1
@@ -508,4 +506,41 @@ impl CompileNode for NotImplemented {
 /// var f: Fn(S,S->S); /f [1,2]
 /// Some more complicated multiline statement
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+    use crate::compile;
+
+    fn compiler_compare(input: &str, expected: &str) {
+        let compiled_stream_result = compile(input);
+        assert!(compiled_stream_result.is_ok());
+        let compiled_stream = compiled_stream_result.unwrap();
+        println!("------------------------");
+        println!("Input:");
+        println!("{}", input);
+        println!("Compiled stream:");
+        println!("{}", compiled_stream);
+        println!("------------------------");
+
+        let expected_stream_result = syn::parse_str(expected);
+        assert!(expected_stream_result.is_ok());
+        let expected_stream: TokenStream = expected_stream_result.unwrap();
+
+        assert_eq!(compiled_stream.to_string(), expected_stream.to_string());
+    }
+
+    #[test]
+    fn test_empty_input() {
+        compiler_compare("", "");
+    }
+
+    #[test]
+    fn test_var() {
+        compiler_compare("var x: T", "");
+    }
+    #[test]
+    fn test_var_assign() {
+        let input = "x: T = [1]";
+        let expexted = "let x = ijzer::tensor::Tensor::from_vec(vec![1], None);";
+        compiler_compare(input, expexted);
+    }
+}
