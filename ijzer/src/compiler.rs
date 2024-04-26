@@ -22,8 +22,16 @@ pub fn compile_line_from_node(
 
         compiler.submit_as_parsed(node_id, line_stream.clone())
     }
+
+    // Add semicolon if necessary; avoid putting double semicolons
     if has_semicolon == LineHasSemicolon::Yes {
-        line_stream = quote! {#line_stream;};
+        let mut ts_iter = line_stream.clone().into_iter().collect::<Vec<_>>();
+        let last_token = ts_iter.pop();
+        let ends_with_semicolon = matches!(last_token, Some(proc_macro2::TokenTree::Punct(ref p)) if p.as_char() == ';' && p.spacing() == proc_macro2::Spacing::Alone);
+
+        if !ends_with_semicolon {
+            line_stream = quote! {#line_stream;};
+        }
     }
 
     Ok(line_stream)
@@ -483,9 +491,6 @@ impl CompileNode for NotImplemented {
 }
 
 /// TODO tests to write. Check output for statements:
-/// x: T = [1]
-/// x = [1]
-/// x: S = 1
 /// x = + [1] I
 /// + x 1 (error; undefined)
 /// x = 1; + x 1
@@ -537,10 +542,37 @@ mod tests {
     fn test_var() {
         compiler_compare("var x: T", "");
     }
+
     #[test]
-    fn test_var_assign() {
-        let input = "x: T = [1]";
+    fn test_assign_tensor() {
+        let input1 = "x: T = [1]";
+        let input2 = "x = [1]";
         let expexted = "let x = ijzer::tensor::Tensor::from_vec(vec![1], None);";
-        compiler_compare(input, expexted);
+        compiler_compare(input1, expexted);
+        compiler_compare(input2, expexted);
+    }
+
+    #[test]
+    fn test_assign_scalar() {
+        let input1 = "x: S = 1";
+        let input2 = "x = 1";
+        let expexted = "let x = ijzer::tensor::Tensor::scalar(1);";
+        compiler_compare(input1, expexted);
+        compiler_compare(input2, expexted);
+    }
+
+    #[test]
+    fn test_multiline() {
+        let input1 = "x = [1]
+        y = + x x
+        ";
+        let input2 = "x = [1]; y= + x x";
+        let input3 = "
+        x = [1];
+        y= + x x;";
+        let expexted = "let x = ijzer :: tensor :: Tensor :: from_vec (vec ! [1] , None) ; let y = x . apply_binary_op (& x , | a , b | a + b) . unwrap () ;";
+        compiler_compare(input1, expexted);
+        compiler_compare(input2, expexted);
+        compiler_compare(input3, expexted);
     }
 }
