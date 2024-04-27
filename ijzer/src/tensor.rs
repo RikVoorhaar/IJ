@@ -91,6 +91,9 @@ impl<T: Clone + Num> Tensor<T> {
             data,
         }
     }
+    pub fn is_scalar(&self) -> bool {
+        self.shape == vec![1]
+    }
     pub fn from_vec(data: Vec<T>, shape: Option<Vec<usize>>) -> Tensor<T> {
         let shape = shape.unwrap_or_else(|| vec![data.len()]);
         let strides = strides_from_shape(&shape);
@@ -357,12 +360,28 @@ mod tests {
     }
 
     #[test]
-    fn test_tensor_multiply_scalar() {
+    fn test_tensor_multiply_tensor_scalar() {
         let tensor = Tensor::<f64>::ones(&[2, 2]);
         let scalar = Tensor::<f64>::scalar(3.0);
         let result = tensor.apply_binary_op(&scalar, |x, y| x * y).unwrap();
         assert_eq!(result.shape, vec![2, 2]);
         assert!(result.data.iter().all(|&x| x == 3.0));
+    }
+    #[test]
+    fn test_tensor_multiply_scalar_tensor() {
+        let tensor = Tensor::<f64>::ones(&[2, 2]);
+        let scalar = Tensor::<f64>::scalar(3.0);
+        let result = scalar.apply_binary_op(&tensor, |x, y| x * y).unwrap();
+        assert_eq!(result.shape, vec![2, 2]);
+        assert!(result.data.iter().all(|&x| x == 3.0));
+    }
+    #[test]
+    fn test_tensor_multiply_scalar_scalar() {
+        let scalar1 = Tensor::<f64>::scalar(2.0);
+        let scalar2 = Tensor::<f64>::scalar(3.0);
+        let result = scalar1.apply_binary_op(&scalar2, |x, y| x * y).unwrap();
+        assert!(result.is_scalar());
+        assert_eq!(result.data.to_vec(), vec![6.0]);
     }
 
     #[test]
@@ -526,4 +545,7 @@ mod tests {
         assert_eq!(sub_tensor_3.shape(), &vec![3]);
         assert_eq!(sub_tensor_3.to_vec(), vec![1, 5, 9]);
     }
+
+    #[test]
+    fn test_add_scalars() {}
 }

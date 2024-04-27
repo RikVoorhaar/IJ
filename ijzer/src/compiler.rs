@@ -304,7 +304,7 @@ impl CompileNode for Add {
         let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
 
         let res = match node.output_type {
-            IJType::Tensor => {
+            IJType::Tensor | IJType::Scalar => {
                 if children.len() != 2 {
                     panic!("Expected 2 children for add, found {:?}", children.len());
                 }
@@ -492,18 +492,8 @@ impl CompileNode for NotImplemented {
 }
 
 /// TODO tests to write. Check output for statements:
-/// var x: Fn(S->T); x 1
-/// + [1] [2]
-/// + [1] 2
-/// + 1 2
-/// * [1] [2]
-/// * [1] 2
-/// * 1 2
 /// - 1.0
 /// - [1]
-/// - [1] [2]
-/// - [1] 2
-/// - 1 2
 /// (- (+ (1) 2))
 /// /+ [1,2]
 /// var f: Fn(S,S->S); /f [1,2]
@@ -591,5 +581,27 @@ mod tests {
         let expexted = "x (ijzer :: tensor :: Tensor :: scalar (1))";
         compiler_compare(input1, expexted);
         compiler_compare(input2, expexted);
+    }
+
+    #[test]
+    fn test_add() {
+        compiler_compare("+ [1] [2]", "ijzer :: tensor :: Tensor :: from_vec (vec ! [1] , None) . apply_binary_op (& ijzer :: tensor :: Tensor :: from_vec (vec ! [2] , None) , | a , b | a + b) . unwrap ()");
+        compiler_compare("+ [1] 2","ijzer :: tensor :: Tensor :: from_vec (vec ! [1] , None) . apply_binary_op (& ijzer :: tensor :: Tensor :: scalar (2) , | a , b | a + b) . unwrap ()");
+        compiler_compare("+ 1 [2]","ijzer :: tensor :: Tensor :: scalar(1) . apply_binary_op (& ijzer :: tensor :: Tensor :: from_vec (vec ! [2] , None) , | a , b | a + b) . unwrap ()");
+        compiler_compare("+ 1 2","ijzer :: tensor :: Tensor :: scalar (1) . apply_binary_op (& ijzer :: tensor :: Tensor :: scalar (2) , | a , b | a + b) . unwrap ()");
+    }
+    #[test]
+    fn test_subtract() {
+        compiler_compare("- [1] [2]", "ijzer :: tensor :: Tensor :: from_vec (vec ! [1] , None) . apply_binary_op (& ijzer :: tensor :: Tensor :: from_vec (vec ! [2] , None) , | a , b | a - b) . unwrap ()");
+        compiler_compare("- [1] 2","ijzer :: tensor :: Tensor :: from_vec (vec ! [1] , None) . apply_binary_op (& ijzer :: tensor :: Tensor :: scalar (2) , | a , b | a - b) . unwrap ()");
+        compiler_compare("- 1 [2]","ijzer :: tensor :: Tensor :: scalar(1) . apply_binary_op (& ijzer :: tensor :: Tensor :: from_vec (vec ! [2] , None) , | a , b | a - b) . unwrap ()");
+        compiler_compare("- 1 2","ijzer :: tensor :: Tensor :: scalar (1) . apply_binary_op (& ijzer :: tensor :: Tensor :: scalar (2) , | a , b | a - b) . unwrap ()");
+    }
+    #[test]
+    fn test_multiply() {
+        compiler_compare("* [1] [2]", "ijzer :: tensor :: Tensor :: from_vec (vec ! [1] , None) . apply_binary_op (& ijzer :: tensor :: Tensor :: from_vec (vec ! [2] , None) , | a , b | a * b) . unwrap ()");
+        compiler_compare("* [1] 2","ijzer :: tensor :: Tensor :: from_vec (vec ! [1] , None) . apply_binary_op (& ijzer :: tensor :: Tensor :: scalar (2) , | a , b | a * b) . unwrap ()");
+        compiler_compare("* 1 [2]","ijzer :: tensor :: Tensor :: scalar(1) . apply_binary_op (& ijzer :: tensor :: Tensor :: from_vec (vec ! [2] , None) , | a , b | a * b) . unwrap ()");
+        compiler_compare("* 1 2","ijzer :: tensor :: Tensor :: scalar (1) . apply_binary_op (& ijzer :: tensor :: Tensor :: scalar (2) , | a , b | a * b) . unwrap ()");
     }
 }

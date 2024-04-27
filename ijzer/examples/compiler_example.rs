@@ -17,7 +17,8 @@ fn main() -> Result<()> {
     // (* z [1.0] [-2.0])
     // ";
     let input: &str = "
-    var x: Fn(S->T); x 1
+    - 1.0
+    - [1]
     ";
     let tokens = lexer(input)?;
     println!("{:?}", tokens);
