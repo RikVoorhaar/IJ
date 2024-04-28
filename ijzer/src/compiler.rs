@@ -491,13 +491,6 @@ impl CompileNode for NotImplemented {
     }
 }
 
-/// TODO tests to write. Check output for statements:
-/// - 1.0
-/// - [1]
-/// (- (+ (1) 2))
-/// /+ [1,2]
-/// var f: Fn(S,S->S); /f [1,2]
-/// Some more complicated multiline statement
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -603,5 +596,23 @@ mod tests {
         compiler_compare("* [1] 2","ijzer :: tensor :: Tensor :: from_vec (vec ! [1] , None) . apply_binary_op (& ijzer :: tensor :: Tensor :: scalar (2) , | a , b | a * b) . unwrap ()");
         compiler_compare("* 1 [2]","ijzer :: tensor :: Tensor :: scalar(1) . apply_binary_op (& ijzer :: tensor :: Tensor :: from_vec (vec ! [2] , None) , | a , b | a * b) . unwrap ()");
         compiler_compare("* 1 2","ijzer :: tensor :: Tensor :: scalar (1) . apply_binary_op (& ijzer :: tensor :: Tensor :: scalar (2) , | a , b | a * b) . unwrap ()");
+    }
+
+    #[test]
+    fn test_negate() {
+        compiler_compare(
+            "-[1]",
+            "ijzer :: tensor :: Tensor :: from_vec (vec ! [1] , None) . map (| x | -x)",
+        );
+        compiler_compare("var x: S; -x", "x . map (| x | -x)");
+        compiler_compare("- I", "_0 . map (| x | -x)");
+    }
+
+    #[test]
+    fn test_reduction() {
+        compiler_compare(
+            "var f: Fn(S,S->S); /f [1,2]",
+            "ijzer :: tensor :: Tensor :: from_vec (vec ! [1 , 2] , None) . reduce (f)",
+        );
     }
 }

@@ -310,9 +310,6 @@ fn next_node_simple_binary_op(
     slice: TokenSlice,
     context: &mut ASTContext,
 ) -> Result<(Rc<Node>, TokenSlice)> {
-    // let types = (min_arity..=max_arity)
-    //     .map(|arity| vec![IJType::Tensor; arity])
-    //     .collect::<Vec<_>>();
     let types = vec![
         vec![IJType::Tensor, IJType::Tensor],
         vec![IJType::Scalar, IJType::Tensor],
@@ -640,6 +637,27 @@ impl ParseNode for MinusOp {
         } else {
             IJType::Tensor
         };
+        if operands.len() == 1 {
+            if let Operation::Number(x) = operands[0].op.clone() {
+                let x_val = x.value;
+                let modified_x_val = if x_val.starts_with('-') {
+                    x_val.trim_start_matches('-').to_string()
+                } else {
+                    format!("-{}", x_val)
+                };
+
+                let node = Node::new(
+                    Operation::Number(Number {
+                        value: modified_x_val,
+                    }),
+                    input_types,
+                    output_type,
+                    operands,
+                    context.get_increment_id(),
+                );
+                return Ok((Rc::new(node), rest));
+            }
+        }
         match operands.len() {
             1 => Ok((
                 Rc::new(Node::new(
@@ -1038,7 +1056,26 @@ mod tests {
         let result = parse_str_no_context("- 1.0");
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Negate);
+        assert_eq!(
+            node.op,
+            Operation::Number(Number {
+                value: "-1.0".to_string()
+            })
+        );
+        assert_eq!(node.input_types, vec![IJType::Scalar]);
+        assert_eq!(node.output_type, IJType::Scalar);
+    }
+    #[test]
+    fn test_double_negate_with_scalar() {
+        let result = parse_str_no_context("-- 1.0");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(
+            node.op,
+            Operation::Number(Number {
+                value: "1.0".to_string()
+            })
+        );
         assert_eq!(node.input_types, vec![IJType::Scalar]);
         assert_eq!(node.output_type, IJType::Scalar);
     }
