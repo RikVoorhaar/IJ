@@ -227,6 +227,7 @@ fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node>, T
         Token::Symbol(_) => Symbol::next_node(op.clone(), rest, context),
         Token::Identity => IdentityOp::next_node(op.clone(), rest, context),
         Token::Reduction => Reduction::next_node(op.clone(), rest, context),
+        Token::LambdaVariable(_) => LambdaVariable::next_node(op.clone(), rest, context),
         _ => Err(SyntaxError::UnexpectedToken(op.clone()).into()),
     }
 }
@@ -708,6 +709,28 @@ impl ParseNode for IdentityOp {
     }
 }
 
+struct LambdaVariable;
+impl ParseNode for LambdaVariable {
+    fn next_node(
+        op: Token,
+        tokens: TokenSlice,
+        context: &mut ASTContext,
+    ) -> Result<(Rc<Node>, TokenSlice)> {
+        let name = match op {
+            Token::LambdaVariable(v) => v.name,
+            _ => unreachable!(),
+        };
+        let node = Node::new(
+            Operation::LambdaVariable(name),
+            vec![IJType::Tensor],
+            IJType::Tensor,
+            vec![],
+            context.get_increment_id(),
+        );
+        Ok((Rc::new(node), tokens))
+    }
+}
+
 impl ParseNode for Number {
     fn next_node(
         op: Token,
@@ -752,7 +775,16 @@ mod tests {
 
     fn parse_str_no_context(input: &str) -> Result<(Rc<Node>, ASTContext)> {
         let mut context = ASTContext::new();
-        let node = parse_str(input, &mut context)?;
+        let node = match parse_str(input, &mut context) {
+            Ok(node) => {
+                println!("Node: {:?}", node);
+                node
+            },
+            Err(e) => {
+                println!("Error: {:?}", e);
+                return Err(e);
+            }
+        };
         Ok((node, context))
     }
 
@@ -1142,6 +1174,35 @@ mod tests {
             vec![IJType::scalar_function(2, 1), IJType::Tensor]
         );
         assert_eq!(node.output_type, IJType::Scalar);
+    }
+
+    #[test]
+    fn test_lambda_variable() {
+        let result = parse_str_no_context("$x");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::LambdaVariable("x".to_string()));
+
+        let result = parse_str_no_context("+ $x 1");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Add);
+        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Scalar]);
+        assert_eq!(node.output_type, IJType::Tensor);
+
+        let result = parse_str_no_context("+ $x $x");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Add);
+        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Tensor]);
+        assert_eq!(node.output_type, IJType::Tensor);
+
+        let result = parse_str_no_context("+ $x $y");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Add);
+        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Tensor]);
+        assert_eq!(node.output_type, IJType::Tensor);
     }
 
     #[test]

@@ -31,8 +31,22 @@ pub struct SymbolToken {
 impl FromStr for SymbolToken {
     type Err = anyhow::Error;
 
-    fn from_str(s: &str) -> std::prelude::v1::Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         Ok(SymbolToken {
+            name: s.to_string(),
+        })
+    }
+}
+
+#[derive(PartialEq, Clone, Debug)]
+pub struct LambdaVariableName {
+    pub name: String,
+}
+impl FromStr for LambdaVariableName {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        Ok(LambdaVariableName {
             name: s.to_string(),
         })
     }
@@ -86,6 +100,9 @@ pub enum Token {
     #[regex("[a-zA-Z][a-zA-Z0-9]*", |lex| lex.slice().parse().ok())]
     Symbol(SymbolToken),
 
+    #[regex("\\$[a-zA-Z0-9]+", |lex| lex.slice().trim_start_matches('$').parse().ok())]
+    LambdaVariable(LambdaVariableName),
+
     #[token("var")]
     Variable,
 
@@ -120,35 +137,6 @@ pub enum Token {
     Semicolon,
 }
 
-impl Debug for Token {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Newline => write!(f, "\\n"),
-            Self::Plus => write!(f, "+"),
-            Self::Multiplication => write!(f, "*"),
-            Self::Minus => write!(f, "-"),
-            Self::Number(n) => write!(f, "{:?}", n),
-            Self::LParen => write!(f, "("),
-            Self::RParen => write!(f, ")"),
-            Self::Symbol(s) => write!(f, "{}", s.name),
-            Self::Variable => write!(f, "var"),
-            Self::Arrow => write!(f, "->"),
-            Self::Assign => write!(f, "="),
-            Self::Identity => write!(f, "I"),
-            Self::Return => write!(f, "return"),
-            Self::Comma => write!(f, ", "),
-            Self::LSqBracket => write!(f, "["),
-            Self::RSqBracket => write!(f, "]"),
-            Self::Reduction => write!(f, "/"),
-            Self::FunctionType => write!(f, "Fn"),
-            Self::Scalar => write!(f, "S"),
-            Self::Tensor => write!(f, "T"),
-            Self::TypeDeclaration => write!(f, ":"),
-            Self::Semicolon => write!(f, ";"),
-        }
-    }
-}
-
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -174,6 +162,16 @@ impl Display for Token {
             Self::Tensor => write!(f, "T"),
             Self::TypeDeclaration => write!(f, ":"),
             Self::Semicolon => write!(f, ";"),
+            Self::LambdaVariable(v) => write!(f, "${}", v.name),
+        }
+    }
+}
+
+impl Debug for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Number(n) => write!(f, "{:?}", n),
+            _ => write!(f, "{}", self),
         }
     }
 }

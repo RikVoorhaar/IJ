@@ -17,7 +17,9 @@ fn main() -> Result<()> {
     // (* z [1.0] [-2.0])
     // ";
     let input: &str = "
-    var f: Fn(S,S->S); /f [1,2]
+    f: Fn(T,T->T) = + $x $x
+    g: Fn(T,T->T) = + $x $y
+    var k: Fn(T,T->T); h: Fn(T->T) = f $x [1,2]
     ";
     let tokens = lexer(input)?;
     println!("{:?}", tokens);

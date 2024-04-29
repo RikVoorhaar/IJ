@@ -43,7 +43,7 @@ pub struct CompilerContext {
     parseable: Vec<usize>,
     parsed: HashMap<usize, TokenStream>,
     pub parent: HashMap<usize, usize>,
-    inputs: Vec<usize>,
+    inputs: Vec<(usize, String)>,
 }
 
 impl CompilerContext {
@@ -121,6 +121,7 @@ impl CompilerContext {
             Operation::Array(_) => Array::compile(node, self, child_streams)?,
             Operation::Reduce => Reduce::compile(node, self, child_streams)?,
             Operation::Scalar => NotImplemented::compile(node, self, child_streams)?,
+            Operation::LambdaVariable(_) => LambdaVariable::compile(node, self, child_streams)?,
             // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
@@ -243,7 +244,7 @@ impl CompileNode for Identity {
             if !children.is_empty() {
                 panic!("Expected 0 child, found {:?}", children.len());
             }
-            _compiler.inputs.push(node.id);
+            _compiler.inputs.push((node.id, format!("_{}", node.id)));
             let varname = _compiler.get_varname(node.id);
 
             let res = quote! {
@@ -252,6 +253,34 @@ impl CompileNode for Identity {
             Ok(res)
         } else {
             panic!("Expected identity node, found {:?}", node);
+        }
+    }
+}
+
+struct LambdaVariable;
+impl CompileNode for LambdaVariable {
+    fn compile(
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
+        _child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        if let Operation::LambdaVariable(name) = &node.op {
+            let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
+            if !children.is_empty() {
+                panic!("Expected 0 child, found {:?}", children.len());
+            }
+            let name_with_underscore = format!("_{}", name);
+            _compiler
+                .inputs
+                .push((node.id, name_with_underscore.clone()));
+            let varname = Ident::new(name_with_underscore.as_str(), Span::call_site());
+
+            let res = quote! {
+                #varname
+            };
+            Ok(res)
+        } else {
+            panic!("Expected lambda variable node, found {:?}", node);
         }
     }
 }
@@ -277,7 +306,7 @@ impl CompileNode for Assign {
                 let input_varnames = compiler
                     .inputs
                     .iter()
-                    .map(|id| compiler.get_varname(*id))
+                    .map(|(_, name)| Ident::new(name, Span::call_site()))
                     .collect::<Vec<_>>();
 
                 Ok(quote!(
@@ -614,5 +643,21 @@ mod tests {
             "var f: Fn(S,S->S); /f [1,2]",
             "ijzer :: tensor :: Tensor :: from_vec (vec ! [1 , 2] , None) . reduce (f)",
         );
+    }
+
+    #[test]
+    fn test_lambda_variable() {
+        let expected1 =
+            "let f = { | _x , _x | _x . apply_binary_op (& _x , | a , b | a + b) . unwrap () } ;";
+        compiler_compare("f = + $x $x", expected1);
+        compiler_compare("f: Fn(T,T->T) = + $x $x", expected1);
+
+        let expected2 = "let f = { | _x , _y | _x . apply_binary_op (& _y , | a , b | a + b) . unwrap () } ;";
+        compiler_compare("f = + $x $y", expected2);
+        compiler_compare("f: Fn(T,T->T) = + $x $y", expected2);
+
+        let expected3="let h = { | _x | k (_x , ijzer :: tensor :: Tensor :: from_vec (vec ! [1 , 2] , None)) } ;";
+        compiler_compare("var k: Fn(T,T->T); h: Fn(T->T) = k $x [1,2]", expected3);
+        compiler_compare("var k: Fn(T,T->T); h = k $x [1,2]", expected3);
     }
 }
