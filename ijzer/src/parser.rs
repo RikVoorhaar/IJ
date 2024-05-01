@@ -16,6 +16,15 @@ trait ParseNode {
     ) -> Result<(Rc<Node>, TokenSlice)>;
 }
 
+trait ParseNodeFunctional {
+    fn next_node_functional(
+        op: Token,
+        tokens: TokenSlice,
+        context: &mut ASTContext,
+        needed_outputs: &[IJType],
+    ) -> Result<(Rc<Node>, TokenSlice)>;
+}
+
 pub fn parse_lines(
     tokens: Vec<Token>,
     context: &mut ASTContext,
@@ -509,70 +518,83 @@ impl ParseNode for Symbol {
         }
     }
 }
+impl ParseNodeFunctional for Symbol {
+    fn next_node_functional(
+        op: Token,
+        slice: TokenSlice,
+        context: &mut ASTContext,
+        needed_outputs: &[IJType],
+    ) -> Result<(Rc<Node>, TokenSlice)> {
+        let name = match op {
+            Token::Symbol(SymbolToken { name }) => name,
+            _ => unreachable!(),
+        };
+        let variable = context
+            .symbols
+            .get(name.as_str())
+            .ok_or(SyntaxError::UnknownSymbol(name.clone()))?;
+        if let IJType::Function(ref func_signature) = variable.typ {
+            let num_outputs = func_signature.output.len();
+            if num_outputs != needed_outputs.len() {
+                return Err(SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into());
+            }
+
+            if func_signature.output != needed_outputs[..num_outputs] {
+                return Err(SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into());
+            }
+            Ok((
+                Rc::new(Node::new(
+                    Operation::Function(name.clone()),
+                    vec![],
+                    variable.typ.clone(),
+                    vec![],
+                    context.get_increment_id(),
+                )),
+                slice.move_start(1)?,
+            ))
+        } else {
+            Err(SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into())
+        }
+    }
+}
 
 /// Parses a functional operand. This must be a function or a symbol (encoding a function).
 /// No arguments are parsed for the operand, since this function is passed on to something modifying the function's behavior.
 fn next_node_functional(
     slice: TokenSlice,
     context: &mut ASTContext,
-    outputs: Vec<IJType>,
+    outputs: &[IJType],
 ) -> Result<(Rc<Node>, TokenSlice)> {
     let token = context.get_token_at_index(slice.start)?;
-    let rest = slice.move_start(1)?;
-    let (op, inputs) = match token {
-        Token::Plus => match outputs.first() {
-            Some(IJType::Tensor) => (Operation::Add, vec![IJType::Tensor, IJType::Tensor]),
-            Some(IJType::Scalar) => (Operation::Add, vec![IJType::Scalar, IJType::Scalar]),
-            _ => {
-                return Err(SyntaxError::FunctionSignatureMismatch(
-                    format!("{:?}", outputs),
-                    "Tensor -> Tensor -> Tensor or Scalar -> Scalar -> Scalar".to_string(),
-                )
-                .into())
-            }
-        },
-        Token::Multiplication => match outputs.first() {
-            Some(IJType::Tensor) => (Operation::Multiply, vec![IJType::Tensor, IJType::Tensor]),
-            Some(IJType::Scalar) => (Operation::Multiply, vec![IJType::Scalar, IJType::Scalar]),
-            _ => {
-                return Err(SyntaxError::FunctionSignatureMismatch(
-                    format!("{:?}", outputs),
-                    "Tensor -> Tensor -> Tensor or Scalar -> Scalar -> Scalar".to_string(),
-                )
-                .into())
-            }
-        },
-        Token::Symbol(SymbolToken { name }) => {
-            let variable = context
-                .symbols
-                .get(name.as_str())
-                .ok_or(SyntaxError::UnknownSymbol(name.clone()))?;
-            if let IJType::Function(ref func_signature) = variable.typ {
-                if func_signature.output != outputs {
-                    return Err(
-                        SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into(),
-                    );
-                }
-                (
-                    Operation::Function(name.clone()),
-                    func_signature.input.clone(),
-                )
-            } else {
-                return Err(SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into());
-            }
+    match token {
+        Token::Reduction => {
+            Reduction::next_node_functional(Token::Reduction, slice, context, outputs)
         }
-        _ => return Err(SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into()),
-    };
-    Ok((
-        Rc::new(Node::new(
-            op,
-            vec![],
-            IJType::Function(FunctionSignature::new(inputs, outputs)),
-            vec![],
-            context.get_increment_id(),
-        )),
-        rest,
-    ))
+        Token::Plus => Add::next_node_functional(Token::Plus, slice, context, outputs),
+        Token::Multiplication => {
+            Multiply::next_node_functional(Token::Multiplication, slice, context, outputs)
+        }
+
+        Token::Symbol(_) => Symbol::next_node_functional(token.clone(), slice, context, outputs),
+        _ => Err(SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into()),
+    }
+}
+
+fn reduction_get_functional_part(
+    slice: TokenSlice,
+    context: &mut ASTContext,
+) -> Result<(Rc<Node>, TokenSlice)> {
+    let function_signature = FunctionSignature::new(vec![IJType::Scalar; 2], vec![IJType::Scalar]);
+    let function_type = IJType::Function(function_signature.clone());
+    let (function, rest) = next_node_functional(slice, context, &function_signature.output)?;
+    if function.output_type != function_type {
+        return Err(SyntaxError::TypeError(
+            function_type.to_string(),
+            function.output_type.to_string(),
+        )
+        .into());
+    }
+    Ok((function, rest))
 }
 
 struct Reduction;
@@ -582,26 +604,101 @@ impl ParseNode for Reduction {
         slice: TokenSlice,
         context: &mut ASTContext,
     ) -> Result<(Rc<Node>, TokenSlice)> {
-        let function_signature =
-            FunctionSignature::new(vec![IJType::Scalar; 2], vec![IJType::Scalar]);
-        let function_type = IJType::Function(function_signature.clone());
-        let (function, rest) = next_node_functional(slice, context, function_signature.output)?;
-        if function.output_type != function_type {
-            return Err(SyntaxError::TypeError(
-                function_type.to_string(),
-                function.output_type.to_string(),
-            )
-            .into());
-        }
-
+        let (function, rest) = reduction_get_functional_part(slice, context)?;
         let (operands, rest) = gather_operands(vec![vec![IJType::Tensor]], rest, context)?;
         let operand = operands.into_iter().next().unwrap();
         Ok((
             Rc::new(Node::new(
                 Operation::Reduce,
-                vec![function_type, IJType::Tensor],
+                vec![function.output_type.clone(), IJType::Tensor],
                 IJType::Scalar,
                 vec![function, operand],
+                context.get_increment_id(),
+            )),
+            rest,
+        ))
+    }
+}
+impl ParseNodeFunctional for Reduction {
+    fn next_node_functional(
+        _op: Token,
+        slice: TokenSlice,
+        context: &mut ASTContext,
+        needed_outputs: &[IJType],
+    ) -> Result<(Rc<Node>, TokenSlice)> {
+        match needed_outputs.first() {
+            Some(IJType::Tensor) => Ok(reduction_get_functional_part(slice, context)?),
+            _ => Err(SyntaxError::TypeError(
+                needed_outputs.first().unwrap().to_string(),
+                "Tensor".to_string(),
+            )
+            .into()),
+        }
+    }
+}
+
+struct Add;
+impl ParseNodeFunctional for Add {
+    fn next_node_functional(
+        _op: Token,
+        slice: TokenSlice,
+        context: &mut ASTContext,
+        needed_outputs: &[IJType],
+    ) -> Result<(Rc<Node>, TokenSlice)> {
+        let rest = slice.move_start(1)?;
+        let inputs = match needed_outputs.first() {
+            Some(IJType::Tensor) => vec![IJType::Tensor, IJType::Tensor],
+            Some(IJType::Scalar) => vec![IJType::Scalar, IJType::Scalar],
+            _ => {
+                return Err(SyntaxError::FunctionSignatureMismatch(
+                    format!("{:?}", needed_outputs),
+                    "Tensor -> Tensor -> Tensor or Scalar -> Scalar -> Scalar".to_string(),
+                )
+                .into())
+            }
+        };
+        let outputs = vec![needed_outputs.first().unwrap().clone()];
+        let signature = FunctionSignature::new(inputs, outputs);
+        Ok((
+            Rc::new(Node::new(
+                Operation::Add,
+                vec![],
+                IJType::Function(signature.clone()),
+                vec![],
+                context.get_increment_id(),
+            )),
+            rest,
+        ))
+    }
+}
+struct Multiply;
+impl ParseNodeFunctional for Multiply {
+    fn next_node_functional(
+        _op: Token,
+        slice: TokenSlice,
+        context: &mut ASTContext,
+        needed_outputs: &[IJType],
+    ) -> Result<(Rc<Node>, TokenSlice)> {
+        let rest = slice.move_start(1)?;
+        let inputs = match needed_outputs.first() {
+            Some(IJType::Tensor) => vec![IJType::Tensor, IJType::Tensor],
+            Some(IJType::Scalar) => vec![IJType::Scalar, IJType::Scalar],
+            _ => {
+                return Err(SyntaxError::FunctionSignatureMismatch(
+                    format!("{:?}", needed_outputs),
+                    "Tensor -> Tensor -> Tensor or Scalar -> Scalar -> Scalar".to_string(),
+                )
+                .into())
+            }
+        };
+        let outputs = vec![needed_outputs.first().unwrap().clone()];
+        let signature = FunctionSignature::new(inputs, outputs);
+        Ok((
+            Rc::new(Node::new(
+                Operation::Multiply,
+                vec![],
+                IJType::Function(signature.clone()),
+                vec![],
                 context.get_increment_id(),
             )),
             rest,
@@ -766,9 +863,25 @@ mod tests {
     use crate::tokens::{self, lexer};
 
     fn parse_str(input: &str, context: &mut ASTContext) -> Result<Rc<Node>, anyhow::Error> {
-        let tokens = lexer(input).map_err(|e| SyntaxError::LexerError(e.to_string()))?;
-        let result = parse_line(tokens, context)?;
-        verify_types_tree(&result)?;
+        let tokens = match lexer(input) {
+            Ok(t) => t,
+            Err(e) => {
+                println!("Error in lexer:\n {:?}", e);
+                return Err(e);
+            }
+        };
+        let result = match parse_line(tokens, context) {
+            Ok(n) => n,
+            Err(e) => {
+                println!("Error in parser:\n {:?}", e);
+                return Err(e);
+            }
+        };
+        let tree_ok = verify_types_tree(&result);
+        if let Err(e) = tree_ok {
+            println!("Error veryfing tree:\n {:?}", e);
+        }
+
         Ok(result)
     }
 
