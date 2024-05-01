@@ -515,60 +515,59 @@ impl ParseNode for Symbol {
 fn next_node_functional(
     slice: TokenSlice,
     context: &mut ASTContext,
-    signature: &FunctionSignature,
+    outputs: Vec<IJType>,
 ) -> Result<(Rc<Node>, TokenSlice)> {
     let token = context.get_token_at_index(slice.start)?;
     let rest = slice.move_start(1)?;
-    let op = match token {
-        Token::Plus => {
-            if signature != &FunctionSignature::tensor_function(2, 1)
-                && signature != &FunctionSignature::scalar_function(2, 1)
-            {
+    let (op, inputs) = match token {
+        Token::Plus => match outputs.first() {
+            Some(IJType::Tensor) => (Operation::Add, vec![IJType::Tensor, IJType::Tensor]),
+            Some(IJType::Scalar) => (Operation::Add, vec![IJType::Scalar, IJType::Scalar]),
+            _ => {
                 return Err(SyntaxError::FunctionSignatureMismatch(
-                    signature.to_string(),
+                    format!("{:?}", outputs),
                     "Tensor -> Tensor -> Tensor or Scalar -> Scalar -> Scalar".to_string(),
                 )
-                .into());
+                .into())
             }
-            Operation::Add
-        }
-        Token::Multiplication => {
-            if signature != &FunctionSignature::tensor_function(2, 1)
-                && signature != &FunctionSignature::scalar_function(2, 1)
-            {
+        },
+        Token::Multiplication => match outputs.first() {
+            Some(IJType::Tensor) => (Operation::Multiply, vec![IJType::Tensor, IJType::Tensor]),
+            Some(IJType::Scalar) => (Operation::Multiply, vec![IJType::Scalar, IJType::Scalar]),
+            _ => {
                 return Err(SyntaxError::FunctionSignatureMismatch(
-                    signature.to_string(),
+                    format!("{:?}", outputs),
                     "Tensor -> Tensor -> Tensor or Scalar -> Scalar -> Scalar".to_string(),
                 )
-                .into());
+                .into())
             }
-            Operation::Multiply
-        }
-
+        },
         Token::Symbol(SymbolToken { name }) => {
             let variable = context
                 .symbols
                 .get(name.as_str())
                 .ok_or(SyntaxError::UnknownSymbol(name.clone()))?;
             if let IJType::Function(ref func_signature) = variable.typ {
-                if func_signature != signature {
+                if func_signature.output != outputs {
                     return Err(
                         SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into(),
                     );
                 }
-                Operation::Function(name.clone())
+                (
+                    Operation::Function(name.clone()),
+                    func_signature.input.clone(),
+                )
             } else {
                 return Err(SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into());
             }
         }
-
         _ => return Err(SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into()),
     };
     Ok((
         Rc::new(Node::new(
             op,
             vec![],
-            IJType::Function(signature.clone()),
+            IJType::Function(FunctionSignature::new(inputs, outputs)),
             vec![],
             context.get_increment_id(),
         )),
@@ -586,7 +585,7 @@ impl ParseNode for Reduction {
         let function_signature =
             FunctionSignature::new(vec![IJType::Scalar; 2], vec![IJType::Scalar]);
         let function_type = IJType::Function(function_signature.clone());
-        let (function, rest) = next_node_functional(slice, context, &function_signature)?;
+        let (function, rest) = next_node_functional(slice, context, function_signature.output)?;
         if function.output_type != function_type {
             return Err(SyntaxError::TypeError(
                 function_type.to_string(),
@@ -779,7 +778,7 @@ mod tests {
             Ok(node) => {
                 println!("Node: {:?}", node);
                 node
-            },
+            }
             Err(e) => {
                 println!("Error: {:?}", e);
                 return Err(e);
