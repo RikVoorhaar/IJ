@@ -658,10 +658,62 @@ impl ParseNodeFunctional for Reduction {
         if !_check_ok_needed_outputs(needed_outputs, &[IJType::Tensor]) {
             return Err(SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into());
         }
-        let (node, slice) = reduction_get_functional_part(slice, context)?;
+        let (function, slice) = reduction_get_functional_part(slice, context)?;
+        let node = Rc::new(Node::new(
+            Operation::Reduce,
+            vec![function.output_type.clone(), IJType::Tensor],
+            IJType::Scalar,
+            vec![function],
+            context.get_increment_id(),
+        ));
         Ok((vec![node], slice))
     }
 }
+
+/// Splits out a token slice into a vector of token slices, separated by commas.
+fn comma_separate(slice: TokenSlice, context: &mut ASTContext) -> Result<Vec<TokenSlice>> {
+    let mut slices: Vec<TokenSlice> = vec![];
+    let mut last_endpoint = slice.start;
+    let tokens = &context.get_tokens()[slice.start..slice.end];
+    for (index, token) in tokens.iter().enumerate() {
+        if let Token::Comma = token {
+            let new_slice = slice.move_end(index)?.move_start(last_endpoint)?;
+            slices.push(new_slice);
+            last_endpoint = index + 1;
+        }
+    }
+    let last_slice = slice.move_end(tokens.len())?.move_start(last_endpoint)?;
+    slices.push(last_slice);
+
+    Ok(slices)
+}
+
+
+// struct FunctionComposition;
+// impl ParseNode for FunctionComposition {
+//     fn next_node(
+//         _op: Token,
+//         slice: TokenSlice,
+//         context: &mut ASTContext,
+//     ) -> Result<(Rc<Node>, TokenSlice)> {
+//         let next_token = context.get_token_at_index(slice.start)?;
+//         if next_token != &Token::LParen {
+//             return Err(SyntaxError::ExpectedToken(
+//                 "(".to_string(),
+//                 format!("found {:?}", next_token),
+//             )
+//             .into());
+//         }
+//         let rparen_index =
+//             find_matching_parenthesis(context, slice, &Token::LParen, &Token::RParen)
+//                 .map_err(|e| context.add_context_to_syntax_error(e, slice))?;
+//         let remainder = slice.move_start(rparen_index + 1)?;
+//         let slice = slice.move_end(rparen_index)?;
+//         let slices = comma_separate(slice, context)?;
+//         // let (nodes, rest) = gather_operands(vec![vec![IJType::Tensor]], slices, context)?;
+//     }
+// }
+
 
 fn _next_node_functional_binary(
     operation: Operation,

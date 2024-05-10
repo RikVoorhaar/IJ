@@ -135,6 +135,9 @@ pub enum Token {
 
     #[token(";")]
     Semicolon,
+
+    #[token("@")]
+    FunctionComposition,
 }
 
 impl Display for Token {
@@ -163,6 +166,7 @@ impl Display for Token {
             Self::TypeDeclaration => write!(f, ":"),
             Self::Semicolon => write!(f, ";"),
             Self::LambdaVariable(v) => write!(f, "${}", v.name),
+            Self::FunctionComposition => write!(f, "@"),
         }
     }
 }

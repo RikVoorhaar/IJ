@@ -73,9 +73,7 @@ impl FunctionSignature {
         }
     }
     pub fn from_tokens(tokens: &[Token]) -> Result<Self> {
-        let parts: Vec<&[Token]> = tokens
-            .split(|t| *t == Token::Arrow)
-            .collect();
+        let parts: Vec<&[Token]> = tokens.split(|t| *t == Token::Arrow).collect();
 
         if parts.len() != 2 {
             return Err(SyntaxError::InvalidType(
@@ -157,7 +155,7 @@ impl IJType {
             _ => Err(SyntaxError::InvalidType(
                 tokens
                     .iter()
-                    .fold(String::new(), |acc, t| acc + format!("{:?}", t).as_str())
+                    .fold(String::new(), |acc, t| acc + format!("{:?}", t).as_str()),
             )
             .into()),
         }
@@ -291,9 +289,7 @@ impl ASTContext {
     }
 
     pub fn get_token_at_index(&self, index: usize) -> Result<&Token, SyntaxError> {
-        self.tokens
-            .get(index)
-            .ok_or(SyntaxError::EmptyStream)
+        self.tokens.get(index).ok_or(SyntaxError::EmptyStream)
     }
 
     pub fn add_context_to_syntax_error(&self, error: Error, slice: TokenSlice) -> Error {
@@ -382,13 +378,15 @@ mod tests {
     fn test_ijtype_from_string_function() {
         let result = IJType::from_string("Fn(T,T->S)");
         let s = "Fn(T,T->S)";
-        let tokens = lexer(s).map_err(|e| SyntaxError::LexerError(e.to_string())).unwrap();
+        let tokens = lexer(s)
+            .map_err(|e| SyntaxError::LexerError(e.to_string()))
+            .unwrap();
         println!("{:?}", tokens);
 
         assert!(result.is_ok());
-        let expected = IJType::Function(FunctionSignature { 
+        let expected = IJType::Function(FunctionSignature {
             input: vec![IJType::Tensor, IJType::Tensor],
-            output: vec![IJType::Scalar]
+            output: vec![IJType::Scalar],
         });
         assert_eq!(result.unwrap(), expected);
     }
@@ -405,7 +403,7 @@ mod tests {
         assert!(result.is_ok());
         let expected = FunctionSignature {
             input: vec![IJType::Tensor],
-            output: vec![IJType::Scalar]
+            output: vec![IJType::Scalar],
         };
         assert_eq!(result.unwrap(), expected);
     }
@@ -416,7 +414,7 @@ mod tests {
         assert!(result.is_ok());
         let expected = FunctionSignature {
             input: vec![IJType::Tensor, IJType::Tensor],
-            output: vec![IJType::Tensor]
+            output: vec![IJType::Tensor],
         };
         assert_eq!(result.unwrap(), expected);
     }

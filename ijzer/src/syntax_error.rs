@@ -87,4 +87,7 @@ pub enum SyntaxError {
 
     #[error("Empty input")]
     EmptyInput,
+
+    #[error("Expected token {0} but got {1}")]
+    ExpectedToken(String, String),
 }
