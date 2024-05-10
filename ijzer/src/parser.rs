@@ -17,7 +17,7 @@ trait ParseNode {
 }
 
 trait ParseNodeFunctional {
-    fn next_node_functional(
+    fn next_node_functional_impl(
         op: Token,
         tokens: TokenSlice,
         context: &mut ASTContext,
@@ -536,7 +536,7 @@ impl ParseNode for Symbol {
     }
 }
 impl ParseNodeFunctional for Symbol {
-    fn next_node_functional(
+    fn next_node_functional_impl(
         op: Token,
         slice: TokenSlice,
         context: &mut ASTContext,
@@ -582,27 +582,22 @@ impl ParseNodeFunctional for Symbol {
 fn next_node_functional(
     slice: TokenSlice,
     context: &mut ASTContext,
-    outputs: &[IJType],
+    needed_outputs: Option<&[Vec<IJType>]>,
 ) -> Result<(Rc<Node>, TokenSlice)> {
     let token = context.get_token_at_index(slice.start)?;
     let (nodes, rest) = match token {
-        Token::Reduction => Reduction::next_node_functional(
-            Token::Reduction,
-            slice,
-            context,
-            Some(&[outputs.to_vec()]),
-        )?,
-        Token::Plus => {
-            Add::next_node_functional(Token::Plus, slice, context, Some(&[outputs.to_vec()]))?
+        Token::Reduction => {
+            Reduction::next_node_functional_impl(Token::Reduction, slice, context, needed_outputs)?
         }
-        Token::Multiplication => Multiply::next_node_functional(
+        Token::Plus => Add::next_node_functional_impl(Token::Plus, slice, context, needed_outputs)?,
+        Token::Multiplication => Multiply::next_node_functional_impl(
             Token::Multiplication,
             slice,
             context,
-            Some(&[outputs.to_vec()]),
+            needed_outputs,
         )?,
         Token::Symbol(_) => {
-            Symbol::next_node_functional(token.clone(), slice, context, Some(&[outputs.to_vec()]))?
+            Symbol::next_node_functional_impl(token.clone(), slice, context, needed_outputs)?
         }
         _ => return Err(SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into()),
     };
@@ -615,7 +610,7 @@ fn reduction_get_functional_part(
 ) -> Result<(Rc<Node>, TokenSlice)> {
     let function_signature = FunctionSignature::new(vec![IJType::Scalar; 2], vec![IJType::Scalar]);
     let function_type = IJType::Function(function_signature.clone());
-    let (function, rest) = next_node_functional(slice, context, &function_signature.output)?;
+    let (function, rest) = next_node_functional(slice, context, Some(&[function_signature.output]))?;
     if function.output_type != function_type {
         return Err(SyntaxError::TypeError(
             function_type.to_string(),
@@ -649,7 +644,7 @@ impl ParseNode for Reduction {
     }
 }
 impl ParseNodeFunctional for Reduction {
-    fn next_node_functional(
+    fn next_node_functional_impl(
         _op: Token,
         slice: TokenSlice,
         context: &mut ASTContext,
@@ -711,7 +706,7 @@ fn _next_node_functional_binary(
 
 struct Add;
 impl ParseNodeFunctional for Add {
-    fn next_node_functional(
+    fn next_node_functional_impl(
         _op: Token,
         slice: TokenSlice,
         context: &mut ASTContext,
@@ -722,7 +717,7 @@ impl ParseNodeFunctional for Add {
 }
 struct Multiply;
 impl ParseNodeFunctional for Multiply {
-    fn next_node_functional(
+    fn next_node_functional_impl(
         _op: Token,
         slice: TokenSlice,
         context: &mut ASTContext,
