@@ -583,7 +583,7 @@ fn next_node_functional(
     slice: TokenSlice,
     context: &mut ASTContext,
     needed_outputs: Option<&[Vec<IJType>]>,
-) -> Result<(Rc<Node>, TokenSlice)> {
+) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
     let token = context.get_token_at_index(slice.start)?;
     let (nodes, rest) = match token {
         Token::Reduction => {
@@ -601,7 +601,7 @@ fn next_node_functional(
         }
         _ => return Err(SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into()),
     };
-    Ok((nodes.into_iter().next().unwrap(), rest))
+    Ok((nodes, rest))
 }
 
 fn reduction_get_functional_part(
@@ -610,15 +610,20 @@ fn reduction_get_functional_part(
 ) -> Result<(Rc<Node>, TokenSlice)> {
     let function_signature = FunctionSignature::new(vec![IJType::Scalar; 2], vec![IJType::Scalar]);
     let function_type = IJType::Function(function_signature.clone());
-    let (function, rest) = next_node_functional(slice, context, Some(&[function_signature.output]))?;
-    if function.output_type != function_type {
+    let (function_options, rest) =
+        next_node_functional(slice, context, Some(&[function_signature.output]))?;
+    let function = function_options
+        .into_iter()
+        .find(|n| n.output_type == function_type);
+
+    if function.is_none() {
         return Err(SyntaxError::TypeError(
             function_type.to_string(),
-            function.output_type.to_string(),
+            "Function type not found".to_string(),
         )
         .into());
     }
-    Ok((function, rest))
+    Ok((function.unwrap(), rest))
 }
 
 struct Reduction;
