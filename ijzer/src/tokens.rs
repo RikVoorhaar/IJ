@@ -23,6 +23,11 @@ impl Display for Number {
         write!(f, "{}", self.value)
     }
 }
+impl Debug for Number {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.value)
+    }
+}
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct SymbolToken {
