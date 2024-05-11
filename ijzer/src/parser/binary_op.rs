@@ -125,3 +125,68 @@ impl ParseNodeFunctional for Multiply {
         _next_node_functional_binary(Operation::Multiply, slice, context, needed_outputs)
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::parse_str_no_context;
+
+    #[test]
+    fn test_add_with_tensors() {
+        let result = parse_str_no_context("+ [1] [2]");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Add);
+        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Tensor]);
+        assert_eq!(node.output_type, IJType::Tensor);
+    }
+
+    #[test]
+    fn test_add_with_tensors_and_scalar() {
+        let result = parse_str_no_context("+ [1] 2");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Add);
+        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Scalar]);
+        assert_eq!(node.output_type, IJType::Tensor);
+    }
+
+    #[test]
+    fn test_add_with_scalars() {
+        let result = parse_str_no_context("+ 1 2");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Add);
+        assert_eq!(node.input_types, vec![IJType::Scalar, IJType::Scalar]);
+        assert_eq!(node.output_type, IJType::Scalar);
+    }
+
+    #[test]
+    fn test_multiply_with_tensors() {
+        let result = parse_str_no_context("* [1] [2]");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Multiply);
+        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Tensor]);
+        assert_eq!(node.output_type, IJType::Tensor);
+    }
+
+    #[test]
+    fn test_multiply_with_tensors_and_scalar() {
+        let result = parse_str_no_context("* [1] 2");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Multiply);
+        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Scalar]);
+        assert_eq!(node.output_type, IJType::Tensor);
+    }
+
+    #[test]
+    fn test_multiply_with_scalars() {
+        let result = parse_str_no_context("* 1 2");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Multiply);
+        assert_eq!(node.input_types, vec![IJType::Scalar, IJType::Scalar]);
+        assert_eq!(node.output_type, IJType::Scalar);
+    }
+}

@@ -1,4 +1,3 @@
-
 use crate::ast_node::{ASTContext, FunctionSignature, IJType, LineHasSemicolon, Node, Variable};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
@@ -201,4 +200,82 @@ pub fn parse_assign(variable_name: String, context: &mut ASTContext) -> Result<R
         context.get_increment_id(),
     ));
     Ok(assign_node)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::{is_specific_syntax_error, parse_str_no_context};
+
+    #[test]
+    fn test_empty_input() {
+        let result = parse_str_no_context("");
+        assert!(result.is_err());
+        assert!(is_specific_syntax_error(
+            &result.unwrap_err(),
+            &SyntaxError::EmptyInput
+        ));
+    }
+
+    #[test]
+    fn test_variable_declaration_tensor() {
+        let result = parse_str_no_context("var a: T");
+        assert!(result.is_ok());
+        let (node, context) = result.unwrap();
+        assert_eq!(node.op, Operation::Nothing);
+        let expected_var = Variable {
+            typ: IJType::Tensor,
+            name: "a".to_string(),
+        };
+        let actual_var = context.symbols.get("a").unwrap();
+        assert_eq!(actual_var, &expected_var);
+    }
+
+    #[test]
+    fn test_variable_declaration_scalar() {
+        let result = parse_str_no_context("var b: S");
+        assert!(result.is_ok());
+        let (node, context) = result.unwrap();
+        assert_eq!(node.op, Operation::Nothing);
+        let expected_var = Variable {
+            typ: IJType::Scalar,
+            name: "b".to_string(),
+        };
+        let actual_var = context.symbols.get("b").unwrap();
+        assert_eq!(actual_var, &expected_var);
+    }
+
+    #[test]
+    fn test_function_declaration_tensor_to_tensor() {
+        let result = parse_str_no_context("var add: Fn(T,T -> T)");
+        assert!(result.is_ok());
+        let (node, context) = result.unwrap();
+        assert_eq!(node.op, Operation::Nothing);
+        let expected_var = Variable {
+            typ: IJType::Function(FunctionSignature {
+                input: vec![IJType::Tensor, IJType::Tensor],
+                output: vec![IJType::Tensor],
+            }),
+            name: "add".to_string(),
+        };
+        let actual_var = context.symbols.get("add").unwrap();
+        assert_eq!(actual_var, &expected_var);
+    }
+
+    #[test]
+    fn test_function_declaration_scalar_to_tensor() {
+        let result = parse_str_no_context("var scale: Fn(S -> T)");
+        assert!(result.is_ok());
+        let (node, context) = result.unwrap();
+        assert_eq!(node.op, Operation::Nothing);
+        let expected_var = Variable {
+            typ: IJType::Function(FunctionSignature {
+                input: vec![IJType::Scalar],
+                output: vec![IJType::Tensor],
+            }),
+            name: "scale".to_string(),
+        };
+        let actual_var = context.symbols.get("scale").unwrap();
+        assert_eq!(actual_var, &expected_var);
+    }
 }

@@ -1,5 +1,7 @@
 #[cfg(test)]
 mod test_utils;
+#[cfg(test)]
+pub use test_utils::{is_specific_syntax_error, parse_str, parse_str_no_context};
 
 mod parser_functions;
 pub use parser_functions::{parse_line, parse_lines};
@@ -108,80 +110,7 @@ fn next_node_functional(
 mod tests {
     use super::*;
     use crate::ast_node::{FunctionSignature, Variable};
-    use crate::tokens::{self, Number};
-    use test_utils::{is_specific_syntax_error, parse_str, parse_str_no_context};
-
-    #[test]
-    fn test_empty_input() {
-        let result = parse_str_no_context("");
-        assert!(result.is_err());
-        assert!(is_specific_syntax_error(
-            &result.unwrap_err(),
-            &SyntaxError::EmptyInput
-        ));
-    }
-
-    #[test]
-    fn test_variable_declaration_tensor() {
-        let result = parse_str_no_context("var a: T");
-        assert!(result.is_ok());
-        let (node, context) = result.unwrap();
-        assert_eq!(node.op, Operation::Nothing);
-        let expected_var = Variable {
-            typ: IJType::Tensor,
-            name: "a".to_string(),
-        };
-        let actual_var = context.symbols.get("a").unwrap();
-        assert_eq!(actual_var, &expected_var);
-    }
-
-    #[test]
-    fn test_variable_declaration_scalar() {
-        let result = parse_str_no_context("var b: S");
-        assert!(result.is_ok());
-        let (node, context) = result.unwrap();
-        assert_eq!(node.op, Operation::Nothing);
-        let expected_var = Variable {
-            typ: IJType::Scalar,
-            name: "b".to_string(),
-        };
-        let actual_var = context.symbols.get("b").unwrap();
-        assert_eq!(actual_var, &expected_var);
-    }
-
-    #[test]
-    fn test_function_declaration_tensor_to_tensor() {
-        let result = parse_str_no_context("var add: Fn(T,T -> T)");
-        assert!(result.is_ok());
-        let (node, context) = result.unwrap();
-        assert_eq!(node.op, Operation::Nothing);
-        let expected_var = Variable {
-            typ: IJType::Function(FunctionSignature {
-                input: vec![IJType::Tensor, IJType::Tensor],
-                output: vec![IJType::Tensor],
-            }),
-            name: "add".to_string(),
-        };
-        let actual_var = context.symbols.get("add").unwrap();
-        assert_eq!(actual_var, &expected_var);
-    }
-
-    #[test]
-    fn test_function_declaration_scalar_to_tensor() {
-        let result = parse_str_no_context("var scale: Fn(S -> T)");
-        assert!(result.is_ok());
-        let (node, context) = result.unwrap();
-        assert_eq!(node.op, Operation::Nothing);
-        let expected_var = Variable {
-            typ: IJType::Function(FunctionSignature {
-                input: vec![IJType::Scalar],
-                output: vec![IJType::Tensor],
-            }),
-            name: "scale".to_string(),
-        };
-        let actual_var = context.symbols.get("scale").unwrap();
-        assert_eq!(actual_var, &expected_var);
-    }
+    use crate::tokens;
 
     #[test]
     fn test_tensor_assignment() {
@@ -323,155 +252,12 @@ mod tests {
     }
 
     #[test]
-    fn test_add_with_tensors() {
-        let result = parse_str_no_context("+ [1] [2]");
-        assert!(result.is_ok());
-        let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Add);
-        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Tensor]);
-        assert_eq!(node.output_type, IJType::Tensor);
-    }
-
-    #[test]
-    fn test_add_with_tensors_and_scalar() {
-        let result = parse_str_no_context("+ [1] 2");
-        assert!(result.is_ok());
-        let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Add);
-        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Scalar]);
-        assert_eq!(node.output_type, IJType::Tensor);
-    }
-
-    #[test]
-    fn test_add_with_scalars() {
-        let result = parse_str_no_context("+ 1 2");
-        assert!(result.is_ok());
-        let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Add);
-        assert_eq!(node.input_types, vec![IJType::Scalar, IJType::Scalar]);
-        assert_eq!(node.output_type, IJType::Scalar);
-    }
-
-    #[test]
-    fn test_multiply_with_tensors() {
-        let result = parse_str_no_context("* [1] [2]");
-        assert!(result.is_ok());
-        let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Multiply);
-        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Tensor]);
-        assert_eq!(node.output_type, IJType::Tensor);
-    }
-
-    #[test]
-    fn test_multiply_with_tensors_and_scalar() {
-        let result = parse_str_no_context("* [1] 2");
-        assert!(result.is_ok());
-        let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Multiply);
-        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Scalar]);
-        assert_eq!(node.output_type, IJType::Tensor);
-    }
-
-    #[test]
-    fn test_multiply_with_scalars() {
-        let result = parse_str_no_context("* 1 2");
-        assert!(result.is_ok());
-        let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Multiply);
-        assert_eq!(node.input_types, vec![IJType::Scalar, IJType::Scalar]);
-        assert_eq!(node.output_type, IJType::Scalar);
-    }
-
-    #[test]
-    fn test_negate_with_scalar() {
-        let result = parse_str_no_context("- 1.0");
-        assert!(result.is_ok());
-        let (node, _) = result.unwrap();
-        assert_eq!(
-            node.op,
-            Operation::Number(Number {
-                value: "-1.0".to_string()
-            })
-        );
-        assert_eq!(node.input_types, vec![IJType::Scalar]);
-        assert_eq!(node.output_type, IJType::Scalar);
-    }
-    #[test]
-    fn test_double_negate_with_scalar() {
-        let result = parse_str_no_context("-- 1.0");
-        assert!(result.is_ok());
-        let (node, _) = result.unwrap();
-        assert_eq!(
-            node.op,
-            Operation::Number(Number {
-                value: "1.0".to_string()
-            })
-        );
-        assert_eq!(node.input_types, vec![IJType::Scalar]);
-        assert_eq!(node.output_type, IJType::Scalar);
-    }
-
-    #[test]
-    fn test_negate_with_tensor() {
-        let result = parse_str_no_context("- [1]");
-        assert!(result.is_ok());
-        let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Negate);
-        assert_eq!(node.input_types, vec![IJType::Tensor]);
-        assert_eq!(node.output_type, IJType::Tensor);
-    }
-
-    #[test]
-    fn test_subtract_with_tensors() {
-        let result = parse_str_no_context("- [1] [2]");
-        assert!(result.is_ok());
-        let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Subtract);
-        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Tensor]);
-        assert_eq!(node.output_type, IJType::Tensor);
-    }
-
-    #[test]
-    fn test_subtract_with_tensor_and_scalar() {
-        let result = parse_str_no_context("- [1] 1");
-        assert!(result.is_ok());
-        let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Subtract);
-        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Scalar]);
-        assert_eq!(node.output_type, IJType::Tensor);
-    }
-
-    #[test]
-    fn test_subtract_with_scalars() {
-        let result = parse_str_no_context("- 1 2");
-        assert!(result.is_ok());
-        let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Subtract);
-        assert_eq!(node.input_types, vec![IJType::Scalar, IJType::Scalar]);
-        assert_eq!(node.output_type, IJType::Scalar);
-    }
-
-    #[test]
     fn test_nested_parentheses() {
         let result = parse_str_no_context("(- (+ (1) 2))");
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
         assert_eq!(node.op, Operation::Negate);
         assert_eq!(node.input_types, vec![IJType::Scalar]);
-        assert_eq!(node.output_type, IJType::Scalar);
-    }
-
-    #[test]
-    fn test_reduce_plus_with_tensor() {
-        let result = parse_str_no_context("/+ [1,2]");
-        assert!(result.is_ok());
-        let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Reduce);
-
-        assert_eq!(
-            node.input_types,
-            vec![IJType::scalar_function(2, 1), IJType::Tensor]
-        );
         assert_eq!(node.output_type, IJType::Scalar);
     }
 
@@ -502,22 +288,6 @@ mod tests {
         assert_eq!(node.op, Operation::Add);
         assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Tensor]);
         assert_eq!(node.output_type, IJType::Tensor);
-    }
-
-    #[test]
-    fn test_reduce_with_function_and_tensor() {
-        let mut context = ASTContext::new();
-        let var_declaration = parse_str("var f: Fn(S,S->S)", &mut context);
-        assert!(var_declaration.is_ok());
-        let result = parse_str("/f [1,2]", &mut context);
-        assert!(result.is_ok());
-        let node = result.unwrap();
-        assert_eq!(node.op, Operation::Reduce);
-        assert_eq!(
-            node.input_types,
-            vec![IJType::scalar_function(2, 1), IJType::Tensor]
-        );
-        assert_eq!(node.output_type, IJType::Scalar);
     }
 
     #[test]

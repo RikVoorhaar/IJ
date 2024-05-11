@@ -74,3 +74,38 @@ impl ParseNodeFunctional for Reduction {
         Ok((vec![node], slice))
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::{parse_str, parse_str_no_context};
+
+    #[test]
+    fn test_reduce_plus_with_tensor() {
+        let result = parse_str_no_context("/+ [1,2]");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Reduce);
+
+        assert_eq!(
+            node.input_types,
+            vec![IJType::scalar_function(2, 1), IJType::Tensor]
+        );
+        assert_eq!(node.output_type, IJType::Scalar);
+    }
+
+    #[test]
+    fn test_reduce_with_function_and_tensor() {
+        let mut context = ASTContext::new();
+        let var_declaration = parse_str("var f: Fn(S,S->S)", &mut context);
+        assert!(var_declaration.is_ok());
+        let result = parse_str("/f [1,2]", &mut context);
+        assert!(result.is_ok());
+        let node = result.unwrap();
+        assert_eq!(node.op, Operation::Reduce);
+        assert_eq!(
+            node.input_types,
+            vec![IJType::scalar_function(2, 1), IJType::Tensor]
+        );
+        assert_eq!(node.output_type, IJType::Scalar);
+    }
+}
