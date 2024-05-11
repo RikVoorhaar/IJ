@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod test_utils;
+
 mod parser_functions;
 pub use parser_functions::{parse_line, parse_lines};
 
@@ -104,71 +107,9 @@ fn next_node_functional(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tokens::{self, lexer, Number};
-    use anyhow::anyhow;
-    use crate::ast_node::{Variable, FunctionSignature};
-
-    fn parse_str(input: &str, context: &mut ASTContext) -> Result<Rc<Node>, anyhow::Error> {
-        let tokens = match lexer(input) {
-            Ok(t) => t,
-            Err(e) => {
-                println!("Error in lexer:\n {:?}", e);
-                return Err(e);
-            }
-        };
-        let result = match parser_functions::parse_line(tokens, context) {
-            Ok(n) => n,
-            Err(e) => {
-                println!("Error in parser:\n {:?}", e);
-                return Err(e);
-            }
-        };
-        let tree_ok = verify_types_tree(&result);
-        if let Err(e) = tree_ok {
-            println!("Error veryfing tree:\n {:?}", e);
-        }
-
-        Ok(result)
-    }
-
-    fn parse_str_no_context(input: &str) -> Result<(Rc<Node>, ASTContext)> {
-        let mut context = ASTContext::new();
-        let node = match parse_str(input, &mut context) {
-            Ok(node) => {
-                println!("Node: {:?}", node);
-                node
-            }
-            Err(e) => {
-                println!("Error: {:?}", e);
-                return Err(e);
-            }
-        };
-        Ok((node, context))
-    }
-
-    fn is_specific_syntax_error(error: &anyhow::Error, expected_error: &SyntaxError) -> bool {
-        if let Some(actual_error) = error.downcast_ref::<SyntaxError>() {
-            actual_error == expected_error
-        } else {
-            false
-        }
-    }
-
-    fn verify_types_tree(node: &Node) -> Result<(), anyhow::Error> {
-        if node.operands.is_empty() {
-            return Ok(());
-        }
-        if node.operands.len() != node.input_types.len() {
-            return Err(anyhow!("Operands and input types length mismatch"));
-        }
-        for (operand, input_type) in node.operands.iter().zip(node.input_types.iter()) {
-            if operand.output_type != *input_type {
-                return Err(anyhow!("Operand and input type mismatch"));
-            }
-        }
-
-        node.operands.iter().try_for_each(|n| verify_types_tree(n))
-    }
+    use crate::ast_node::{FunctionSignature, Variable};
+    use crate::tokens::{self, Number};
+    use test_utils::{is_specific_syntax_error, parse_str, parse_str_no_context};
 
     #[test]
     fn test_empty_input() {
