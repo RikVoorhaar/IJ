@@ -21,7 +21,7 @@ pub enum LineHasSemicolon {
     No,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub struct TokenSlice {
     pub start: usize,
     pub end: usize,
@@ -354,6 +354,16 @@ impl std::fmt::Display for Node {
             write!(f, "({})", operand_types.join(", "))?;
         }
         Ok(())
+    }
+}
+
+impl Debug for TokenSlice {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "TokenSlice<{:?}:{:?}/max={:?}>",
+            self.start, self.end, self.max
+        )
     }
 }
 #[cfg(test)]

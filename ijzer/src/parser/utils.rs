@@ -125,15 +125,137 @@ pub fn comma_separate(slice: TokenSlice, context: &mut ASTContext) -> Result<Vec
     let mut slices: Vec<TokenSlice> = vec![];
     let mut last_endpoint = slice.start;
     let tokens = &context.get_tokens()[slice.start..slice.end];
-    for (index, token) in tokens.iter().enumerate() {
-        if let Token::Comma = token {
-            let new_slice = slice.move_end(index)?.move_start(last_endpoint)?;
-            slices.push(new_slice);
-            last_endpoint = index + 1;
+    let mut index = 0;
+    while index < tokens.len() {
+        let token = &tokens[index];
+        match token {
+            Token::Comma => {
+                let new_slice = slice.move_end(index)?.move_start(last_endpoint)?;
+                slices.push(new_slice);
+                last_endpoint = index + 1;
+            }
+
+            Token::LParen => {
+                let group_len = find_matching_parenthesis(
+                    context,
+                    slice.move_start(index + 1)?,
+                    &Token::LParen,
+                    &Token::RParen,
+                )?;
+                index += group_len;
+            }
+            Token::LSqBracket => {
+                let group_len = find_matching_parenthesis(
+                    context,
+                    slice.move_start(index + 1)?,
+                    &Token::LSqBracket,
+                    &Token::RSqBracket,
+                )?;
+                index += group_len;
+            }
+
+            _ => (),
         }
+
+        index += 1;
     }
     let last_slice = slice.move_end(tokens.len())?.move_start(last_endpoint)?;
     slices.push(last_slice);
 
+    if slices.iter().any(|slice| slice.is_empty()) {
+        return Err(SyntaxError::EmptySlice.into());
+    }
+
     Ok(slices)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::test_utils::*;
+
+    #[test]
+    fn test_comma_separate() {
+        let maybe_context = create_context_with_tokens_from_str("+,/-,f");
+        if let Err(e) = maybe_context {
+            panic!("Failed to create context: {:?}", e);
+        }
+        let mut context = maybe_context.unwrap();
+
+        let maybe_slices = comma_separate(context.full_slice(), &mut context);
+        if let Err(e) = maybe_slices {
+            panic!("Failed to comma separate: {:?}", e);
+        }
+        let slices = maybe_slices.unwrap();
+        for slice in &slices {
+            let tokens = &context.get_tokens()[slice.start..slice.end];
+            println!("{:?}: '{:?}'", slice, tokens);
+        }
+        let correct_slices = vec![
+            TokenSlice::new(0, 1, 6),
+            TokenSlice::new(2, 4, 6),
+            TokenSlice::new(5, 6, 6),
+        ];
+        assert_eq!(slices, correct_slices);
+    }
+
+    #[test]
+    fn test_comma_separate_empty() {
+        let maybe_context = create_context_with_tokens_from_str("");
+        if let Err(e) = maybe_context {
+            panic!("Failed to create context: {:?}", e);
+        }
+        let mut context = maybe_context.unwrap();
+
+        let maybe_slices = comma_separate(context.full_slice(), &mut context);
+        assert!(maybe_slices.is_err());
+
+        let error = maybe_slices.unwrap_err();
+        let actual_error = error.downcast_ref::<SyntaxError>().unwrap();
+        assert_eq!(actual_error, &SyntaxError::EmptySlice);
+    }
+
+    #[test]
+    fn test_comma_separate_with_nesting() {
+        let maybe_context = create_context_with_tokens_from_str("+,(x,y),f");
+        if let Err(e) = maybe_context {
+            panic!("Failed to create context: {:?}", e);
+        }
+        let mut context = maybe_context.unwrap();
+
+        let maybe_slices = comma_separate(context.full_slice(), &mut context);
+        let slices = maybe_slices.unwrap();
+        for slice in &slices {
+            let tokens = &context.get_tokens()[slice.start..slice.end];
+            println!("{:?}: '{:?}'", slice, tokens);
+        }
+        let correct_slices = vec![
+            TokenSlice::new(0, 1, 9),
+            TokenSlice::new(2, 7, 9),
+            TokenSlice::new(8, 9, 9),
+        ];
+        assert_eq!(slices, correct_slices);
+    }
+
+    #[test]
+    fn test_comma_separate_with_array() {
+        let maybe_context = create_context_with_tokens_from_str("+,[0,1],f");
+        if let Err(e) = maybe_context {
+            panic!("Failed to create context: {:?}", e);
+        }
+        let mut context = maybe_context.unwrap();
+
+        let maybe_slices = comma_separate(context.full_slice(), &mut context);
+        let slices = maybe_slices.unwrap();
+        for slice in &slices {
+            let tokens = &context.get_tokens()[slice.start..slice.end];
+            println!("{:?}: '{:?}'", slice, tokens);
+        }
+        let correct_slices = vec![
+            TokenSlice::new(0, 1, 9),
+            TokenSlice::new(2, 7, 9),
+            TokenSlice::new(8, 9, 9),
+        ];
+        assert_eq!(slices, correct_slices);
+    }
 }

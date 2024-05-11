@@ -1,7 +1,9 @@
 #[cfg(test)]
 mod test_utils;
 #[cfg(test)]
-pub use test_utils::{is_specific_syntax_error, parse_str, parse_str_no_context};
+pub use test_utils::{
+    create_context_with_tokens_from_str, is_specific_syntax_error, parse_str, parse_str_no_context,
+};
 
 mod parser_functions;
 pub use parser_functions::{parse_line, parse_lines};

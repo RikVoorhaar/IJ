@@ -90,4 +90,7 @@ pub enum SyntaxError {
 
     #[error("Expected token {0} but got {1}")]
     ExpectedToken(String, String),
+
+    #[error("Empty slice")]
+    EmptySlice,
 }

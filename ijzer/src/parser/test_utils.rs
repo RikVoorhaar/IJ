@@ -65,3 +65,13 @@ pub fn verify_types_tree(node: &Node) -> Result<(), anyhow::Error> {
 
     node.operands.iter().try_for_each(|n| verify_types_tree(n))
 }
+
+pub fn create_context_with_tokens_from_str(input: &str) -> Result<ASTContext, anyhow::Error> {
+    let tokens = match lexer(input) {
+        Ok(t) => t,
+        Err(e) => return Err(e),
+    };
+    let mut context = ASTContext::new();
+    context.set_tokens(tokens);
+    Ok(context)
+}
