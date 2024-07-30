@@ -1,7 +1,8 @@
-use super::{gather_operands, ParseNode};
+use super::{check_ok_needed_outputs, gather_operands, ParseNode, ParseNodeFunctional};
 
-use crate::ast_node::{ASTContext, IJType, Node, TokenSlice};
+use crate::ast_node::{ASTContext, IJType, Node, TokenSlice, FunctionSignature};
 use crate::operations::Operation;
+use crate::syntax_error::SyntaxError;
 use crate::tokens::{Number, Token};
 use anyhow::Result;
 use std::rc::Rc;
@@ -78,6 +79,57 @@ impl ParseNode for MinusOp {
             )),
             _ => unreachable!(),
         }
+    }
+}
+
+impl ParseNodeFunctional for MinusOp {
+    fn next_node_functional_impl(
+        _op: Token,
+        slice: TokenSlice,
+        context: &mut ASTContext,
+        needed_outputs: Option<&[Vec<IJType>]>,
+    ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
+        let rest = slice.move_start(1)?;
+        let mut nodes = vec![];
+        if check_ok_needed_outputs(needed_outputs, &[IJType::Scalar]) {
+            let output_type = vec![IJType::Scalar];
+            let input_types = vec![vec![IJType::Scalar, IJType::Scalar], vec![IJType::Scalar]];
+            for input_type in input_types {
+                nodes.push(Rc::new(Node::new(
+                    Operation::Subtract,
+                    vec![],
+                    IJType::Function(FunctionSignature::new(input_type, output_type.clone())),
+                    vec![],
+                    context.get_increment_id(),
+                )));
+            }
+        }
+        if check_ok_needed_outputs(needed_outputs, &[IJType::Tensor]) {
+            let output_type = vec![IJType::Tensor];
+            let input_types = vec![
+                vec![IJType::Tensor, IJType::Tensor],
+                vec![IJType::Scalar, IJType::Tensor],
+                vec![IJType::Tensor, IJType::Scalar],
+                vec![IJType::Tensor],
+            ];
+            for input_type in input_types {
+                nodes.push(Rc::new(Node::new(
+                    Operation::Subtract,
+                    vec![],
+                    IJType::Function(FunctionSignature::new(input_type, output_type.clone())),
+                    vec![],
+                    context.get_increment_id(),
+                )));
+            }
+        }
+        if nodes.is_empty() {
+            return Err(SyntaxError::FunctionSignatureMismatch(
+                format!("{:?}", needed_outputs),
+                "Fn(T,T->T) or Fn(S,S->S) or Fn(T,S->T) or Fn(S,T->S)".to_string(),
+            )
+            .into());
+        }
+        Ok((nodes, rest))
     }
 }
 

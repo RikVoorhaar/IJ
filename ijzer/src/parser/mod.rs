@@ -103,6 +103,12 @@ fn next_node_functional(
         Token::Symbol(_) => {
             Symbol::next_node_functional_impl(token.clone(), slice, context, needed_outputs)?
         }
+        Token::Minus => MinusOp::next_node_functional_impl(
+            Token::Minus,
+            slice,
+            context,
+            needed_outputs,
+        )?,
         _ => return Err(SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into()),
     };
     Ok((nodes, rest))
