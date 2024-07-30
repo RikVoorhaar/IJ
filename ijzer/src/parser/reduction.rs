@@ -60,10 +60,15 @@ impl ParseNodeFunctional for Reduction {
         context: &mut ASTContext,
         needed_outputs: Option<&[Vec<IJType>]>,
     ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
-        if !check_ok_needed_outputs(needed_outputs, &[IJType::Tensor]) {
-            return Err(SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into());
+        let actual_outputs = vec![IJType::Scalar];
+        if !check_ok_needed_outputs(needed_outputs, &actual_outputs) {
+            return Err(SyntaxError::FunctionSignatureMismatch(
+                format!("{:?}", needed_outputs),
+                format!("{:?}", actual_outputs),
+            )
+            .into());
         }
-        let (function, slice) = reduction_get_functional_part(slice, context)?;
+        let (function, rest) = reduction_get_functional_part(slice.move_start(1)?, context)?;
         let node = Rc::new(Node::new(
             Operation::Reduce,
             vec![function.output_type.clone(), IJType::Tensor],
@@ -71,12 +76,13 @@ impl ParseNodeFunctional for Reduction {
             vec![function],
             context.get_increment_id(),
         ));
-        Ok((vec![node], slice))
+        Ok((vec![node], rest))
     }
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::test_utils::tokenize_str_no_context;
     use crate::parser::{parse_str, parse_str_no_context};
 
     #[test]
@@ -107,5 +113,17 @@ mod tests {
             vec![IJType::scalar_function(2, 1), IJType::Tensor]
         );
         assert_eq!(node.output_type, IJType::Scalar);
+    }
+
+    #[test]
+    fn test_next_node_functional() {
+        let (mut context, slice) = tokenize_str_no_context("/+ [1,2]").unwrap();
+        let result = Reduction::next_node_functional_impl(
+            Token::Reduction,
+            slice,
+            &mut context,
+            Some(&[vec![IJType::Scalar]]),
+        );
+        assert!(result.is_ok());
     }
 }
