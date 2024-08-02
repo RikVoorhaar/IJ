@@ -38,6 +38,9 @@ use identity::IdentityNode;
 mod lambda_variable;
 use lambda_variable::LambdaVariable;
 
+mod function_composition;
+use function_composition::FunctionComposition;
+
 use crate::ast_node::{ASTContext, IJType, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
