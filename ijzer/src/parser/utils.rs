@@ -275,6 +275,15 @@ mod tests {
             println!("{:?}: '{:?}'", slice, tokens);
             let (node, rest) = next_node_functional(*slice, &mut context, None).unwrap();
             println!("{:?}", node);
+            for n in &node {
+                let num_operands = n.operands.len();
+                println!("Output type: {:}", n.output_type);
+                println!(
+                    "Input types: {:?}",
+                    n.input_types
+                );
+                println!("Num operands: {:?}", num_operands);
+            }
             println!("{:?}", rest.is_empty());
             println!("---");
         }

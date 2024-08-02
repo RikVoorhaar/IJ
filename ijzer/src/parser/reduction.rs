@@ -71,8 +71,14 @@ impl ParseNodeFunctional for Reduction {
         let (function, rest) = reduction_get_functional_part(slice.move_start(1)?, context)?;
         let node = Rc::new(Node::new(
             Operation::Reduce,
-            vec![function.output_type.clone(), IJType::Tensor],
-            IJType::Scalar,
+            vec![IJType::Function(FunctionSignature::new(
+                vec![IJType::Scalar, IJType::Scalar],
+                vec![IJType::Scalar],
+            ))],
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor],
+                vec![IJType::Scalar],
+            )),
             vec![function],
             context.get_increment_id(),
         ));
