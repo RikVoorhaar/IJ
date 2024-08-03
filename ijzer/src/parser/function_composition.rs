@@ -1,5 +1,5 @@
-use crate::ast_node::{ASTContext, FunctionSignature, IJType, Node, TokenSlice};
-use crate::parser::{comma_separate, find_matching_parenthesis, ParseNode, ParseNodeFunctional};
+use crate::ast_node::{ASTContext, IJType, Node, TokenSlice};
+use crate::parser::{comma_separate, find_matching_parenthesis, ParseNode};
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
 use anyhow::Result;
@@ -13,14 +13,14 @@ struct FunctionChain {
 fn _get_output_type_from_function(function: Rc<Node>) -> Result<Vec<IJType>, SyntaxError> {
     match &function.output_type {
         IJType::Function(function_signature) => Ok(function_signature.output.clone()),
-        _ => Err(SyntaxError::NotPureFunction(format!("{:?}", function)).into()),
+        _ => Err(SyntaxError::NotPureFunction(format!("{:?}", function))),
     }
 }
 
 fn _get_input_types_from_function(function: Rc<Node>) -> Result<Vec<IJType>, SyntaxError> {
     match &function.output_type {
         IJType::Function(function_signature) => Ok(function_signature.input.clone()),
-        _ => Err(SyntaxError::NotPureFunction(format!("{:?}", function)).into()),
+        _ => Err(SyntaxError::NotPureFunction(format!("{:?}", function))),
     }
 }
 
@@ -59,8 +59,7 @@ impl FunctionChain {
                 return Err(SyntaxError::TypeError(
                     "Function".to_string(),
                     format!("{:?}", function.output_type),
-                )
-                .into());
+                ));
             }
         }
         for (prev_function, next_function) in self.functions.iter().tuple_windows() {
@@ -70,7 +69,7 @@ impl FunctionChain {
                     "Function is not last in chain but does not have exactly one input type. Instead it has {:?}",
                     prev_input_types
                 ))
-                .into());
+                );
             }
             let prev_input_type = prev_input_types[0].clone();
             let next_output_types = _get_output_type_from_function(next_function.clone())?;
@@ -97,7 +96,7 @@ impl FunctionChain {
         self.functions.len()
     }
 
-    fn extend(self, node: Rc<Node>) -> Result<Option<Self>, SyntaxError> {
+    fn extend(&self, node: Rc<Node>) -> Result<Option<Self>, SyntaxError> {
         if !_is_function(node.clone()) {
             return Err(SyntaxError::NotPureFunction(format!("{:?}", node)));
         }
@@ -123,6 +122,21 @@ impl FunctionChain {
         new_functions.push(node);
         Ok(Some(Self::new(new_functions)?))
     }
+}
+
+fn extend_chains(
+    chains: Vec<FunctionChain>,
+    nodes: Vec<Rc<Node>>,
+) -> Result<Vec<FunctionChain>, SyntaxError> {
+    let mut new_chains = vec![];
+    new_chains.extend(
+        chains.iter().flat_map(|chain| {
+            nodes.iter().filter_map(move |node| {
+                chain.extend(node.clone()).ok().flatten()
+            })
+        })
+    );
+    Ok(new_chains)
 }
 
 pub struct FunctionComposition;
@@ -155,6 +169,7 @@ impl ParseNode for FunctionComposition {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ast_node::FunctionSignature;
     use crate::ast_node::Node;
     use crate::operations::Operation;
 
