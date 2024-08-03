@@ -99,4 +99,7 @@ pub enum SyntaxError {
 
     #[error("Function chain is not consistent: {0}")]
     FunctionChainInconsistency(String),
+
+    #[error("Not implemented: {0}")]
+    NotImplemented(String),
 }

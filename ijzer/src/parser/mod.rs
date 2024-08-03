@@ -9,7 +9,9 @@ mod parser_functions;
 pub use parser_functions::{parse_line, parse_lines};
 
 mod utils;
-use utils::{check_ok_needed_outputs, find_matching_parenthesis, gather_all, gather_operands};
+use utils::{
+    check_ok_needed_outputs, comma_separate, find_matching_parenthesis, gather_all, gather_operands,
+};
 
 mod binary_op;
 use binary_op::{next_node_simple_binary_op, Add, Multiply};
@@ -106,12 +108,9 @@ fn next_node_functional(
         Token::Symbol(_) => {
             Symbol::next_node_functional_impl(token.clone(), slice, context, needed_outputs)?
         }
-        Token::Minus => MinusOp::next_node_functional_impl(
-            Token::Minus,
-            slice,
-            context,
-            needed_outputs,
-        )?,
+        Token::Minus => {
+            MinusOp::next_node_functional_impl(Token::Minus, slice, context, needed_outputs)?
+        }
         _ => return Err(SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into()),
     };
     Ok((nodes, rest))
