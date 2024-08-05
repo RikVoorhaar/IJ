@@ -2,9 +2,12 @@ use crate::ast_node::{ASTContext, IJType, Node, TokenSlice};
 use crate::parser::{comma_separate, find_matching_parenthesis, ParseNode};
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
-use anyhow::Result;
+use anyhow::{Error, Result};
 use itertools::Itertools;
 use std::rc::Rc;
+
+use super::next_node_functional;
+use super::utils::gather_operands;
 
 struct FunctionChain {
     functions: Vec<Rc<Node>>,
@@ -129,13 +132,11 @@ fn extend_chains(
     nodes: Vec<Rc<Node>>,
 ) -> Result<Vec<FunctionChain>, SyntaxError> {
     let mut new_chains = vec![];
-    new_chains.extend(
-        chains.iter().flat_map(|chain| {
-            nodes.iter().filter_map(move |node| {
-                chain.extend(node.clone()).ok().flatten()
-            })
-        })
-    );
+    new_chains.extend(chains.iter().flat_map(|chain| {
+        nodes
+            .iter()
+            .filter_map(move |node| chain.extend(node.clone()).ok().flatten())
+    }));
     Ok(new_chains)
 }
 
@@ -161,6 +162,33 @@ impl ParseNode for FunctionComposition {
         let slice = slice.move_end(rparen_index)?;
         let slices = comma_separate(slice, context)?;
         // let (nodes, rest) = gather_operands(vec![vec![IJType::Tensor]], slices, context)?;
+        let function_operands = slices
+            .into_iter()
+            .map(|s| {
+                let (nodes, rest) = next_node_functional(s, context, None)
+                    .map_err(|e| context.add_context_to_syntax_error(e, s))?;
+                if !rest.is_empty() {
+                    return Err(context
+                        .add_context_to_syntax_error(
+                            SyntaxError::UnhandledTokens(format!("found {:?}", rest)).into(),
+                            rest,
+                        )
+                        .into());
+                }
+                Ok(nodes)
+            })
+            .collect::<Result<Vec<Vec<Rc<Node>>>, Error>>()?;
+        let chains = function_operands
+            .into_iter()
+            .try_fold(vec![FunctionChain::empty()], extend_chains)?;
+        let types = chains
+            .iter()
+            .map(|chain| chain.get_input_types())
+            .collect::<Result<Vec<Vec<IJType>>, SyntaxError>>()?;
+        let (value_operands, rest) = gather_operands(types, remainder, context)?;
+
+        /// next match the type of `value_operands` to one of the variants of the chains. If nothing matches return error. This should be done in a seperate function. Maybe we can make a method for `FunctionChain` that takes a `Vec<IJType>` and returns a bool. Then we just filter and make sure only one option remains. Otherwise we throw an error indicating ambiguity.
+
 
         Err(SyntaxError::NotImplemented("Function composition".to_string()).into())
     }
