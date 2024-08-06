@@ -123,11 +123,12 @@ pub fn check_ok_needed_outputs(
 /// Splits out a token slice into a vector of token slices, separated by commas.
 pub fn comma_separate(slice: TokenSlice, context: &mut ASTContext) -> Result<Vec<TokenSlice>> {
     let mut slices: Vec<TokenSlice> = vec![];
-    let mut last_endpoint = slice.start;
+    let mut last_endpoint = 0;
     let tokens = &context.get_tokens()[slice.start..slice.end];
     let mut index = 0;
     while index < tokens.len() {
         let token = &tokens[index];
+        let token_str = format!("{}", token);
         match token {
             Token::Comma => {
                 let new_slice = slice.move_end(index)?.move_start(last_endpoint)?;

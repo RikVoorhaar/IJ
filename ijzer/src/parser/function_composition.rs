@@ -1,4 +1,5 @@
 use crate::ast_node::{ASTContext, IJType, Node, TokenSlice};
+use crate::operations::Operation;
 use crate::parser::{comma_separate, find_matching_parenthesis, ParseNode};
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
@@ -125,6 +126,11 @@ impl FunctionChain {
         new_functions.push(node);
         Ok(Some(Self::new(new_functions)?))
     }
+
+    fn match_input_type(&self, input_types: Vec<IJType>) -> Result<bool, SyntaxError> {
+        let chain_input_types = self.get_input_types()?;
+        Ok(chain_input_types == input_types)
+    }
 }
 
 fn extend_chains(
@@ -155,13 +161,30 @@ impl ParseNode for FunctionComposition {
             )
             .into());
         }
+        let slice = slice.move_start(1)?;
         let rparen_index =
             find_matching_parenthesis(context, slice, &Token::LParen, &Token::RParen)
                 .map_err(|e| context.add_context_to_syntax_error(e, slice))?;
-        let remainder = slice.move_start(rparen_index + 1)?;
-        let slice = slice.move_end(rparen_index)?;
+        let remainder = slice.move_start(rparen_index+1)?;
+        let slice = slice
+            .move_end(rparen_index + 1)
+            .map_err(|e| context.add_context_to_syntax_error(e.into(), slice))?;
+
+        // Debug stuff
+        let _remainder_tokens = context.get_tokens_from_slice(remainder);
+        let _remainder_string = _remainder_tokens
+            .iter()
+            .map(|t| t.to_string())
+            .collect::<Vec<String>>()
+            .join(" ");
+        let _slice_tokens = context.get_tokens_from_slice(slice);
+        let _slice_string = _slice_tokens
+            .iter()
+            .map(|t| t.to_string())
+            .collect::<Vec<String>>()
+            .join(" ");
+
         let slices = comma_separate(slice, context)?;
-        // let (nodes, rest) = gather_operands(vec![vec![IJType::Tensor]], slices, context)?;
         let function_operands = slices
             .into_iter()
             .map(|s| {
@@ -187,10 +210,55 @@ impl ParseNode for FunctionComposition {
             .collect::<Result<Vec<Vec<IJType>>, SyntaxError>>()?;
         let (value_operands, rest) = gather_operands(types, remainder, context)?;
 
-        /// next match the type of `value_operands` to one of the variants of the chains. If nothing matches return error. This should be done in a seperate function. Maybe we can make a method for `FunctionChain` that takes a `Vec<IJType>` and returns a bool. Then we just filter and make sure only one option remains. Otherwise we throw an error indicating ambiguity.
+        let operand_types = value_operands
+            .iter()
+            .map(|operand| operand.output_type.clone())
+            .collect::<Vec<IJType>>();
 
+        let mut matching_chain: Option<FunctionChain> = None;
+        for chain in chains {
+            if chain.match_input_type(operand_types.clone())? {
+                if matching_chain.is_some() {
+                    return Err(SyntaxError::FunctionChainAmbiguousType(format!(
+                        "{:?}",
+                        operand_types
+                    ))
+                    .into());
+                }
+                matching_chain = Some(chain);
+            }
+        }
+        if matching_chain.is_none() {
+            return Err(
+                SyntaxError::FunctionChainAmbiguousType(format!("{:?}", operand_types)).into(),
+            );
+        }
+        let matching_chain = matching_chain.unwrap();
+        let mut full_input_type: Vec<IJType> = vec![];
+        let mut all_nodes: Vec<Rc<Node>> = vec![];
+        for node in matching_chain.functions.iter() {
+            full_input_type.push(node.output_type.clone());
+            all_nodes.push(node.clone());
+        }
+        full_input_type.extend(operand_types);
+        all_nodes.extend(value_operands);
 
-        Err(SyntaxError::NotImplemented("Function composition".to_string()).into())
+        let output_type = matching_chain.get_output_type()?;
+        if output_type.len() != 1 {
+            return Err(SyntaxError::MultipleOutputs.into());
+        }
+        let output_type = output_type[0].clone();
+
+        Ok((
+            Rc::new(Node::new(
+                Operation::FunctionComposition,
+                full_input_type,
+                output_type,
+                all_nodes,
+                context.get_increment_id(),
+            )),
+            rest,
+        ))
     }
 }
 
@@ -200,6 +268,7 @@ mod tests {
     use crate::ast_node::FunctionSignature;
     use crate::ast_node::Node;
     use crate::operations::Operation;
+    use crate::parser::parse_str_no_context;
 
     fn _create_function_node(
         input_types: Vec<IJType>,
@@ -276,5 +345,12 @@ mod tests {
         let node1 = _create_non_function_node(0);
         let result = chain.extend(node1);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_function_composition_parser() {
+        let result = parse_str_no_context("@(-,+) 1 2");
+        println!("{:?}", result);
+        assert!(result.is_ok());
     }
 }

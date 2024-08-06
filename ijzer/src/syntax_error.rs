@@ -100,6 +100,9 @@ pub enum SyntaxError {
     #[error("Function chain is not consistent: {0}")]
     FunctionChainInconsistency(String),
 
+    #[error("Function chain has ambiguous type. It should match exactly one type of the following: {0}")]
+    FunctionChainAmbiguousType(String),
+
     #[error("Not implemented: {0}")]
     NotImplemented(String),
 }

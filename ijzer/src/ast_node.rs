@@ -292,6 +292,10 @@ impl ASTContext {
         self.tokens.get(index).ok_or(SyntaxError::EmptyStream)
     }
 
+    pub fn get_tokens_from_slice(&self, slice: TokenSlice) -> Vec<Token> {
+        self.tokens[slice.start..slice.end].to_vec()
+    }
+
     pub fn add_context_to_syntax_error(&self, error: Error, slice: TokenSlice) -> Error {
         let token_str = self.get_tokens()[slice.start..slice.end]
             .iter()
@@ -366,6 +370,8 @@ impl Debug for TokenSlice {
         )
     }
 }
+
+
 #[cfg(test)]
 mod tests {
     use super::*;

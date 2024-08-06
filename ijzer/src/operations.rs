@@ -18,6 +18,7 @@ pub enum Operation {
     Array(String),
     Reduce,
     Scalar,
+    FunctionComposition,
     LambdaVariable(String),
 }
 
@@ -38,6 +39,7 @@ impl Debug for Operation {
             Self::Array(s) => write!(f, "Array[{}]", s),
             Self::Reduce => write!(f, "Reduce"),
             Self::Scalar => write!(f, "Scalar"),
+            Self::FunctionComposition => write!(f, "FunctionComposition"),
             Self::LambdaVariable(s) => write!(f, "LambdaVariable({})", s),
         }
     }

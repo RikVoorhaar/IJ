@@ -122,7 +122,7 @@ impl CompilerContext {
             Operation::Reduce => Reduce::compile(node, self, child_streams)?,
             Operation::Scalar => NotImplemented::compile(node, self, child_streams)?,
             Operation::LambdaVariable(_) => LambdaVariable::compile(node, self, child_streams)?,
-            // _ => NotImplemented::compile(node, self, child_streams)?,
+            Operation::FunctionComposition => NotImplemented::compile(node, self, child_streams)?, // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
         Ok(stream)
@@ -652,7 +652,8 @@ mod tests {
         compiler_compare("f = + $x $x", expected1);
         compiler_compare("f: Fn(T,T->T) = + $x $x", expected1);
 
-        let expected2 = "let f = { | _x , _y | _x . apply_binary_op (& _y , | a , b | a + b) . unwrap () } ;";
+        let expected2 =
+            "let f = { | _x , _y | _x . apply_binary_op (& _y , | a , b | a + b) . unwrap () } ;";
         compiler_compare("f = + $x $y", expected2);
         compiler_compare("f: Fn(T,T->T) = + $x $y", expected2);
 

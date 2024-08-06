@@ -82,6 +82,8 @@ pub fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node
         Token::Identity => IdentityNode::next_node(op.clone(), rest, context),
         Token::Reduction => Reduction::next_node(op.clone(), rest, context),
         Token::LambdaVariable(_) => LambdaVariable::next_node(op.clone(), rest, context),
+        Token::FunctionComposition => FunctionComposition::next_node(op.clone(), rest, context),
+
         _ => Err(SyntaxError::UnexpectedToken(op.clone()).into()),
     }
 }
