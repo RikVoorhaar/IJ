@@ -44,17 +44,17 @@ impl FunctionChain {
     }
 
     fn get_output_type(&self) -> Result<Vec<IJType>, SyntaxError> {
-        let last_function = self.functions.last().ok_or_else(|| {
-            SyntaxError::FunctionChainInconsistency("Function chain is empty".to_string())
-        })?;
-        _get_output_type_from_function(last_function.clone())
-    }
-
-    fn get_input_types(&self) -> Result<Vec<IJType>, SyntaxError> {
         let first_function = self.functions.first().ok_or_else(|| {
             SyntaxError::FunctionChainInconsistency("Function chain is empty".to_string())
         })?;
-        _get_input_types_from_function(first_function.clone())
+        _get_output_type_from_function(first_function.clone())
+    }
+
+    fn get_input_types(&self) -> Result<Vec<IJType>, SyntaxError> {
+        let last_function = self.functions.last().ok_or_else(|| {
+            SyntaxError::FunctionChainInconsistency("Function chain is empty".to_string())
+        })?;
+        _get_input_types_from_function(last_function.clone())
     }
 
     fn verify_consistency(&self) -> Result<(), SyntaxError> {
@@ -165,9 +165,9 @@ impl ParseNode for FunctionComposition {
         let rparen_index =
             find_matching_parenthesis(context, slice, &Token::LParen, &Token::RParen)
                 .map_err(|e| context.add_context_to_syntax_error(e, slice))?;
-        let remainder = slice.move_start(rparen_index+1)?;
+        let remainder = slice.move_start(rparen_index + 1)?;
         let slice = slice
-            .move_end(rparen_index + 1)
+            .move_end(rparen_index)
             .map_err(|e| context.add_context_to_syntax_error(e.into(), slice))?;
 
         // Debug stuff
@@ -348,9 +348,88 @@ mod tests {
     }
 
     #[test]
-    fn test_function_composition_parser() {
+    fn test_function_composition_parser_minus_plus_scalar_scalar() {
         let result = parse_str_no_context("@(-,+) 1 2");
-        println!("{:?}", result);
         assert!(result.is_ok());
+        let (composition_node, _) = result.unwrap();
+        let operands = composition_node.operands.clone();
+        assert_eq!(operands.len(), 4);
+        let node1 = operands[0].clone();
+        assert_eq!(
+            node1.output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Scalar],
+                vec![IJType::Scalar],
+            ))
+        );
+        let node2 = operands[1].clone();
+        assert_eq!(
+            node2.output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Scalar, IJType::Scalar],
+                vec![IJType::Scalar],
+            ))
+        );
+        let node3 = operands[2].clone();
+        assert_eq!(node3.output_type, IJType::Scalar);
+        let node4 = operands[3].clone();
+        assert_eq!(node4.output_type, IJType::Scalar);
+    }
+
+    #[test]
+    fn test_function_composition_parser_minus_plus_scalar_tensor() {
+        let result = parse_str_no_context("@(-,+) 1 [2]");
+        assert!(result.is_ok());
+        let (composition_node, _) = result.unwrap();
+        let operands = composition_node.operands.clone();
+        assert_eq!(operands.len(), 4);
+        let node1 = operands[0].clone();
+        assert_eq!(
+            node1.output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor],
+                vec![IJType::Tensor],
+            ))
+        );
+        let node2 = operands[1].clone();
+        assert_eq!(
+            node2.output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Scalar, IJType::Tensor],
+                vec![IJType::Tensor],
+            ))
+        );
+        let node3 = operands[2].clone();
+        assert_eq!(node3.output_type, IJType::Scalar);
+        let node4 = operands[3].clone();
+        assert_eq!(node4.output_type, IJType::Tensor);
+    }
+    #[test]
+    fn test_function_composition_parser_minus_plus_tensor_tensor() {
+        let result = parse_str_no_context("@(-,+) [1] [2]");
+        assert!(result.is_ok());
+        let (composition_node, _) = result.unwrap();
+        let operands = composition_node.operands.clone();
+        assert_eq!(operands.len(), 4);
+        let node1 = operands[0].clone();
+        assert_eq!(
+            node1.output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor],
+                vec![IJType::Tensor],
+            ))
+        );
+        let node2 = operands[1].clone();
+        assert_eq!(
+            node2.output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor, IJType::Tensor],
+                vec![IJType::Tensor],
+            ))
+        );
+        let node3 = operands[2].clone();
+        assert_eq!(node3.output_type, IJType::Tensor);
+        let node4 = operands[3].clone();
+        assert_eq!(node4.output_type, IJType::Tensor);
     }
 }
