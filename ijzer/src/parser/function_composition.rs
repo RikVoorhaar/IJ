@@ -82,15 +82,14 @@ impl FunctionChain {
                     "Function is not first in chain but does not have exactly one output type. Instead it has {:?}",
                     next_output_types
                 ))
-                .into());
+                );
             }
             let next_output_type = next_output_types[0].clone();
             if prev_input_type != next_output_type {
                 return Err(SyntaxError::FunctionChainInconsistency(format!(
                     "Function chain is not consistent: {:?} -> {:?}",
                     prev_input_type, next_output_type
-                ))
-                .into());
+                )));
             }
         }
         Ok(())
@@ -191,12 +190,10 @@ impl ParseNode for FunctionComposition {
                 let (nodes, rest) = next_node_functional(s, context, None)
                     .map_err(|e| context.add_context_to_syntax_error(e, s))?;
                 if !rest.is_empty() {
-                    return Err(context
-                        .add_context_to_syntax_error(
-                            SyntaxError::UnhandledTokens(format!("found {:?}", rest)).into(),
-                            rest,
-                        )
-                        .into());
+                    return Err(context.add_context_to_syntax_error(
+                        SyntaxError::UnhandledTokens(format!("found {:?}", rest)).into(),
+                        rest,
+                    ));
                 }
                 Ok(nodes)
             })
@@ -268,7 +265,7 @@ mod tests {
     use crate::ast_node::FunctionSignature;
     use crate::ast_node::Node;
     use crate::operations::Operation;
-    use crate::parser::parse_str_no_context;
+    use crate::parser::{parse_str, parse_str_no_context};
 
     fn _create_function_node(
         input_types: Vec<IJType>,
@@ -431,5 +428,57 @@ mod tests {
         assert_eq!(node3.output_type, IJType::Tensor);
         let node4 = operands[3].clone();
         assert_eq!(node4.output_type, IJType::Tensor);
+    }
+
+    #[test]
+    fn test_function_composition_parser_minus_tensor_scalar() {
+        let result = parse_str_no_context("@(-) [1] 2");
+        assert!(result.is_ok());
+        let (composition_node, _) = result.unwrap();
+        let operands = composition_node.operands.clone();
+        assert_eq!(operands.len(), 3);
+        let node1 = operands[0].clone();
+        assert_eq!(
+            node1.output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor, IJType::Scalar],
+                vec![IJType::Tensor],
+            ))
+        );
+        let node2 = operands[1].clone();
+        assert_eq!(node2.output_type, IJType::Tensor);
+        let node3 = operands[2].clone();
+        assert_eq!(node3.output_type, IJType::Scalar);
+    }
+
+    #[test]
+    fn test_function_composition_parser_custom_functoin() {
+        let mut context = ASTContext::new();
+        parse_str("var f: Fn(S,S->S)", &mut context).unwrap();
+        let result = parse_str("@(-, f) 1 2", &mut context);
+        assert!(result.is_ok());
+        let composition_node = result.unwrap();
+        let operands = composition_node.operands.clone();
+        assert_eq!(operands.len(), 4);
+        let node1 = operands[0].clone();
+        assert_eq!(
+            node1.output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Scalar],
+                vec![IJType::Scalar],
+            ))
+        );
+        let node2 = operands[1].clone();
+        assert_eq!(
+            node2.output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Scalar, IJType::Scalar],
+                vec![IJType::Scalar],
+            ))
+        );
+        let node3 = operands[2].clone();
+        assert_eq!(node3.output_type, IJType::Scalar);
+        let node4 = operands[3].clone();
+        assert_eq!(node4.output_type, IJType::Scalar);
     }
 }

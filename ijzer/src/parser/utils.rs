@@ -128,7 +128,6 @@ pub fn comma_separate(slice: TokenSlice, context: &mut ASTContext) -> Result<Vec
     let mut index = 0;
     while index < tokens.len() {
         let token = &tokens[index];
-        let token_str = format!("{}", token);
         match token {
             Token::Comma => {
                 let new_slice = slice.move_end(index)?.move_start(last_endpoint)?;
