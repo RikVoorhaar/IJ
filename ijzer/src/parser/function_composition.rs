@@ -248,7 +248,7 @@ impl ParseNode for FunctionComposition {
 
         Ok((
             Rc::new(Node::new(
-                Operation::FunctionComposition,
+                Operation::FunctionComposition(matching_chain.len()),
                 full_input_type,
                 output_type,
                 all_nodes,

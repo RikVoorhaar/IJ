@@ -122,7 +122,7 @@ impl CompilerContext {
             Operation::Reduce => Reduce::compile(node, self, child_streams)?,
             Operation::Scalar => NotImplemented::compile(node, self, child_streams)?,
             Operation::LambdaVariable(_) => LambdaVariable::compile(node, self, child_streams)?,
-            Operation::FunctionComposition => NotImplemented::compile(node, self, child_streams)?, // _ => NotImplemented::compile(node, self, child_streams)?,
+            Operation::FunctionComposition(_) => NotImplemented::compile(node, self, child_streams)?, // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
         Ok(stream)
@@ -487,6 +487,27 @@ impl CompileNode for Reduce {
         Ok(quote! {
             #data_stream.reduce(#functional_operand_stream)
         })
+    }
+}
+
+struct FunctionComposition;
+impl CompileNode for FunctionComposition {
+    fn compile(
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        let num_functions = if let Operation::FunctionComposition(n) = &node.op {
+            *n
+        } else {
+            panic!("Expected FunctionComposition operation, found {:?}", node.op);
+        };    
+        let operands = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
+        let functional_operands = operands.iter().take(num_functions);
+        let data_operands = operands.iter().skip(num_functions);
+        
+
+
     }
 }
 
