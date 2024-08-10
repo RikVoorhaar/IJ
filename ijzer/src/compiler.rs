@@ -718,5 +718,13 @@ mod tests {
         let input = "@(-,+) 1 2";
         let expected = "(| x1 , x2 | (| a , b | a - b) ((| a , b | a + b) (x1 , x2))) (ijzer :: tensor :: Tensor :: scalar (1) , ijzer :: tensor :: Tensor :: scalar (2))";
         compiler_compare(input, expected);
+
+        let input = "@(+) 1 2";
+        let expected = "(| x1 , x2 | (| a , b | a + b)  (x1 , x2)) (ijzer :: tensor :: Tensor :: scalar (1) , ijzer :: tensor :: Tensor :: scalar (2))";
+        compiler_compare(input, expected);
+        
+        let input = "var f: Fn(T->T); @(f,-) [1]";
+        let expected = "(| x1 | (f) ((| a , b | a - b) (x1))) (ijzer :: tensor :: Tensor :: from_vec (vec ! [1] , None))";
+        compiler_compare(input, expected);
     }
 }

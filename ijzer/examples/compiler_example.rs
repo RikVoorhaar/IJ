@@ -5,20 +5,18 @@ use ijzer::{
 };
 
 fn main() -> Result<()> {
-    // let input: &str = "
-    // var x: T
-    // (+ x [1.0]);
-    // y = (+ x [1.0])
-    // z = - x y
-    // z = * y I
-    // u = [1.0,2.0,3.0]
-    // /+ u;
-    // v = /+ u
-    // (* z [1.0] [-2.0])
-    // ";
     let input: &str = "
-    f: Fn(T,T->S) = /+ *
-
+    var x: T
+    (+ x [1.0]);
+    y = (+ x [1.0])
+    z = - x y
+    z = * y I
+    u = [1.0,2.0,3.0]
+    f: Fn(T->S) = /+ $x
+    g: Fn(T,T->T) = * $x $y;
+    @(+,+ ) u;
+    v = /+ u
+    (* z [1.0] [-2.0])
     ";
     let tokens = lexer(input)?;
     println!("{:?}", tokens);

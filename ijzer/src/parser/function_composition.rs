@@ -205,6 +205,15 @@ impl ParseNode for FunctionComposition {
             .iter()
             .map(|chain| chain.get_input_types())
             .collect::<Result<Vec<Vec<IJType>>, SyntaxError>>()?;
+        if types.is_empty() {
+            return Err(context.add_context_to_syntax_error(
+                SyntaxError::FunctionChainInconsistency(
+                    "Types of function are not composible".to_string(),
+                )
+                .into(),
+                slice,
+            ));
+        }
         let (value_operands, rest) = gather_operands(types, remainder, context)?;
 
         let operand_types = value_operands
