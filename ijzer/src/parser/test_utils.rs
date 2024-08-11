@@ -1,8 +1,20 @@
 use super::{parser_functions, ASTContext, Node, SyntaxError};
 
-use crate::tokens::lexer;
+use crate::{ast_node::TokenSlice, tokens::lexer};
 use anyhow::{anyhow, Result};
 use std::rc::Rc;
+
+pub fn tokenize_str_no_context(input: &str) -> Result<(ASTContext, TokenSlice), anyhow::Error> {
+    let tokens = match lexer(input) {
+        Ok(t) => t,
+        Err(e) => return Err(e),
+    };
+    let mut context = ASTContext::new();
+    let num_tokens = tokens.len();
+    context.set_tokens(tokens);
+    let slice = TokenSlice::new(0, num_tokens, num_tokens);
+    Ok((context, slice))
+}
 
 pub fn parse_str(input: &str, context: &mut ASTContext) -> Result<Rc<Node>, anyhow::Error> {
     let tokens = match lexer(input) {

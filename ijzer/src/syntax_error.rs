@@ -85,6 +85,9 @@ pub enum SyntaxError {
     #[error("Invalid assignment statement: {0}")]
     InvalidAssignmentStatement(String),
 
+    #[error("Not a pure function: {0}")]
+    NotPureFunction(String),
+
     #[error("Empty input")]
     EmptyInput,
 
@@ -93,4 +96,15 @@ pub enum SyntaxError {
 
     #[error("Empty slice")]
     EmptySlice,
+
+    #[error("Function chain is not consistent: {0}")]
+    FunctionChainInconsistency(String),
+
+    #[error("Function chain has ambiguous type. It should match exactly one type of the following: {0}")]
+    FunctionChainAmbiguousType(String),
+
+    #[error("Not implemented: {0}")]
+    NotImplemented(String),
+
+    
 }

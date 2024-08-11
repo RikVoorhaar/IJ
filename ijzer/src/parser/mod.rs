@@ -9,7 +9,9 @@ mod parser_functions;
 pub use parser_functions::{parse_line, parse_lines};
 
 mod utils;
-use utils::{check_ok_needed_outputs, find_matching_parenthesis, gather_all, gather_operands};
+use utils::{
+    check_ok_needed_outputs, comma_separate, find_matching_parenthesis, gather_all, gather_operands,
+};
 
 mod binary_op;
 use binary_op::{next_node_simple_binary_op, Add, Multiply};
@@ -37,6 +39,9 @@ use identity::IdentityNode;
 
 mod lambda_variable;
 use lambda_variable::LambdaVariable;
+
+mod function_composition;
+use function_composition::FunctionComposition;
 
 use crate::ast_node::{ASTContext, IJType, Node, TokenSlice};
 use crate::operations::Operation;
@@ -77,6 +82,8 @@ pub fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node
         Token::Identity => IdentityNode::next_node(op.clone(), rest, context),
         Token::Reduction => Reduction::next_node(op.clone(), rest, context),
         Token::LambdaVariable(_) => LambdaVariable::next_node(op.clone(), rest, context),
+        Token::FunctionComposition => FunctionComposition::next_node(op.clone(), rest, context),
+
         _ => Err(SyntaxError::UnexpectedToken(op.clone()).into()),
     }
 }
@@ -102,6 +109,9 @@ fn next_node_functional(
         )?,
         Token::Symbol(_) => {
             Symbol::next_node_functional_impl(token.clone(), slice, context, needed_outputs)?
+        }
+        Token::Minus => {
+            MinusOp::next_node_functional_impl(Token::Minus, slice, context, needed_outputs)?
         }
         _ => return Err(SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into()),
     };

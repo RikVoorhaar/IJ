@@ -3,7 +3,7 @@ use std::{collections::HashMap, rc::Rc};
 use syn::Ident;
 
 use proc_macro2::{Span, TokenStream};
-use quote::quote;
+use quote::{format_ident, quote};
 
 use crate::{
     ast_node::{IJType, LineHasSemicolon, Node},
@@ -122,6 +122,9 @@ impl CompilerContext {
             Operation::Reduce => Reduce::compile(node, self, child_streams)?,
             Operation::Scalar => NotImplemented::compile(node, self, child_streams)?,
             Operation::LambdaVariable(_) => LambdaVariable::compile(node, self, child_streams)?,
+            Operation::FunctionComposition(_) => {
+                FunctionComposition::compile(node, self, child_streams)?
+            }
             // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
@@ -490,6 +493,54 @@ impl CompileNode for Reduce {
     }
 }
 
+struct FunctionComposition;
+impl FunctionComposition {
+    fn apply_stream_to_stream(stream1: TokenStream, stream2: TokenStream) -> TokenStream {
+        quote! {
+            (#stream1)(#stream2)
+        }
+    }
+    fn generate_identifiers(n: usize) -> Vec<Ident> {
+        (1..=n).map(|i| format_ident!("x{}", i)).collect()
+    }
+}
+impl CompileNode for FunctionComposition {
+    fn compile(
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        let num_functions = if let Operation::FunctionComposition(n) = &node.op {
+            *n
+        } else {
+            panic!(
+                "Expected FunctionComposition operation, found {:?}",
+                node.op
+            );
+        };
+        let num_data_operands = node.operands.len() - num_functions;
+        let operands = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
+        let functional_operands = operands.iter().take(num_functions);
+        let data_operands = operands.iter().skip(num_functions);
+        let data_streams = data_operands
+            .map(|id| child_streams[id].clone())
+            .collect::<Vec<_>>();
+
+        let identifiers = FunctionComposition::generate_identifiers(num_data_operands);
+        let closure = functional_operands.rev().fold(
+            quote! {
+                #(#identifiers),*
+            },
+            |acc, id| FunctionComposition::apply_stream_to_stream(child_streams[id].clone(), acc),
+        );
+        let closure = quote!{|#(#identifiers),*| #closure};
+
+        Ok(quote! {
+            (#closure)(#(#data_streams),*)
+        })
+    }
+}
+
 struct Nothing;
 impl CompileNode for Nothing {
     fn compile(
@@ -652,12 +703,28 @@ mod tests {
         compiler_compare("f = + $x $x", expected1);
         compiler_compare("f: Fn(T,T->T) = + $x $x", expected1);
 
-        let expected2 = "let f = { | _x , _y | _x . apply_binary_op (& _y , | a , b | a + b) . unwrap () } ;";
+        let expected2 =
+            "let f = { | _x , _y | _x . apply_binary_op (& _y , | a , b | a + b) . unwrap () } ;";
         compiler_compare("f = + $x $y", expected2);
         compiler_compare("f: Fn(T,T->T) = + $x $y", expected2);
 
         let expected3="let h = { | _x | k (_x , ijzer :: tensor :: Tensor :: from_vec (vec ! [1 , 2] , None)) } ;";
         compiler_compare("var k: Fn(T,T->T); h: Fn(T->T) = k $x [1,2]", expected3);
         compiler_compare("var k: Fn(T,T->T); h = k $x [1,2]", expected3);
+    }
+
+    #[test]
+    fn test_function_composition() {
+        let input = "@(-,+) 1 2";
+        let expected = "(| x1 , x2 | (| a , b | a - b) ((| a , b | a + b) (x1 , x2))) (ijzer :: tensor :: Tensor :: scalar (1) , ijzer :: tensor :: Tensor :: scalar (2))";
+        compiler_compare(input, expected);
+
+        let input = "@(+) 1 2";
+        let expected = "(| x1 , x2 | (| a , b | a + b)  (x1 , x2)) (ijzer :: tensor :: Tensor :: scalar (1) , ijzer :: tensor :: Tensor :: scalar (2))";
+        compiler_compare(input, expected);
+        
+        let input = "var f: Fn(T->T); @(f,-) [1]";
+        let expected = "(| x1 | (f) ((| a , b | a - b) (x1))) (ijzer :: tensor :: Tensor :: from_vec (vec ! [1] , None))";
+        compiler_compare(input, expected);
     }
 }

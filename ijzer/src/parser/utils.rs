@@ -123,7 +123,7 @@ pub fn check_ok_needed_outputs(
 /// Splits out a token slice into a vector of token slices, separated by commas.
 pub fn comma_separate(slice: TokenSlice, context: &mut ASTContext) -> Result<Vec<TokenSlice>> {
     let mut slices: Vec<TokenSlice> = vec![];
-    let mut last_endpoint = slice.start;
+    let mut last_endpoint = 0;
     let tokens = &context.get_tokens()[slice.start..slice.end];
     let mut index = 0;
     while index < tokens.len() {
@@ -172,6 +172,7 @@ pub fn comma_separate(slice: TokenSlice, context: &mut ASTContext) -> Result<Vec
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::next_node_functional;
     use crate::parser::test_utils::*;
 
     #[test]
@@ -257,5 +258,34 @@ mod tests {
             TokenSlice::new(8, 9, 9),
         ];
         assert_eq!(slices, correct_slices);
+    }
+
+    #[test]
+    fn test_comma_separate_next_node_functional() {
+        let maybe_context = create_context_with_tokens_from_str("/+,+");
+        if let Err(e) = maybe_context {
+            panic!("Failed to create context: {:?}", e);
+        }
+        let mut context = maybe_context.unwrap();
+
+        let maybe_slices = comma_separate(context.full_slice(), &mut context);
+        let slices = maybe_slices.unwrap();
+        for slice in &slices {
+            let tokens = &context.get_tokens()[slice.start..slice.end];
+            println!("{:?}: '{:?}'", slice, tokens);
+            let (node, rest) = next_node_functional(*slice, &mut context, None).unwrap();
+            println!("{:?}", node);
+            for n in &node {
+                let num_operands = n.operands.len();
+                println!("Output type: {:}", n.output_type);
+                println!(
+                    "Input types: {:?}",
+                    n.input_types
+                );
+                println!("Num operands: {:?}", num_operands);
+            }
+            println!("{:?}", rest.is_empty());
+            println!("---");
+        }
     }
 }
