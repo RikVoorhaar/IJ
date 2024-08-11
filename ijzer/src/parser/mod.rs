@@ -43,10 +43,11 @@ use lambda_variable::LambdaVariable;
 mod function_composition;
 use function_composition::FunctionComposition;
 
-use crate::ast_node::{ASTContext, IJType, Node, TokenSlice};
+use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
+use crate::types::IJType;
 use anyhow::Result;
 use std::rc::Rc;
 
@@ -121,8 +122,9 @@ fn next_node_functional(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast_node::{FunctionSignature, Variable};
+    use crate::ast_node::Variable;
     use crate::tokens;
+    use crate::types::FunctionSignature;
 
     #[test]
     fn test_tensor_assignment() {

@@ -5,10 +5,9 @@ use syn::Ident;
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 
-use crate::{
-    ast_node::{IJType, LineHasSemicolon, Node},
-    operations::Operation,
-};
+use crate::ast_node::{LineHasSemicolon, Node};
+use crate::operations::Operation;
+use crate::types::IJType;
 
 pub fn compile_line_from_node(
     node: Rc<Node>,
@@ -124,8 +123,7 @@ impl CompilerContext {
             Operation::LambdaVariable(_) => LambdaVariable::compile(node, self, child_streams)?,
             Operation::FunctionComposition(_) => {
                 FunctionComposition::compile(node, self, child_streams)?
-            }
-            // _ => NotImplemented::compile(node, self, child_streams)?,
+            } // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
         Ok(stream)
@@ -533,7 +531,7 @@ impl CompileNode for FunctionComposition {
             },
             |acc, id| FunctionComposition::apply_stream_to_stream(child_streams[id].clone(), acc),
         );
-        let closure = quote!{|#(#identifiers),*| #closure};
+        let closure = quote! {|#(#identifiers),*| #closure};
 
         Ok(quote! {
             (#closure)(#(#data_streams),*)
@@ -722,7 +720,7 @@ mod tests {
         let input = "@(+) 1 2";
         let expected = "(| x1 , x2 | (| a , b | a + b)  (x1 , x2)) (ijzer :: tensor :: Tensor :: scalar (1) , ijzer :: tensor :: Tensor :: scalar (2))";
         compiler_compare(input, expected);
-        
+
         let input = "var f: Fn(T->T); @(f,-) [1]";
         let expected = "(| x1 | (f) ((| a , b | a - b) (x1))) (ijzer :: tensor :: Tensor :: from_vec (vec ! [1] , None))";
         compiler_compare(input, expected);

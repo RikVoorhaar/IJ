@@ -1,6 +1,7 @@
 use super::next_node;
 
-use crate::ast_node::{ASTContext, IJType, Node, TokenSlice};
+use crate::ast_node::{ASTContext, Node, TokenSlice};
+use crate::types::IJType;
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
 use anyhow::Result;

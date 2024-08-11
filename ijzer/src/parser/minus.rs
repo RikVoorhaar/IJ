@@ -1,9 +1,10 @@
 use super::{check_ok_needed_outputs, gather_operands, ParseNode, ParseNodeFunctional};
 
-use crate::ast_node::{ASTContext, IJType, Node, TokenSlice, FunctionSignature};
+use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
 use crate::tokens::{Number, Token};
+use crate::types::{FunctionSignature, IJType};
 use anyhow::Result;
 use std::rc::Rc;
 

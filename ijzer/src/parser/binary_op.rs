@@ -1,6 +1,7 @@
 use super::{check_ok_needed_outputs, gather_operands, ParseNodeFunctional};
 
-use crate::ast_node::{ASTContext, FunctionSignature, IJType, Node, TokenSlice};
+use crate::ast_node::{ASTContext, Node, TokenSlice};
+use crate::types::{FunctionSignature, IJType};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
