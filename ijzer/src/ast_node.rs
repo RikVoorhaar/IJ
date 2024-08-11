@@ -1,7 +1,7 @@
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
-use crate::tokens::{lexer, Token};
-use crate::types::{FunctionSignature, IJType};
+use crate::tokens::Token;
+use crate::types::IJType;
 use anyhow::{anyhow, Error, Result};
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -41,9 +41,6 @@ pub struct ASTContext {
     pub line_no: usize,
     pub id_counter: usize,
 }
-
-
-
 
 impl TokenSlice {
     pub fn new(start: usize, end: usize, max: usize) -> Self {

@@ -8,6 +8,7 @@ pub enum IJType {
     Void,
     Scalar,
     Tensor,
+    Number,
     Function(FunctionSignature),
     Group(Vec<IJType>),
 }
@@ -32,6 +33,12 @@ impl FunctionSignature {
         Self {
             input: vec![IJType::Scalar; inputs],
             output: vec![IJType::Scalar; outputs],
+        }
+    }
+    pub fn number_function(inputs: usize, outputs: usize) -> Self {
+        Self {
+            input: vec![IJType::Number; inputs],
+            output: vec![IJType::Number; outputs],
         }
     }
     pub fn from_tokens(tokens: &[Token]) -> Result<Self> {
@@ -75,6 +82,12 @@ impl IJType {
             output: vec![IJType::Scalar; outputs],
         })
     }
+    pub fn number_function(inputs: usize, outputs: usize) -> IJType {
+        IJType::Function(FunctionSignature {
+            input: vec![IJType::Number; inputs],
+            output: vec![IJType::Number; outputs],
+        })
+    }
     pub fn tensor_to_scalar_function(inputs: usize) -> IJType {
         IJType::Function(FunctionSignature {
             input: vec![IJType::Tensor; inputs],
@@ -85,6 +98,7 @@ impl IJType {
         match tokens {
             [Token::Scalar] => Ok(IJType::Scalar),
             [Token::Tensor] => Ok(IJType::Tensor),
+            [Token::NumberType] => Ok(IJType::Number),
             [Token::FunctionType, Token::LParen, rest @ ..] => {
                 let mut depth = 1;
                 let mut inside = Vec::new();
@@ -135,6 +149,7 @@ impl std::fmt::Display for IJType {
             IJType::Tensor => write!(f, "T"),
             IJType::Function(sig) => write!(f, "Fn({})", sig),
             IJType::Void => write!(f, "Void"),
+            IJType::Number => write!(f, "N"),
             IJType::Group(types) => write!(
                 f,
                 "Group({})",
