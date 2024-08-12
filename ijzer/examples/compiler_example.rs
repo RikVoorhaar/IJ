@@ -33,3 +33,18 @@ fn main() -> Result<()> {
     }
     Ok(())
 }
+
+fn test() -> Result<()> {
+    let closure = (|x1: ijzer::tensor::Tensor<_>, x2: ijzer::tensor::Tensor<_>| {
+        (|x: ijzer::tensor::Tensor<i64>| x.map(|a| -a))(
+            (|x1: ijzer::tensor::Tensor<_>, x2: ijzer::tensor::Tensor<_>| {
+                x1.apply_binary_op(&x2, |a, b| a + b).unwrap()
+            })(x1, x2),
+        )
+    })(
+        ijzer::tensor::Tensor::scalar(1),
+        ijzer::tensor::Tensor::scalar(2),
+    );
+    let x = ijzer::tensor::Tensor::<i64>::from_vec(vec![1], None);
+    Ok(())
+}
