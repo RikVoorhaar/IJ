@@ -700,8 +700,10 @@ mod tests {
         // println!("{:?}", expected_stream);
         println!("------------------------");
 
-
-        assert_eq!(compiled_stream.to_string().replace(" ", ""), expected_stream.to_string().replace(" ", ""));
+        assert_eq!(
+            compiled_stream.to_string().replace(" ", ""),
+            expected_stream.to_string().replace(" ", "")
+        );
     }
 
     #[test]
@@ -853,13 +855,6 @@ mod tests {
     fn test_number_type_from_string() {
         let tokens = number_type_from_string("i64").unwrap();
         assert_eq!(tokens.to_string(), (quote! {i64}).to_string());
-        for token in tokens.clone() {
-            println!("{:?}", token);
-        }
-        let tokens2 = quote! {Tensor::<#tokens>};
-        for token in tokens2.clone() {
-            println!("{:?}", token);
-        }
 
         let tokens = number_type_from_string("f64").unwrap();
         assert_eq!(tokens.to_string(), (quote! {f64}).to_string());

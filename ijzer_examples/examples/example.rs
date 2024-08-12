@@ -21,5 +21,3 @@ fn main() -> Result<()> {
     println!("{}", y);
     Ok(())
 }
-
-
