@@ -1,7 +1,8 @@
 use super::{find_matching_parenthesis, gather_all, ParseNode};
-use crate::ast_node::{ASTContext, IJType, Node, TokenSlice};
+use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::tokens::Token;
+use crate::types::IJType;
 use anyhow::{anyhow, Context, Result};
 use std::fmt::Debug;
 use std::rc::Rc;

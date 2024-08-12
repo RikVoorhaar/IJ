@@ -1,9 +1,10 @@
 use super::{check_ok_needed_outputs, gather_operands, ParseNode, ParseNodeFunctional};
 
-use crate::ast_node::{ASTContext, IJType, Node, TokenSlice, FunctionSignature};
+use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
 use crate::tokens::{Number, Token};
+use crate::types::{FunctionSignature, IJType};
 use anyhow::Result;
 use std::rc::Rc;
 
@@ -93,16 +94,49 @@ impl ParseNodeFunctional for MinusOp {
         let mut nodes = vec![];
         if check_ok_needed_outputs(needed_outputs, &[IJType::Scalar]) {
             let output_type = vec![IJType::Scalar];
-            let input_types = vec![vec![IJType::Scalar, IJType::Scalar], vec![IJType::Scalar]];
-            for input_type in input_types {
-                nodes.push(Rc::new(Node::new(
-                    Operation::Subtract,
-                    vec![],
-                    IJType::Function(FunctionSignature::new(input_type, output_type.clone())),
-                    vec![],
-                    context.get_increment_id(),
-                )));
-            }
+            nodes.push(Rc::new(Node::new(
+                Operation::Subtract,
+                vec![],
+                IJType::Function(FunctionSignature::new(
+                    vec![IJType::Scalar, IJType::Scalar],
+                    output_type.clone(),
+                )),
+                vec![],
+                context.get_increment_id(),
+            )));
+            nodes.push(Rc::new(Node::new(
+                Operation::Negate,
+                vec![],
+                IJType::Function(FunctionSignature::new(
+                    vec![IJType::Scalar],
+                    output_type.clone(),
+                )),
+                vec![],
+                context.get_increment_id(),
+            )));
+        }
+        if check_ok_needed_outputs(needed_outputs, &[IJType::Number]) {
+            let output_type = vec![IJType::Number];
+            nodes.push(Rc::new(Node::new(
+                Operation::Subtract,
+                vec![],
+                IJType::Function(FunctionSignature::new(
+                    vec![IJType::Number, IJType::Number],
+                    output_type.clone(),
+                )),
+                vec![],
+                context.get_increment_id(),
+            )));
+            nodes.push(Rc::new(Node::new(
+                Operation::Negate,
+                vec![],
+                IJType::Function(FunctionSignature::new(
+                    vec![IJType::Number],
+                    output_type.clone(),
+                )),
+                vec![],
+                context.get_increment_id(),
+            )));
         }
         if check_ok_needed_outputs(needed_outputs, &[IJType::Tensor]) {
             let output_type = vec![IJType::Tensor];
@@ -113,8 +147,13 @@ impl ParseNodeFunctional for MinusOp {
                 vec![IJType::Tensor],
             ];
             for input_type in input_types {
+                let op = if input_type.len() == 1 {
+                    Operation::Negate
+                } else {
+                    Operation::Subtract
+                };
                 nodes.push(Rc::new(Node::new(
-                    Operation::Subtract,
+                    op,
                     vec![],
                     IJType::Function(FunctionSignature::new(input_type, output_type.clone())),
                     vec![],
@@ -125,7 +164,7 @@ impl ParseNodeFunctional for MinusOp {
         if nodes.is_empty() {
             return Err(SyntaxError::FunctionSignatureMismatch(
                 format!("{:?}", needed_outputs),
-                "Fn(T,T->T) or Fn(S,S->S) or Fn(T,S->T) or Fn(S,T->S)".to_string(),
+                "Fn(T,T->T) or Fn(S,S->S) or Fn(T,S->T) or Fn(S,T->S) or Fn(N,N->N) or Fn(N->N) or Fn(S->S) or Fn(T->T)".to_string(),
             )
             .into());
         }

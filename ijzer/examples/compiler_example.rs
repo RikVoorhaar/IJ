@@ -1,6 +1,9 @@
 use anyhow::Result;
 use ijzer::{
-    ast_node::ASTContext, compile, compiler::compile_line_from_node, parser::parse_lines,
+    ast_node::ASTContext,
+    compile,
+    compiler::{compile_line_from_node, number_type_from_string},
+    parser::parse_lines,
     tokens::lexer,
 };
 
@@ -14,13 +17,13 @@ fn main() -> Result<()> {
     u = [1.0,2.0,3.0]
     f: Fn(T->S) = /+ $x
     g: Fn(T,T->T) = * $x $y;
-    @(+,+ ) u;
+    @(-,+ ) u u
     v = /+ u
     (* z [1.0] [-2.0])
     ";
     let tokens = lexer(input)?;
     println!("{:?}", tokens);
-    let stream = compile(input)?;
+    let stream = compile(input, "f64")?;
     println!("{:?}", stream.to_string());
     println!("------------------------");
 
@@ -28,8 +31,10 @@ fn main() -> Result<()> {
     let parsed_lines = parse_lines(tokens, &mut symbol_table)?;
 
     for (root, has_semicolon) in parsed_lines.into_iter() {
-        let line_stream = compile_line_from_node(root, has_semicolon)?;
+        let line_stream =
+            compile_line_from_node(root, has_semicolon, number_type_from_string("f64")?)?;
         println!("{:?}", line_stream.to_string());
     }
     Ok(())
 }
+

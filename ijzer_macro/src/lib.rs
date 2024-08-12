@@ -6,7 +6,8 @@ use regex::Regex;
 use syn::{parse_macro_input, ItemFn};
 
 #[proc_macro_attribute]
-pub fn ijzer(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn ijzer(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let number_type = attr.to_string();
     let input_fn = parse_macro_input!(item as ItemFn);
     let sig = &input_fn.sig;
 
@@ -22,7 +23,7 @@ pub fn ijzer(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     }
 
-    let compiled_ijzer = match compile(ijzer_code.as_str()) {
+    let compiled_ijzer = match compile(ijzer_code.as_str(), &number_type) {
         Ok(code) => code,
         Err(e) => {
             let error_message = e.to_string();

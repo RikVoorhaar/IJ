@@ -1,8 +1,9 @@
-use crate::ast_node::{ASTContext, IJType, Node, TokenSlice};
+use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::parser::{comma_separate, find_matching_parenthesis, ParseNode};
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
+use crate::types::IJType;
 use anyhow::{Error, Result};
 use itertools::Itertools;
 use std::rc::Rc;
@@ -271,10 +272,10 @@ impl ParseNode for FunctionComposition {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast_node::FunctionSignature;
     use crate::ast_node::Node;
     use crate::operations::Operation;
     use crate::parser::{parse_str, parse_str_no_context};
+    use crate::types::FunctionSignature;
 
     fn _create_function_node(
         input_types: Vec<IJType>,

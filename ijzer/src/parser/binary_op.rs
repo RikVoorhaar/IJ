@@ -1,6 +1,7 @@
 use super::{check_ok_needed_outputs, gather_operands, ParseNodeFunctional};
 
-use crate::ast_node::{ASTContext, FunctionSignature, IJType, Node, TokenSlice};
+use crate::ast_node::{ASTContext, Node, TokenSlice};
+use crate::types::{FunctionSignature, IJType};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
@@ -76,6 +77,17 @@ fn _next_node_functional_binary(
             context.get_increment_id(),
         )));
     }
+    if check_ok_needed_outputs(needed_outputs, &[IJType::Number]) {
+        let output_type = vec![IJType::Number];
+        let input_type = vec![IJType::Number, IJType::Number];
+        nodes.push(Rc::new(Node::new(
+            operation.clone(),
+            vec![],
+            IJType::Function(FunctionSignature::new(input_type, output_type)),
+            vec![],
+            context.get_increment_id(),
+        )));
+    }
     if check_ok_needed_outputs(needed_outputs, &[IJType::Tensor]) {
         let output_type = vec![IJType::Tensor];
         let input_types = vec![
@@ -96,7 +108,7 @@ fn _next_node_functional_binary(
     if nodes.is_empty() {
         return Err(SyntaxError::FunctionSignatureMismatch(
             format!("{:?}", needed_outputs),
-            "Fn(T,T->T) or Fn(S,S->S) or Fn(T,S->T) or Fn(S,T->S)".to_string(),
+            "Fn(T,T->T) or Fn(S,S->S) or Fn(T,S->T) or Fn(S,T->S) or Fn(N,N->N)".to_string(),
         )
         .into());
     }

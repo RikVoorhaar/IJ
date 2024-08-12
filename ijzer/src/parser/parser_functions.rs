@@ -1,7 +1,8 @@
-use crate::ast_node::{ASTContext, FunctionSignature, IJType, LineHasSemicolon, Node, Variable};
+use crate::ast_node::{ASTContext, LineHasSemicolon, Node, Variable};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
+use crate::types::{FunctionSignature, IJType};
 use anyhow::Result;
 use std::rc::Rc;
 

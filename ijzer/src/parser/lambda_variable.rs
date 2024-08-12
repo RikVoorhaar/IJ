@@ -1,6 +1,7 @@
 use super::ParseNode;
 
-use crate::ast_node::{ASTContext, IJType, Node, TokenSlice};
+use crate::ast_node::{ASTContext, Node, TokenSlice};
+use crate::types::IJType;
 use crate::operations::Operation;
 use crate::tokens::Token;
 use anyhow::Result;

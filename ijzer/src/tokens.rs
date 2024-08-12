@@ -135,6 +135,9 @@ pub enum Token {
     #[token("T", priority = 3)]
     Tensor,
 
+    #[token("N", priority = 3)]
+    NumberType,
+
     #[token(":")]
     TypeDeclaration,
 
@@ -168,6 +171,7 @@ impl Display for Token {
             Self::FunctionType => write!(f, "Fn"),
             Self::Scalar => write!(f, "S"),
             Self::Tensor => write!(f, "T"),
+            Self::NumberType => write!(f, "N"),
             Self::TypeDeclaration => write!(f, ":"),
             Self::Semicolon => write!(f, ";"),
             Self::LambdaVariable(v) => write!(f, "${}", v.name),

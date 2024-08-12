@@ -2,10 +2,11 @@ use super::{
     check_ok_needed_outputs, gather_operands, next_node_functional, ParseNode, ParseNodeFunctional,
 };
 
-use crate::ast_node::{ASTContext, FunctionSignature, IJType, Node, TokenSlice};
+use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
+use crate::types::{FunctionSignature, IJType};
 use anyhow::Result;
 use std::rc::Rc;
 
@@ -13,7 +14,7 @@ fn reduction_get_functional_part(
     slice: TokenSlice,
     context: &mut ASTContext,
 ) -> Result<(Rc<Node>, TokenSlice)> {
-    let function_signature = FunctionSignature::new(vec![IJType::Scalar; 2], vec![IJType::Scalar]);
+    let function_signature = FunctionSignature::new(vec![IJType::Number; 2], vec![IJType::Number]);
     let function_type = IJType::Function(function_signature.clone());
     let (function_options, rest) =
         next_node_functional(slice, context, Some(&[function_signature.output]))?;
@@ -100,7 +101,7 @@ mod tests {
 
         assert_eq!(
             node.input_types,
-            vec![IJType::scalar_function(2, 1), IJType::Tensor]
+            vec![IJType::number_function(2, 1), IJType::Tensor]
         );
         assert_eq!(node.output_type, IJType::Scalar);
     }
@@ -108,7 +109,7 @@ mod tests {
     #[test]
     fn test_reduce_with_function_and_tensor() {
         let mut context = ASTContext::new();
-        let var_declaration = parse_str("var f: Fn(S,S->S)", &mut context);
+        let var_declaration = parse_str("var f: Fn(N,N->N)", &mut context);
         assert!(var_declaration.is_ok());
         let result = parse_str("/f [1,2]", &mut context);
         assert!(result.is_ok());
@@ -116,7 +117,7 @@ mod tests {
         assert_eq!(node.op, Operation::Reduce);
         assert_eq!(
             node.input_types,
-            vec![IJType::scalar_function(2, 1), IJType::Tensor]
+            vec![IJType::number_function(2, 1), IJType::Tensor]
         );
         assert_eq!(node.output_type, IJType::Scalar);
     }
