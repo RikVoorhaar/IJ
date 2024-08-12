@@ -60,10 +60,25 @@ impl FromStr for LambdaVariableName {
 pub fn lexer(input: &str) -> Result<Vec<Token>> {
     let lex = Token::lexer(input);
     let mut tokens = Vec::new();
+    let mut is_comment = false;
     for token in lex {
         match token {
-            Ok(token) => tokens.push(token),
-            Err(e) => return Err(anyhow!("Error: {:?}", e).context("Error in lexer")),
+            Ok(Token::Comment) => is_comment = true,
+            Ok(Token::Newline) => {
+                is_comment = false;
+                tokens.push(Token::Newline);
+            }
+            Ok(token) => {
+                if is_comment {
+                    continue;
+                }
+                tokens.push(token);
+            }
+            Err(e) => {
+                if !is_comment {
+                    return Err(anyhow!("Error: {:?}", e).context("Error in lexer"));
+                }
+            }
         }
     }
     Ok(tokens)
@@ -146,6 +161,9 @@ pub enum Token {
 
     #[token("@")]
     FunctionComposition,
+
+    #[token("//")]
+    Comment,
 }
 
 impl Display for Token {
@@ -176,6 +194,7 @@ impl Display for Token {
             Self::Semicolon => write!(f, ";"),
             Self::LambdaVariable(v) => write!(f, "${}", v.name),
             Self::FunctionComposition => write!(f, "@"),
+            Self::Comment => write!(f, "//"),
         }
     }
 }
@@ -186,5 +205,44 @@ impl Debug for Token {
             Self::Number(n) => write!(f, "{:?}", n),
             _ => write!(f, "{}", self),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_lexer() {
+        let input = "1 + 1";
+        let tokens = lexer(input).unwrap();
+        println!("{:?}", tokens);
+        assert_eq!(tokens.len(), 3);
+    }
+
+    #[test]
+    fn test_comments() {
+        let input = "// this is a 2309 asdfklj 19 &8 * comment b=with invalid syntax";
+        let tokens = lexer(input).unwrap();
+        println!("{:?}", tokens);
+        assert_eq!(tokens.len(), 0);
+    }
+
+    #[test]
+    fn test_comments_multiline() {
+        let input_with_comment = "x = 1; // this is a comment\n y = 2;";
+        let input_with_multiline = "x = 1; // this is a comment
+         y = 2;// and another comment";
+        let input_without_comment = "x = 1;\n y = 2;";
+        let tokens_with_comment = lexer(input_with_comment).unwrap();
+        let tokens_with_multiline = lexer(input_with_multiline).unwrap();
+        let tokens_without_comment = lexer(input_without_comment).unwrap();
+        println!("{:?}", tokens_with_comment);
+        println!("{:?}", tokens_with_multiline);
+        println!("{:?}", tokens_without_comment);
+        assert_eq!(tokens_with_comment.len(), tokens_without_comment.len());
+        assert_eq!(tokens_with_comment, tokens_without_comment);
+        assert_eq!(tokens_with_multiline.len(), tokens_with_comment.len());
+        assert_eq!(tokens_with_multiline, tokens_with_comment);
     }
 }
