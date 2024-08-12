@@ -9,8 +9,8 @@ use ijzer::{
 
 fn main() -> Result<()> {
     let input: &str = "
-    var x: T
-    (+ x [1.0]);
+    var x: T // this just declares a variable
+    (+ x [1.0]); // semicolon is optional. Only needed if there is more than one expression on the same line
     y = (+ x [1.0])
     z = - x y
     z = * y I
@@ -18,6 +18,7 @@ fn main() -> Result<()> {
     f: Fn(T->S) = /+ $x
     g: Fn(T,T->T) = * $x $y;
     @(-,+ ) u u
+    // this is a comment
     v = /+ u
     (* z [1.0] [-2.0])
     ";

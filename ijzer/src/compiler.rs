@@ -649,7 +649,7 @@ impl CompileNode for Nothing {
         if let Operation::Nothing = &node.op {
             let res = quote! {};
             Ok(res)
-        } else {
+    } else {
             panic!("Expected nothing node, found {:?}", node);
         }
     }
