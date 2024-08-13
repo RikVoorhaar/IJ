@@ -94,6 +94,13 @@ impl<T: Clone + Num> Tensor<T> {
     pub fn is_scalar(&self) -> bool {
         self.shape == vec![1]
     }
+    pub fn extract_scalar(&self) -> Result<T> {
+        if !self.is_scalar() {
+            return Err(anyhow!("Tensor is not a scalar"));
+        }
+        Ok(self.data[0].clone())
+    }
+
     pub fn from_vec(data: Vec<T>, shape: Option<Vec<usize>>) -> Tensor<T> {
         let shape = shape.unwrap_or_else(|| vec![data.len()]);
         let strides = strides_from_shape(&shape);
@@ -547,5 +554,18 @@ mod tests {
     }
 
     #[test]
-    fn test_add_scalars() {}
+    fn test_extract_scalar() {
+        // Test with a scalar tensor
+        let scalar_tensor = Tensor::scalar(42.0);
+        assert_eq!(scalar_tensor.extract_scalar().unwrap(), 42.0);
+
+        // Test with a non-scalar tensor
+        let non_scalar_tensor = Tensor::from_vec(vec![1.0, 2.0, 3.0], Some(vec![3]));
+        assert!(non_scalar_tensor.extract_scalar().is_err());
+
+        // Test with a tensor that has been reshaped to a scalar
+        let mut reshaped_tensor = Tensor::from_vec(vec![5.0], Some(vec![1]));
+        reshaped_tensor.reshape(&[1]).unwrap();
+        assert_eq!(reshaped_tensor.extract_scalar().unwrap(), 5.0);
+    }
 }
