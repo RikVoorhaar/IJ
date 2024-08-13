@@ -136,7 +136,8 @@ impl CompilerContext {
             Operation::LambdaVariable(_) => LambdaVariable::compile(node, self, child_streams)?,
             Operation::FunctionComposition(_) => {
                 FunctionComposition::compile(node, self, child_streams)?
-            } // _ => NotImplemented::compile(node, self, child_streams)?,
+            }
+            _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
         Ok(stream)
@@ -649,7 +650,7 @@ impl CompileNode for Nothing {
         if let Operation::Nothing = &node.op {
             let res = quote! {};
             Ok(res)
-    } else {
+        } else {
             panic!("Expected nothing node, found {:?}", node);
         }
     }

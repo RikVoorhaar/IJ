@@ -1,5 +1,5 @@
 use crate::syntax_error::SyntaxError;
-use crate::tokens::{lexer, Token};
+use crate::tokens::{find_matching_parenthesis_on_tokens, lexer, Token};
 use anyhow::Result;
 use std::fmt::Debug;
 
@@ -17,6 +17,27 @@ pub enum IJType {
 pub struct FunctionSignature {
     pub input: Vec<IJType>,
     pub output: Vec<IJType>,
+}
+
+fn _split_tokens(tokens: &[Token], delimiter: Token) -> Vec<&[Token]> {
+    let mut parts: Vec<&[Token]> = Vec::new();
+    let mut depth = 0;
+    let mut start = 0;
+    for (i, t) in tokens.iter().enumerate() {
+        match t {
+            Token::LParen => depth += 1,
+            Token::RParen => depth -= 1,
+            _ if *t == delimiter => {
+                if depth == 0 {
+                    parts.push(&tokens[start..i]);
+                    start = i + 1;
+                }
+            }
+            _ => {}
+        }
+    }
+    parts.push(&tokens[start..]);
+    parts
 }
 
 impl FunctionSignature {
@@ -42,8 +63,7 @@ impl FunctionSignature {
         }
     }
     pub fn from_tokens(tokens: &[Token]) -> Result<Self> {
-        let parts: Vec<&[Token]> = tokens.split(|t| *t == Token::Arrow).collect();
-
+        let mut parts = _split_tokens(tokens, Token::Arrow);
         if parts.len() != 2 {
             return Err(SyntaxError::InvalidType(
                 tokens
@@ -52,13 +72,13 @@ impl FunctionSignature {
             )
             .into());
         }
-        let input = parts[0]
-            .split(|t| *t == Token::Comma)
-            .map(IJType::from_tokens)
+        let input = _split_tokens(parts[0], Token::Comma)
+            .iter()
+            .map(|part| IJType::from_tokens(part))
             .collect::<Result<_, _>>()?;
-        let output = parts[1]
-            .split(|t| *t == Token::Comma)
-            .map(IJType::from_tokens)
+        let output = _split_tokens(parts[1], Token::Comma)
+            .iter()
+            .map(|part| IJType::from_tokens(part))
             .collect::<Result<_, _>>()?;
 
         Ok(FunctionSignature { input, output })
@@ -100,34 +120,23 @@ impl IJType {
             [Token::Tensor] => Ok(IJType::Tensor),
             [Token::NumberType] => Ok(IJType::Number),
             [Token::FunctionType, Token::LParen, rest @ ..] => {
-                let mut depth = 1;
-                let mut inside = Vec::new();
-                for token in rest {
-                    match token {
-                        Token::LParen => depth += 1,
-                        Token::RParen => {
-                            if depth == 1 {
-                                break;
-                            } else {
-                                depth -= 1;
-                            }
-                        }
-                        _ => {
-                            if depth > 0 {
-                                inside.push(token.clone());
-                            }
-                        }
+                let maybe_index =
+                    find_matching_parenthesis_on_tokens(rest, &Token::LParen, &Token::RParen);
+                match maybe_index {
+                    None => {
+                        return Err(SyntaxError::UnmatchedParenthesis(
+                            "Mismatched parentheses in function type".to_string(),
+                        )
+                        .into())
+                    }
+                    Some(index) => {
+                        let inside = &rest[..index];
+                        let sig = FunctionSignature::from_tokens(inside)?;
+                        Ok(IJType::Function(sig))
                     }
                 }
-                if depth != 1 {
-                    return Err(SyntaxError::UnmatchedParenthesis(
-                        "Mismatched parentheses in function type".to_string(),
-                    )
-                    .into());
-                }
-                let sig = FunctionSignature::from_tokens(&inside)?;
-                Ok(IJType::Function(sig))
             }
+
             _ => Err(SyntaxError::InvalidType(
                 tokens
                     .iter()
@@ -243,5 +252,23 @@ mod tests {
     fn test_function_signature_from_string_invalid() {
         let result = FunctionSignature::from_string("T,T");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_nested_function_signature() {
+        let result = IJType::from_string("Fn(Fn(T,T->S),T->S)");
+        println!("{:?}", result);
+        assert!(result.is_ok());
+        let expected = IJType::Function(FunctionSignature {
+            input: vec![
+                IJType::Function(FunctionSignature {
+                    input: vec![IJType::Tensor, IJType::Tensor],
+                    output: vec![IJType::Scalar],
+                }),
+                IJType::Tensor,
+            ],
+            output: vec![IJType::Scalar],
+        });
+        assert_eq!(result.unwrap(), expected);
     }
 }

@@ -19,6 +19,7 @@ pub enum Operation {
     Reduce,
     Scalar,
     FunctionComposition(usize),
+    TypeConversion,
     LambdaVariable(String),
 }
 
@@ -40,6 +41,7 @@ impl Debug for Operation {
             Self::Reduce => write!(f, "Reduce"),
             Self::Scalar => write!(f, "Scalar"),
             Self::FunctionComposition(n) => write!(f, "FunctionComposition({})", n),
+            Self::TypeConversion => write!(f, "TypeConversion"),
             Self::LambdaVariable(s) => write!(f, "LambdaVariable({})", s),
         }
     }

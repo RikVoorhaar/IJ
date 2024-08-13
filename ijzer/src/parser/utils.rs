@@ -1,9 +1,9 @@
 use super::next_node;
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};
-use crate::types::IJType;
 use crate::syntax_error::SyntaxError;
-use crate::tokens::Token;
+use crate::tokens::{Token, find_matching_parenthesis_on_tokens};
+use crate::types::IJType;
 use anyhow::Result;
 use std::rc::Rc;
 
@@ -79,6 +79,8 @@ pub fn gather_all(slice: TokenSlice, context: &mut ASTContext) -> Result<Vec<Rc<
     Ok(operands)
 }
 
+
+
 /// Finds the index of the matching parenthesis in the token slice.
 /// This function assumes that the opening parenthesis is not part of the slice.
 pub fn find_matching_parenthesis(
@@ -88,20 +90,11 @@ pub fn find_matching_parenthesis(
     rparen: &Token,
 ) -> Result<usize> {
     let tokens = &context.get_tokens()[slice.start..slice.end];
-    let mut depth = 1;
-    for (i, token) in tokens.iter().enumerate() {
-        match token {
-            token if token == lparen => depth += 1,
-            token if token == rparen => {
-                depth -= 1;
-                if depth == 0 {
-                    return Ok(i);
-                }
-            }
-            _ => (),
-        }
+    let maybe_index = find_matching_parenthesis_on_tokens(tokens, lparen, rparen);
+    match maybe_index {
+        Some(index) => Ok(index),
+        None => Err(SyntaxError::UnmatchedParenthesis(context.tokens_to_string(slice)).into()),
     }
-    Err(SyntaxError::UnmatchedParenthesis(context.tokens_to_string(slice)).into())
 }
 
 pub fn check_ok_needed_outputs(
@@ -279,10 +272,7 @@ mod tests {
             for n in &node {
                 let num_operands = n.operands.len();
                 println!("Output type: {:}", n.output_type);
-                println!(
-                    "Input types: {:?}",
-                    n.input_types
-                );
+                println!("Input types: {:?}", n.input_types);
                 println!("Num operands: {:?}", num_operands);
             }
             println!("{:?}", rest.is_empty());
