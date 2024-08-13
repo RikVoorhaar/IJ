@@ -106,5 +106,6 @@ pub enum SyntaxError {
     #[error("Not implemented: {0}")]
     NotImplemented(String),
 
-    
+    #[error("Type conversion not possible from {0} to {1}")]
+    TypeConversionNotPossible(String, String),
 }
