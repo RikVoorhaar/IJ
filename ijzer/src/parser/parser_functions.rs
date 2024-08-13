@@ -1,4 +1,4 @@
-use crate::ast_node::{ASTContext, LineHasSemicolon, Node, Variable};
+use crate::ast_node::{ASTContext, LineHasSemicolon, Node, TokenSlice, Variable};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
@@ -77,7 +77,16 @@ fn parse_ast(context: &mut ASTContext) -> Result<Rc<Node>> {
 fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
     match context.tokens.as_slice() {
         [Token::Variable, Token::Symbol(symbol), Token::TypeDeclaration, rest @ ..] => {
-            let typ = IJType::from_tokens(rest)?;
+            let (typ, end_of_type) = IJType::parse_tokens(rest)?;
+            let rest_slice = context.full_slice().move_start(2)?;
+            let remainder_slice = rest_slice.move_start(end_of_type)?;
+
+            if remainder_slice.is_empty() {
+                return Err(context.add_context_to_syntax_error(
+                    SyntaxError::UnhandledTokens(context.tokens_to_string(remainder_slice)).into(),
+                    remainder_slice,
+                ));
+            }
             let var = Variable {
                 name: symbol.name.clone(),
                 typ: typ.clone(),
@@ -149,7 +158,9 @@ pub fn parse_assign(variable_name: String, context: &mut ASTContext) -> Result<R
         ),
     )?;
     let expected_type = match left_of_assign {
-        [Token::Symbol(_), Token::TypeDeclaration, rest @ ..] => Some(IJType::from_tokens(rest)?),
+        [Token::Symbol(_), Token::TypeDeclaration, rest @ ..] => {
+            Some(IJType::parse_tokens(rest)?.0)
+        }
         [Token::Symbol(_)] => None,
         _ => {
             return Err(context.add_context_to_syntax_error(

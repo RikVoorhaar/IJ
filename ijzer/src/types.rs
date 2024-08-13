@@ -63,7 +63,7 @@ impl FunctionSignature {
         }
     }
     pub fn from_tokens(tokens: &[Token]) -> Result<Self> {
-        let mut parts = _split_tokens(tokens, Token::Arrow);
+        let parts = _split_tokens(tokens, Token::Arrow);
         if parts.len() != 2 {
             return Err(SyntaxError::InvalidType(
                 tokens
@@ -74,11 +74,11 @@ impl FunctionSignature {
         }
         let input = _split_tokens(parts[0], Token::Comma)
             .iter()
-            .map(|part| IJType::from_tokens(part))
+            .map(|part| IJType::parse_tokens(part).map(|(t, _)| t))
             .collect::<Result<_, _>>()?;
         let output = _split_tokens(parts[1], Token::Comma)
             .iter()
-            .map(|part| IJType::from_tokens(part))
+            .map(|part| IJType::parse_tokens(part).map(|(t, _)| t))
             .collect::<Result<_, _>>()?;
 
         Ok(FunctionSignature { input, output })
@@ -114,25 +114,53 @@ impl IJType {
             output: vec![IJType::Scalar; 1],
         })
     }
-    pub fn from_tokens(tokens: &[Token]) -> Result<Self> {
+    // pub fn from_tokens(tokens: &[Token]) -> Result<Self> {
+    //     match tokens {
+    //         [Token::Scalar] => Ok(IJType::Scalar),
+    //         [Token::Tensor] => Ok(IJType::Tensor),
+    //         [Token::NumberType] => Ok(IJType::Number),
+    //         [Token::FunctionType, Token::LParen, rest @ ..] => {
+    //             let maybe_index =
+    //                 find_matching_parenthesis_on_tokens(rest, &Token::LParen, &Token::RParen);
+    //             match maybe_index {
+    //                 None => Err(SyntaxError::UnmatchedParenthesis(
+    //                     "Mismatched parentheses in function type".to_string(),
+    //                 )
+    //                 .into()),
+    //                 Some(index) => {
+    //                     let inside = &rest[..index];
+    //                     let sig = FunctionSignature::from_tokens(inside)?;
+    //                     Ok(IJType::Function(sig))
+    //                 }
+    //             }
+    //         }
+
+    //         _ => Err(SyntaxError::InvalidType(
+    //             tokens
+    //                 .iter()
+    //                 .fold(String::new(), |acc, t| acc + format!("{:?}", t).as_str()),
+    //         )
+    //         .into()),
+    //     }
+    // }
+    /// Parses tokens and returns the type and the number of tokens consumed.
+    pub fn parse_tokens(tokens: &[Token]) -> Result<(Self, usize)> {
         match tokens {
-            [Token::Scalar] => Ok(IJType::Scalar),
-            [Token::Tensor] => Ok(IJType::Tensor),
-            [Token::NumberType] => Ok(IJType::Number),
+            [Token::Scalar, ..] => Ok((IJType::Scalar, 1)),
+            [Token::Tensor, ..] => Ok((IJType::Tensor, 1)),
+            [Token::NumberType, ..] => Ok((IJType::Number, 1)),
             [Token::FunctionType, Token::LParen, rest @ ..] => {
                 let maybe_index =
                     find_matching_parenthesis_on_tokens(rest, &Token::LParen, &Token::RParen);
                 match maybe_index {
-                    None => {
-                        return Err(SyntaxError::UnmatchedParenthesis(
-                            "Mismatched parentheses in function type".to_string(),
-                        )
-                        .into())
-                    }
+                    None => Err(SyntaxError::UnmatchedParenthesis(
+                        "Mismatched parentheses in function type".to_string(),
+                    )
+                    .into()),
                     Some(index) => {
                         let inside = &rest[..index];
                         let sig = FunctionSignature::from_tokens(inside)?;
-                        Ok(IJType::Function(sig))
+                        Ok((IJType::Function(sig), index + 3))
                     }
                 }
             }
@@ -147,7 +175,7 @@ impl IJType {
     }
     pub fn from_string(s: &str) -> Result<Self> {
         let tokens = lexer(s).map_err(|e| SyntaxError::LexerError(e.to_string()))?;
-        Self::from_tokens(&tokens)
+        Self::parse_tokens(&tokens).map(|(t, _)| t)
     }
 }
 
@@ -270,5 +298,38 @@ mod tests {
             output: vec![IJType::Scalar],
         });
         assert_eq!(result.unwrap(), expected);
+    }
+
+    #[test]
+    fn test_ijtype_parse_tokens() {
+        let tokens = lexer("Fn(T,T->S) a").unwrap();
+        let (t, i) = IJType::parse_tokens(&tokens).unwrap();
+        assert_eq!(
+            t,
+            IJType::Function(FunctionSignature {
+                input: vec![IJType::Tensor, IJType::Tensor],
+                output: vec![IJType::Scalar],
+            })
+        );
+        assert_eq!(tokens[i..].len(), 1);
+
+        let tokens = lexer("T a").unwrap();
+        let (t, i) = IJType::parse_tokens(&tokens).unwrap();
+        assert_eq!(t, IJType::Tensor);
+        assert_eq!(tokens[i..].len(), 1);
+
+        let tokens = lexer("Fn(T,T->Fn(T->T)) S").unwrap();
+        let (t, i) = IJType::parse_tokens(&tokens).unwrap();
+        assert_eq!(
+            t,
+            IJType::Function(FunctionSignature {
+                input: vec![IJType::Tensor, IJType::Tensor],
+                output: vec![IJType::Function(FunctionSignature {
+                    input: vec![IJType::Tensor],
+                    output: vec![IJType::Tensor],
+                })],
+            })
+        );
+        assert_eq!(tokens[i..].len(), 1);
     }
 }
