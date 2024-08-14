@@ -91,7 +91,7 @@ fn type_conversion_functional_part(
     slice: TokenSlice,
     context: &mut ASTContext,
     desired_signature: FunctionSignature,
-) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
+) -> Result<(Rc<Node>, TokenSlice)> {
     let needed_outputs: Vec<Vec<IJType>> = desired_signature
         .output
         .clone()
@@ -103,34 +103,26 @@ fn type_conversion_functional_part(
         next_node_functional(slice, context, Some(needed_outputs.as_slice()))?;
 
     let desired_type = IJType::Function(desired_signature);
-    let filtered_candidates: Vec<Rc<Node>> = function_candidates
+    match function_candidates
         .into_iter()
-        .filter(|candidate| {
-            conversion_possible(candidate.output_type.clone(), desired_type.clone())
-        })
-        .collect();
-    if filtered_candidates.is_empty() {
-        return Err(SyntaxError::TypeConversionNotPossible(
+        .find(|candidate| conversion_possible(candidate.output_type.clone(), desired_type.clone()))
+    {
+        Some(function_node) => {
+            let conversion_node = Node::new(
+                Operation::TypeConversion,
+                vec![function_node.output_type.clone()],
+                desired_type,
+                vec![function_node],
+                context.get_increment_id(),
+            );
+            Ok((Rc::new(conversion_node), rest))
+        }
+        None => Err(SyntaxError::TypeConversionNotPossible(
             desired_type.to_string(),
             context.tokens_to_string(rest),
         )
-        .into());
+        .into()),
     }
-
-    let possible_nodes: Vec<Rc<Node>> = filtered_candidates
-        .into_iter()
-        .map(|candidate| {
-            Rc::new(Node::new(
-                Operation::TypeConversion,
-                vec![candidate.output_type.clone()],
-                desired_type.clone(),
-                vec![candidate],
-                context.get_increment_id(),
-            ))
-        })
-        .collect();
-
-    Ok((possible_nodes, rest))
 }
 
 pub struct TypeConversion;
@@ -168,40 +160,26 @@ impl ParseNode for TypeConversion {
                 Ok((Rc::new(conversion_node), rest))
             }
             IJType::Function(ref signature) => {
-                let (possible_functions, rest) =
+                if signature.output.len() != 1 {
+                    return Err(context
+                        .add_context_to_syntax_error(SyntaxError::MultipleOutputs.into(), slice));
+                }
+                let (convered_function, rest) =
                     type_conversion_functional_part(rest, context, signature.clone())?;
-                let possible_input_types: Vec<Vec<IJType>> = possible_functions
-                    .iter()
-                    .filter_map(|node| {
-                        if let IJType::Function(signature) = node.output_type.clone() {
-                            Some(signature.input)
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-                let (operands, rest) =
-                    gather_operands(possible_input_types.clone(), rest, context)?;
-                let function_node = match match_operand_types(&operands, &possible_input_types) {
-                    Some(index) => possible_functions[index].clone(),
-                    None => {
-                        return Err(SyntaxError::TypeConversionNotPossible(
-                            context.tokens_to_string(rest),
-                            desired_type.to_string(),
-                        )
-                        .into());
-                    }
-                };
-                let input_types = operands
-                    .iter()
-                    .map(|node| node.output_type.clone())
-                    .collect();
+                let input_types = signature.input.clone();
+                let (operands, rest) = gather_operands(vec![input_types.clone()], rest, context)?;
                 Ok((
                     Rc::new(Node::new(
-                        Operation::TypeConversion,
-                        input_types,
-                        function_node.output_type.clone(),
-                        vec![function_node].into_iter().chain(operands).collect(),
+                        Operation::Apply,
+                        vec![convered_function.output_type.clone()]
+                            .into_iter()
+                            .chain(input_types)
+                            .collect(),
+                        signature.output[0].clone(),
+                        vec![convered_function]
+                            .into_iter()
+                            .chain(operands)
+                            .collect(),
                         context.get_increment_id(),
                     )),
                     rest,
@@ -220,6 +198,7 @@ impl ParseNode for TypeConversion {
 mod tests {
     use super::*;
     use crate::tokens::lexer;
+    use crate::parser::parse_str_no_context;
 
     #[test]
     fn test_list_conversions_to() {
@@ -284,8 +263,9 @@ mod tests {
             FunctionSignature::new(vec![IJType::Number, IJType::Number], vec![IJType::Scalar]);
         let maybe_nodes = type_conversion_functional_part(slice, &mut context, desired_signature);
         assert!(maybe_nodes.is_ok());
-        let (nodes, rest) = maybe_nodes.unwrap();
-        assert_eq!(nodes.len(), 2);
+        let (node, rest) = maybe_nodes.unwrap();
+        println!("{:?}", node);
+        assert_eq!(node.op, Operation::TypeConversion);
         assert_eq!(rest.len(), 1);
 
         let tokens = lexer("*").unwrap();
@@ -296,4 +276,30 @@ mod tests {
         let maybe_nodes = type_conversion_functional_part(slice, &mut context, desired_signature);
         assert!(maybe_nodes.is_err());
     }
+
+
+    #[test]
+    fn test_type_conversion_node_simple() {
+        let result = parse_str_no_context("<-T 1.0");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::TypeConversion);
+
+        let result = parse_str_no_context("<-T [1.0]");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::TypeConversion);
+
+        let result = parse_str_no_context("<-S [1.0]");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_type_conversion_node_function() {
+        let result = parse_str_no_context("<-Fn(S,S->T) + 1 1");
+        assert!(result.is_ok());
+        let (node, _) = result.unwrap();
+        assert_eq!(node.op, Operation::Apply);
+    }
+
 }

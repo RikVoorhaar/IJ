@@ -44,6 +44,7 @@ mod function_composition;
 use function_composition::FunctionComposition;
 
 mod type_conversion;
+use type_conversion::TypeConversion;
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
@@ -86,6 +87,7 @@ pub fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node
         Token::Reduction => Reduction::next_node(op.clone(), rest, context),
         Token::LambdaVariable(_) => LambdaVariable::next_node(op.clone(), rest, context),
         Token::FunctionComposition => FunctionComposition::next_node(op.clone(), rest, context),
+        Token::TypeConversion => TypeConversion::next_node(op.clone(), rest, context),
 
         _ => Err(SyntaxError::UnexpectedToken(op.clone()).into()),
     }

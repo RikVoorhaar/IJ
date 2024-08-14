@@ -39,6 +39,8 @@ pub fn parse_str(input: &str, context: &mut ASTContext) -> Result<Rc<Node>, anyh
     Ok(result)
 }
 
+/// Parses a string and returns a node and the context
+/// Useful for testing and debugging
 pub fn parse_str_no_context(input: &str) -> Result<(Rc<Node>, ASTContext)> {
     let mut context = ASTContext::new();
     let node = match parse_str(input, &mut context) {
