@@ -2,12 +2,13 @@ use super::{next_node, next_node_functional};
 use crate::{
     ast_node::{ASTContext, Node, TokenSlice},
     operations::Operation,
+    parser::utils::{gather_operands, match_operand_types},
     parser::ParseNode,
     syntax_error::SyntaxError,
     tokens::Token,
     types::{FunctionSignature, IJType},
 };
-use anyhow::{Error, Result};
+use anyhow::Result;
 use itertools::{iproduct, Itertools};
 use std::rc::Rc;
 
@@ -20,7 +21,7 @@ fn list_conversions_to(from: IJType) -> Vec<IJType> {
                 .input
                 .clone()
                 .into_iter()
-                .map(list_conversions_to)
+                .map(list_conversions_from) // from because of contravariance
                 .multi_cartesian_product()
                 .collect();
             let output_conversions: Vec<Vec<IJType>> = signature
@@ -56,7 +57,7 @@ fn list_conversions_from(to: IJType) -> Vec<IJType> {
                 .input
                 .clone()
                 .into_iter()
-                .map(list_conversions_from)
+                .map(list_conversions_to) // to because of contravariance
                 .multi_cartesian_product()
                 .collect();
             let output_conversions: Vec<Vec<IJType>> = signature
@@ -132,7 +133,7 @@ fn type_conversion_functional_part(
     Ok((possible_nodes, rest))
 }
 
-struct TypeConversion;
+pub struct TypeConversion;
 impl ParseNode for TypeConversion {
     fn next_node(
         _op: Token,
@@ -164,12 +165,12 @@ impl ParseNode for TypeConversion {
                     vec![operand],
                     context.get_increment_id(),
                 );
-                return Ok((Rc::new(conversion_node), rest));
+                Ok((Rc::new(conversion_node), rest))
             }
-            IJType::Function(signature) => {
-                let (possible_nodes, rest) =
-                    type_conversion_functional_part(rest, context, signature)?;
-                let possible_input_types: Vec<Vec<IJType>> = possible_nodes
+            IJType::Function(ref signature) => {
+                let (possible_functions, rest) =
+                    type_conversion_functional_part(rest, context, signature.clone())?;
+                let possible_input_types: Vec<Vec<IJType>> = possible_functions
                     .iter()
                     .filter_map(|node| {
                         if let IJType::Function(signature) = node.output_type.clone() {
@@ -179,23 +180,46 @@ impl ParseNode for TypeConversion {
                         }
                     })
                     .collect();
-                let operands: Vec<Rc<Node>> = possible_nodes.iter().map(|node| node.clone()).collect();
-                /// TODO: figure out which nodes are compatible with these operands, and use them in the final output.
+                let (operands, rest) =
+                    gather_operands(possible_input_types.clone(), rest, context)?;
+                let function_node = match match_operand_types(&operands, &possible_input_types) {
+                    Some(index) => possible_functions[index].clone(),
+                    None => {
+                        return Err(SyntaxError::TypeConversionNotPossible(
+                            context.tokens_to_string(rest),
+                            desired_type.to_string(),
+                        )
+                        .into());
+                    }
+                };
+                let input_types = operands
+                    .iter()
+                    .map(|node| node.output_type.clone())
+                    .collect();
+                Ok((
+                    Rc::new(Node::new(
+                        Operation::TypeConversion,
+                        input_types,
+                        function_node.output_type.clone(),
+                        vec![function_node].into_iter().chain(operands).collect(),
+                        context.get_increment_id(),
+                    )),
+                    rest,
+                ))
             }
-            _ => {
-                todo!()
-            }
+            _ => Err(SyntaxError::TypeConversionNotPossible(
+                context.tokens_to_string(rest),
+                desired_type.to_string(),
+            )
+            .into()),
         }
-
-        // return the correct node
-
-        Err(anyhow::anyhow!("TypeConversion::next_node not implemented"))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tokens::lexer;
 
     #[test]
     fn test_list_conversions_to() {
@@ -206,13 +230,13 @@ mod tests {
             vec![IJType::Number],
             vec![IJType::Scalar],
         )));
-        assert_eq!(types.len(), 9);
+        assert_eq!(types.len(), 6);
 
         let types = list_conversions_to(IJType::Function(FunctionSignature::new(
             vec![IJType::Number, IJType::Scalar],
             vec![IJType::Number, IJType::Scalar],
         )));
-        assert_eq!(types.len(), 81);
+        assert_eq!(types.len(), 36);
 
         let types = list_conversions_to(IJType::Function(FunctionSignature::new(
             vec![IJType::Tensor],
@@ -221,7 +245,7 @@ mod tests {
                 vec![IJType::Scalar],
             ))],
         )));
-        assert_eq!(types.len(), 9);
+        assert_eq!(types.len(), 18);
     }
 
     #[test]
@@ -233,13 +257,13 @@ mod tests {
             vec![IJType::Number],
             vec![IJType::Scalar],
         )));
-        assert_eq!(types.len(), 4);
+        assert_eq!(types.len(), 6);
 
         let types = list_conversions_from(IJType::Function(FunctionSignature::new(
             vec![IJType::Number, IJType::Scalar],
             vec![IJType::Number, IJType::Tensor],
         )));
-        assert_eq!(types.len(), 24);
+        assert_eq!(types.len(), 54);
 
         let types = list_conversions_from(IJType::Function(FunctionSignature::new(
             vec![IJType::Tensor],
@@ -248,6 +272,28 @@ mod tests {
                 vec![IJType::Scalar],
             ))],
         )));
-        assert_eq!(types.len(), 12);
+        assert_eq!(types.len(), 6);
+    }
+
+    #[test]
+    fn test_type_conversion_functional_part() {
+        let tokens = lexer("+ -").unwrap();
+        let mut context = ASTContext::from_tokens(tokens);
+        let slice = context.full_slice();
+        let desired_signature =
+            FunctionSignature::new(vec![IJType::Number, IJType::Number], vec![IJType::Scalar]);
+        let maybe_nodes = type_conversion_functional_part(slice, &mut context, desired_signature);
+        assert!(maybe_nodes.is_ok());
+        let (nodes, rest) = maybe_nodes.unwrap();
+        assert_eq!(nodes.len(), 2);
+        assert_eq!(rest.len(), 1);
+
+        let tokens = lexer("*").unwrap();
+        let mut context = ASTContext::from_tokens(tokens);
+        let slice = context.full_slice();
+        let desired_signature =
+            FunctionSignature::new(vec![IJType::Tensor, IJType::Tensor], vec![IJType::Scalar]);
+        let maybe_nodes = type_conversion_functional_part(slice, &mut context, desired_signature);
+        assert!(maybe_nodes.is_err());
     }
 }

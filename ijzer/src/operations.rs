@@ -21,6 +21,7 @@ pub enum Operation {
     FunctionComposition(usize),
     TypeConversion,
     LambdaVariable(String),
+    Apply,
 }
 
 impl Debug for Operation {
@@ -43,6 +44,7 @@ impl Debug for Operation {
             Self::FunctionComposition(n) => write!(f, "FunctionComposition({})", n),
             Self::TypeConversion => write!(f, "TypeConversion"),
             Self::LambdaVariable(s) => write!(f, "LambdaVariable({})", s),
+            Self::Apply => write!(f, "Apply"),
         }
     }
 }

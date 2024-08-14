@@ -2,7 +2,7 @@ use super::next_node;
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::syntax_error::SyntaxError;
-use crate::tokens::{Token, find_matching_parenthesis_on_tokens};
+use crate::tokens::{find_matching_parenthesis_on_tokens, Token};
 use crate::types::IJType;
 use anyhow::Result;
 use std::rc::Rc;
@@ -65,6 +65,15 @@ pub fn gather_operands(
     Ok((operands, rest))
 }
 
+/// Given list of operands and list of types, find the type that matches the operands.
+pub fn match_operand_types(operands: &[Rc<Node>], types: &[Vec<IJType>]) -> Option<usize> {
+    let operands_types = operands
+        .iter()
+        .map(|n| n.output_type.clone())
+        .collect::<Vec<IJType>>();
+    types.iter().position(|t| t == &operands_types)
+}
+
 /// Match as many tokens of any kind as possible.
 /// Always consumes the entire token slice
 pub fn gather_all(slice: TokenSlice, context: &mut ASTContext) -> Result<Vec<Rc<Node>>> {
@@ -78,8 +87,6 @@ pub fn gather_all(slice: TokenSlice, context: &mut ASTContext) -> Result<Vec<Rc<
     }
     Ok(operands)
 }
-
-
 
 /// Finds the index of the matching parenthesis in the token slice.
 /// This function assumes that the opening parenthesis is not part of the slice.

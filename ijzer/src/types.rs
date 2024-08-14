@@ -114,35 +114,7 @@ impl IJType {
             output: vec![IJType::Scalar; 1],
         })
     }
-    // pub fn from_tokens(tokens: &[Token]) -> Result<Self> {
-    //     match tokens {
-    //         [Token::Scalar] => Ok(IJType::Scalar),
-    //         [Token::Tensor] => Ok(IJType::Tensor),
-    //         [Token::NumberType] => Ok(IJType::Number),
-    //         [Token::FunctionType, Token::LParen, rest @ ..] => {
-    //             let maybe_index =
-    //                 find_matching_parenthesis_on_tokens(rest, &Token::LParen, &Token::RParen);
-    //             match maybe_index {
-    //                 None => Err(SyntaxError::UnmatchedParenthesis(
-    //                     "Mismatched parentheses in function type".to_string(),
-    //                 )
-    //                 .into()),
-    //                 Some(index) => {
-    //                     let inside = &rest[..index];
-    //                     let sig = FunctionSignature::from_tokens(inside)?;
-    //                     Ok(IJType::Function(sig))
-    //                 }
-    //             }
-    //         }
 
-    //         _ => Err(SyntaxError::InvalidType(
-    //             tokens
-    //                 .iter()
-    //                 .fold(String::new(), |acc, t| acc + format!("{:?}", t).as_str()),
-    //         )
-    //         .into()),
-    //     }
-    // }
     /// Parses tokens and returns the type and the number of tokens consumed.
     pub fn parse_tokens(tokens: &[Token]) -> Result<(Self, usize)> {
         match tokens {
