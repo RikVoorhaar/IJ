@@ -2,8 +2,8 @@ use super::{next_node, next_node_functional};
 use crate::{
     ast_node::{ASTContext, Node, TokenSlice},
     operations::Operation,
-    parser::utils::{gather_operands, match_operand_types},
-    parser::ParseNode,
+    parser::utils::gather_operands,
+    parser::{ParseNode, ParseNodeFunctional},
     syntax_error::SyntaxError,
     tokens::Token,
     types::{FunctionSignature, IJType},
@@ -133,8 +133,7 @@ impl ParseNode for TypeConversion {
         context: &mut ASTContext,
     ) -> Result<(Rc<Node>, TokenSlice)> {
         // get the type from the slice
-        let tokens = context.get_tokens_from_slice(slice);
-        let (desired_type, type_end) = IJType::parse_tokens(&tokens)?;
+        let (desired_type, type_end) = IJType::parse_tokens(&context.get_tokens_from_slice(slice))?;
         let rest = slice.move_start(type_end)?;
 
         match desired_type {
@@ -190,6 +189,38 @@ impl ParseNode for TypeConversion {
                 desired_type.to_string(),
             )
             .into()),
+        }
+    }
+}
+
+impl ParseNodeFunctional for TypeConversion {
+    fn next_node_functional_impl(
+        _op: Token,
+        slice: TokenSlice,
+        context: &mut ASTContext,
+        needed_outputs: Option<&[Vec<IJType>]>,
+    ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
+        let slice = slice.move_start(1)?;
+        // get the type from the slice
+        let (desired_type, type_end) = IJType::parse_tokens(&context.get_tokens_from_slice(slice))?;
+        let rest = slice.move_start(type_end)?;
+
+        match desired_type {
+            IJType::Function(ref signature) => {
+                if let Some(outputs) = needed_outputs {
+                    if !outputs.contains(&signature.output) {
+                        return Err(SyntaxError::TypeConversionNotPossible(
+                            desired_type.to_string(),
+                            context.tokens_to_string(slice),
+                        )
+                        .into());
+                    }
+                }
+                let (converted_function, rest) =
+                    type_conversion_functional_part(rest, context, signature.clone())?;
+                Ok((vec![converted_function], rest))
+            }
+            _ => Err(SyntaxError::ExpectedFunction(context.tokens_to_string(rest)).into()),
         }
     }
 }
@@ -331,5 +362,17 @@ mod tests {
         assert!(result.is_ok());
         let maybe_node = parse_str("<-Fn(T->S) f [1]", &mut context);
         assert!(maybe_node.is_err());
+    }
+
+    #[test]
+    fn test_type_conversion_functional() {
+        let mut context = ASTContext::new();
+        let result = parse_str("var f: Fn(S,S->S)", &mut context);
+        assert!(result.is_ok());
+        let maybe_node = parse_str("/<-Fn(N,N->N) f [1]", &mut context);
+        assert!(maybe_node.is_ok());
+        let node = maybe_node.unwrap();
+        println!("{:?}", node);
+        assert_eq!(node.op, Operation::Reduce);
     }
 }

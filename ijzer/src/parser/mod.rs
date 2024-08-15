@@ -118,6 +118,12 @@ fn next_node_functional(
         Token::Minus => {
             MinusOp::next_node_functional_impl(Token::Minus, slice, context, needed_outputs)?
         }
+        Token::TypeConversion => TypeConversion::next_node_functional_impl(
+            Token::TypeConversion,
+            slice,
+            context,
+            needed_outputs,
+        )?,
         _ => return Err(SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into()),
     };
     Ok((nodes, rest))
