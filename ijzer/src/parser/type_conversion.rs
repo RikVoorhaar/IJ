@@ -197,8 +197,8 @@ impl ParseNode for TypeConversion {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::{parse_str, parse_str_no_context};
     use crate::tokens::lexer;
-    use crate::parser::parse_str_no_context;
 
     #[test]
     fn test_list_conversions_to() {
@@ -277,7 +277,6 @@ mod tests {
         assert!(maybe_nodes.is_err());
     }
 
-
     #[test]
     fn test_type_conversion_node_simple() {
         let result = parse_str_no_context("<-T 1.0");
@@ -295,11 +294,42 @@ mod tests {
     }
 
     #[test]
-    fn test_type_conversion_node_function() {
+    fn test_type_conversion_node_function1() {
         let result = parse_str_no_context("<-Fn(S,S->T) + 1 1");
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
         assert_eq!(node.op, Operation::Apply);
     }
 
+    #[test]
+    fn test_type_conversion_node_function2() {
+        let mut context = ASTContext::new();
+        let result = parse_str("var f: Fn(S->S)", &mut context);
+        assert!(result.is_ok());
+        let maybe_node = parse_str("<-Fn(S->S) f 1", &mut context);
+        assert!(maybe_node.is_ok());
+        let node = maybe_node.unwrap();
+        assert_eq!(node.op, Operation::Apply);
+    }
+
+    #[test]
+    fn test_type_conversion_node_function3() {
+        let mut context = ASTContext::new();
+        let result = parse_str("var f: Fn(T->T)", &mut context);
+        assert!(result.is_ok());
+        let maybe_node = parse_str("<-Fn(S->T) f 1", &mut context);
+        assert!(maybe_node.is_ok());
+        let node = maybe_node.unwrap();
+        assert_eq!(node.op, Operation::Apply);
+        println!("{:?}", node);
+    }
+
+    #[test]
+    fn test_type_conversion_node_function4() {
+        let mut context = ASTContext::new();
+        let result = parse_str("var f: Fn(T->T)", &mut context);
+        assert!(result.is_ok());
+        let maybe_node = parse_str("<-Fn(T->S) f [1]", &mut context);
+        assert!(maybe_node.is_err());
+    }
 }
