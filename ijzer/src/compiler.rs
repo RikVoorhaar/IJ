@@ -48,6 +48,10 @@ pub fn compile_line_from_node(
     Ok(line_stream)
 }
 
+fn generate_identifiers(n: usize, name: &str) -> Vec<Ident> {
+    (1..=n).map(|i| format_ident!("{}{}", name, i)).collect()
+}
+
 pub struct CompilerContext {
     pub node_map: HashMap<usize, Rc<Node>>,
     parseable: Vec<usize>,
@@ -136,7 +140,10 @@ impl CompilerContext {
             Operation::LambdaVariable(_) => LambdaVariable::compile(node, self, child_streams)?,
             Operation::FunctionComposition(_) => {
                 FunctionComposition::compile(node, self, child_streams)?
-            } // _ => NotImplemented::compile(node, self, child_streams)?,
+            }
+            Operation::Apply => Apply::compile(node, self, child_streams)?,
+            Operation::TypeConversion => TypeConversion::compile(node, self, child_streams)?,
+            // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
         Ok(stream)
@@ -597,9 +604,6 @@ impl FunctionComposition {
             (#stream1)(#stream2)
         }
     }
-    fn generate_identifiers(n: usize) -> Vec<Ident> {
-        (1..=n).map(|i| format_ident!("x{}", i)).collect()
-    }
 }
 impl CompileNode for FunctionComposition {
     fn compile(
@@ -624,7 +628,7 @@ impl CompileNode for FunctionComposition {
             .map(|id| child_streams[id].clone())
             .collect::<Vec<_>>();
 
-        let identifiers = FunctionComposition::generate_identifiers(num_data_operands);
+        let identifiers = generate_identifiers(num_data_operands, &format!("_{}_", node.id));
         let closure = functional_operands.rev().fold(
             quote! {
                 #(#identifiers),*
@@ -649,7 +653,7 @@ impl CompileNode for Nothing {
         if let Operation::Nothing = &node.op {
             let res = quote! {};
             Ok(res)
-    } else {
+        } else {
             panic!("Expected nothing node, found {:?}", node);
         }
     }
@@ -669,6 +673,110 @@ impl CompileNode for NotImplemented {
     }
 }
 
+/// Apply nodes have as first argument a function, and the other arguments are the operands to apply the function to.
+struct Apply;
+impl CompileNode for Apply {
+    fn compile(
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        if let Operation::Apply = &node.op {
+        } else {
+            panic!("Expected apply node, found {:?}", node.op);
+        }
+
+        let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
+        let child_streams: Vec<TokenStream> = children
+            .iter()
+            .map(|id| child_streams[id].clone())
+            .collect();
+
+        if child_streams.is_empty() {
+            panic!("Expected at least one child for apply node, found 0");
+        }
+
+        let function_stream = child_streams.first().unwrap();
+        let operand_streams = child_streams.iter().skip(1);
+
+        Ok(quote! {
+            #function_stream(#(#operand_streams),*)
+        })
+    }
+}
+
+struct TypeConversion;
+impl TypeConversion {
+    fn convert_type(
+        from: &IJType,
+        to: &IJType,
+        child_stream: TokenStream,
+        number_type: TokenStream,
+        id: usize,
+    ) -> Result<TokenStream> {
+        let res = match (from, to) {
+            (IJType::Tensor, IJType::Tensor) => quote! {#child_stream},
+            (IJType::Scalar, IJType::Scalar) => quote! {#child_stream},
+            (IJType::Scalar, IJType::Tensor) => quote! {#child_stream},
+            (IJType::Scalar, IJType::Number) => quote! {#child_stream.extract_scalar()},
+            (IJType::Number, IJType::Number) => quote! {#child_stream},
+            (IJType::Number, IJType::Scalar) => {
+                quote! {ijzer::tensor::Tensor::<#number_type>::scalar(#child_stream)}
+            }
+            (IJType::Number, IJType::Tensor) => {
+                quote! {ijzer::tensor::Tensor::<#number_type>::scalar(#child_stream)}
+            }
+            (IJType::Function(ref signature_from), IJType::Function(ref signature_to)) => {
+                let num_ops = signature_from.input.len();
+                let idents = generate_identifiers(num_ops, &format!("_{}_", id));
+                let input_conversions = signature_from
+                    .input
+                    .iter()
+                    .zip(signature_to.input.clone())
+                    .zip(idents.clone())
+                    .map(|((from, to), ident)| {
+                        Self::convert_type(&to, from, quote!(#ident), number_type.clone(), id)
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                let input_stream = quote! {(#child_stream)(#(#input_conversions),*)};
+                let converted_stream = Self::convert_type(
+                    signature_from.output.first().unwrap(),
+                    signature_to.output.first().unwrap(),
+                    input_stream,
+                    number_type.clone(),
+                    id,
+                )?;
+                quote! {
+                    (|#(#idents: ijzer::tensor::Tensor::<#number_type>),*| (#converted_stream))
+                }
+            }
+            _ => {
+                panic!("Type conversion from {} to {} not implemented", from, to);
+            }
+        };
+        Ok(res)
+    }
+}
+impl CompileNode for TypeConversion {
+    fn compile(
+        node: Rc<Node>,
+        compiler: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        let number_type = compiler.number_type.clone();
+        if node.operands.len() != 1 {
+            panic!("Expected 1 operands, found {}", node.operands.len());
+        }
+        let child_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
+        Self::convert_type(
+            &node.input_types[0],
+            &node.output_type,
+            child_stream,
+            number_type,
+            node.id,
+        )
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -839,15 +947,15 @@ mod tests {
     #[test]
     fn test_function_composition() {
         let input = "@(-,+) 1 2";
-        let expected = "(| x1: ijzer::tensor::Tensor::<i64> , x2: ijzer::tensor::Tensor::<i64> | (| x: ijzer::tensor::Tensor::<i64> | x.map(|a: i64| -a)) ((| x1: ijzer::tensor::Tensor::<i64> , x2: ijzer::tensor::Tensor::<i64> | x1.apply_binary_op(&x2, |a: i64, b: i64| a + b).unwrap()) (x1 , x2))) (ijzer::tensor::Tensor::<i64>::scalar(1) , ijzer::tensor::Tensor::<i64>::scalar(2))";
+        let expected = "(| _15_1 : ijzer :: tensor :: Tensor :: < i64 > , _15_2 : ijzer :: tensor :: Tensor :: < i64 > | (| x : ijzer :: tensor :: Tensor :: < i64 > | x . map (| a : i64 | - a)) ((| x1 : ijzer :: tensor :: Tensor :: < i64 > , x2 : ijzer :: tensor :: Tensor :: < i64 > | x1 . apply_binary_op (& x2 , | a : i64 , b : i64 | a + b) . unwrap ()) (_15_1 , _15_2))) (ijzer :: tensor :: Tensor :: < i64 > :: scalar (1) , ijzer :: tensor :: Tensor :: < i64 > :: scalar (2))";
         compiler_compare(input, expected, "i64");
 
         let input = "@(+) 1 2";
-        let expected = "(| x1: ijzer::tensor::Tensor::<i64> , x2: ijzer::tensor::Tensor::<i64> | (| x1: ijzer::tensor::Tensor::<i64>, x2: ijzer::tensor::Tensor::<i64> | x1.apply_binary_op(&x2, |a: i64, b: i64| a + b).unwrap()) (x1 , x2)) (ijzer::tensor::Tensor::<i64>::scalar(1) , ijzer::tensor::Tensor::<i64>::scalar(2))";
+        let expected = "(| _7_1 : ijzer :: tensor :: Tensor :: < i64 > , _7_2 : ijzer :: tensor :: Tensor :: < i64 > | (| x1 : ijzer :: tensor :: Tensor :: < i64 > , x2 : ijzer :: tensor :: Tensor :: < i64 > | x1 . apply_binary_op (& x2 , | a : i64 , b : i64 | a + b) . unwrap ()) (_7_1 , _7_2)) (ijzer :: tensor :: Tensor :: < i64 > :: scalar (1) , ijzer :: tensor :: Tensor :: < i64 > :: scalar (2))";
         compiler_compare(input, expected, "i64");
 
         let input = "var f: Fn(T->T); @(f,-) [1]";
-        let expected = "(| x1: ijzer::tensor::Tensor::<i64> | (f) ((| x: ijzer::tensor::Tensor::<i64> | x.map(|a: i64| -a)) (x1))) (ijzer::tensor::Tensor::<i64>::from_vec(vec![1], None))";
+        let expected = "(|_11_1:ijzer::tensor::Tensor::<i64>|(f)((|x:ijzer::tensor::Tensor::<i64>|x.map(|a:i64|-a))(_11_1)))(ijzer::tensor::Tensor::<i64>::from_vec(vec![1],None))";
         compiler_compare(input, expected, "i64");
     }
 
@@ -858,5 +966,31 @@ mod tests {
 
         let tokens = number_type_from_string("f64").unwrap();
         assert_eq!(tokens.to_string(), (quote! {f64}).to_string());
+    }
+
+    #[test]
+    fn test_type_conersion() {
+        let input = "var x: S; <-T x";
+        let expected = "x";
+        compiler_compare(input, expected, "i64");
+
+        let input = "var f: Fn(T->T); <-Fn(S->T) f 1";
+        let expected = "(| _2_1 : ijzer :: tensor :: Tensor :: < i64 > | ((f) (_2_1))) (ijzer :: tensor :: Tensor :: < i64 > :: scalar (1))";
+        compiler_compare(input, expected, "i64");
+
+        let input = "var f: Fn(T->N); <-Fn(S->T) f 1";
+        let expected = "(|_2_1:ijzer::tensor::Tensor::<i64>|(ijzer::tensor::Tensor::<i64>::scalar((f)(_2_1))))(ijzer::tensor::Tensor::<i64>::scalar(1))";
+        compiler_compare(input, expected, "i64");
+
+        let input = "var f: Fn(S,S->S); /<-Fn(N,N->N) f [1]";
+        let expected = "ijzer::tensor::Tensor::<i64>::from_vec(vec![1],None).reduce((|_2_1:ijzer::tensor::Tensor::<i64>,_2_2:ijzer::tensor::Tensor::<i64>|((f)(ijzer::tensor::Tensor::<i64>::scalar(_2_1),ijzer::tensor::Tensor::<i64>::scalar(_2_2)).extract_scalar())))";
+        compiler_compare(input, expected, "i64");
+    }
+
+    #[test]
+    fn test_type_implicit_function() {
+        let input = "<-Fn(T,T->T) + $x $y";
+        let expected = "(|_5_1:ijzer::tensor::Tensor::<i64>,_5_2:ijzer::tensor::Tensor::<i64>|((|x1:ijzer::tensor::Tensor::<i64>,x2:ijzer::tensor::Tensor::<i64>|x1.apply_binary_op(&x2,|a:i64,b:i64|a+b).unwrap())(_5_1,_5_2)))(_x,_y)";
+        compiler_compare(input, expected, "i64");
     }
 }

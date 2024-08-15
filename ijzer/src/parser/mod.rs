@@ -43,6 +43,9 @@ use lambda_variable::LambdaVariable;
 mod function_composition;
 use function_composition::FunctionComposition;
 
+mod type_conversion;
+use type_conversion::TypeConversion;
+
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
@@ -84,6 +87,7 @@ pub fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node
         Token::Reduction => Reduction::next_node(op.clone(), rest, context),
         Token::LambdaVariable(_) => LambdaVariable::next_node(op.clone(), rest, context),
         Token::FunctionComposition => FunctionComposition::next_node(op.clone(), rest, context),
+        Token::TypeConversion => TypeConversion::next_node(op.clone(), rest, context),
 
         _ => Err(SyntaxError::UnexpectedToken(op.clone()).into()),
     }
@@ -114,6 +118,12 @@ fn next_node_functional(
         Token::Minus => {
             MinusOp::next_node_functional_impl(Token::Minus, slice, context, needed_outputs)?
         }
+        Token::TypeConversion => TypeConversion::next_node_functional_impl(
+            Token::TypeConversion,
+            slice,
+            context,
+            needed_outputs,
+        )?,
         _ => return Err(SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into()),
     };
     Ok((nodes, rest))

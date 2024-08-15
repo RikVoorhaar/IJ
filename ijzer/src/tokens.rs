@@ -56,6 +56,26 @@ impl FromStr for LambdaVariableName {
         })
     }
 }
+pub fn find_matching_parenthesis_on_tokens(
+    tokens: &[Token],
+    lparen: &Token,
+    rparen: &Token,
+) -> Option<usize> {
+    let mut depth = 1;
+    for (i, token) in tokens.iter().enumerate() {
+        match token {
+            token if token == lparen => depth += 1,
+            token if token == rparen => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(i);
+                }
+            }
+            _ => (),
+        }
+    }
+    None
+}
 
 pub fn lexer(input: &str) -> Result<Vec<Token>> {
     let lex = Token::lexer(input);
@@ -164,6 +184,9 @@ pub enum Token {
 
     #[token("//")]
     Comment,
+
+    #[token("<-")]
+    TypeConversion,
 }
 
 impl Display for Token {
@@ -195,6 +218,7 @@ impl Display for Token {
             Self::LambdaVariable(v) => write!(f, "${}", v.name),
             Self::FunctionComposition => write!(f, "@"),
             Self::Comment => write!(f, "//"),
+            Self::TypeConversion => write!(f, "<-"),
         }
     }
 }

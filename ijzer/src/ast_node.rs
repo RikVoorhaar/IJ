@@ -75,6 +75,10 @@ impl TokenSlice {
         out.check_valid()?;
         Ok(out)
     }
+
+    pub fn len(&self) -> usize {
+        self.end - self.start
+    }
 }
 
 impl Node {
@@ -103,6 +107,12 @@ impl ASTContext {
             line_no: 0,
             id_counter: 0,
         }
+    }
+
+    pub fn from_tokens(tokens: Vec<Token>) -> Self {
+        let mut context = ASTContext::new();
+        context.set_tokens(tokens);
+        context
     }
 
     pub fn insert_variable(&mut self, var: Variable) {
