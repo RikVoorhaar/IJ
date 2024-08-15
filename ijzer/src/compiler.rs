@@ -48,6 +48,10 @@ pub fn compile_line_from_node(
     Ok(line_stream)
 }
 
+fn generate_identifiers(n: usize) -> Vec<Ident> {
+    (1..=n).map(|i| format_ident!("x{}", i)).collect()
+}
+
 pub struct CompilerContext {
     pub node_map: HashMap<usize, Rc<Node>>,
     parseable: Vec<usize>,
@@ -137,6 +141,7 @@ impl CompilerContext {
             Operation::FunctionComposition(_) => {
                 FunctionComposition::compile(node, self, child_streams)?
             }
+            Operation::Apply => Apply::compile(node, self, child_streams)?,
             _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
@@ -598,9 +603,6 @@ impl FunctionComposition {
             (#stream1)(#stream2)
         }
     }
-    fn generate_identifiers(n: usize) -> Vec<Ident> {
-        (1..=n).map(|i| format_ident!("x{}", i)).collect()
-    }
 }
 impl CompileNode for FunctionComposition {
     fn compile(
@@ -625,7 +627,7 @@ impl CompileNode for FunctionComposition {
             .map(|id| child_streams[id].clone())
             .collect::<Vec<_>>();
 
-        let identifiers = FunctionComposition::generate_identifiers(num_data_operands);
+        let identifiers = generate_identifiers(num_data_operands);
         let closure = functional_operands.rev().fold(
             quote! {
                 #(#identifiers),*
@@ -670,6 +672,105 @@ impl CompileNode for NotImplemented {
     }
 }
 
+/// Apply nodes have as first argument a function, and the other arguments are the operands to apply the function to.
+struct Apply;
+impl CompileNode for Apply {
+    fn compile(
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        if let Operation::Apply = &node.op {
+        } else {
+            panic!("Expected apply node, found {:?}", node.op);
+        }
+
+        let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
+        let child_streams: Vec<TokenStream> = children
+            .iter()
+            .map(|id| child_streams[id].clone())
+            .collect();
+
+        if child_streams.is_empty() {
+            panic!("Expected at least one child for apply node, found 0");
+        }
+
+        let function_stream = child_streams.first().unwrap();
+        let operand_streams = child_streams.iter().skip(1);
+
+        Ok(quote! {
+            (#function_stream)(#(#operand_streams),*)
+        })
+    }
+}
+
+struct TypeConversion;
+impl TypeConversion {
+    fn convert_type(
+        from: &IJType,
+        to: &IJType,
+        child_stream: TokenStream,
+        number_type: TokenStream,
+    ) -> Result<TokenStream> {
+        let res = match (from, to) {
+            (IJType::Scalar, IJType::Scalar) => quote! {#child_stream},
+            (IJType::Scalar, IJType::Tensor) => quote! {#child_stream},
+            (IJType::Scalar, IJType::Number) => quote! {#child_stream.extract_scalar()},
+            (IJType::Number, IJType::Number) => quote! {#child_stream},
+            (IJType::Number, IJType::Scalar) => {
+                quote! {ijzer::tensor::Tensor::<#number_type>::scalar(#child_stream)}
+            }
+            (IJType::Number, IJType::Tensor) => {
+                quote! {ijzer::tensor::Tensor::<#number_type>::scalar(#child_stream)}
+            }
+            (IJType::Function(ref signature_from), IJType::Function(ref signature_to)) => {
+                let num_ops = signature_from.input.len();
+                let idents = generate_identifiers(num_ops);
+                let input_conversions = signature_from
+                    .input
+                    .iter()
+                    .zip(signature_to.input.clone())
+                    .zip(idents.clone())
+                    .map(|((from, to), ident)| {
+                        Self::convert_type(&to, from, quote!(#ident), number_type.clone())
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                let output_conversion = Self::convert_type(
+                    signature_from.output.first().unwrap(),
+                    signature_to.output.first().unwrap(),
+                    quote!(),
+                    number_type.clone(),
+                )?;
+                quote! {
+                    (|#(#idents),*| #child_stream(#(#input_conversions),*).#output_conversion)
+                }
+            }
+            _ => {
+                panic!("Type conversion from {} to {} not implemented", from, to);
+            }
+        };
+        Ok(res)
+    }
+}
+impl CompileNode for TypeConversion {
+    fn compile(
+        node: Rc<Node>,
+        compiler: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        let number_type = compiler.number_type.clone();
+        if node.operands.len() != 1 {
+            panic!("Expected 1 operands, found {}", node.operands.len());
+        }
+        let child_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
+        Self::convert_type(
+            &node.input_types[0],
+            &node.output_type,
+            child_stream,
+            number_type,
+        )
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
