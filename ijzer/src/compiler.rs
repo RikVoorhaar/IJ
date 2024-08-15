@@ -48,8 +48,8 @@ pub fn compile_line_from_node(
     Ok(line_stream)
 }
 
-fn generate_identifiers(n: usize) -> Vec<Ident> {
-    (1..=n).map(|i| format_ident!("x{}", i)).collect()
+fn generate_identifiers(n: usize, name: &str) -> Vec<Ident> {
+    (1..=n).map(|i| format_ident!("{}{}", name, i)).collect()
 }
 
 pub struct CompilerContext {
@@ -628,7 +628,7 @@ impl CompileNode for FunctionComposition {
             .map(|id| child_streams[id].clone())
             .collect::<Vec<_>>();
 
-        let identifiers = generate_identifiers(num_data_operands);
+        let identifiers = generate_identifiers(num_data_operands, &format!("_{}_", node.id));
         let closure = functional_operands.rev().fold(
             quote! {
                 #(#identifiers),*
@@ -712,6 +712,7 @@ impl TypeConversion {
         to: &IJType,
         child_stream: TokenStream,
         number_type: TokenStream,
+        id: usize,
     ) -> Result<TokenStream> {
         let res = match (from, to) {
             (IJType::Tensor, IJType::Tensor) => quote! {#child_stream},
@@ -727,25 +728,26 @@ impl TypeConversion {
             }
             (IJType::Function(ref signature_from), IJType::Function(ref signature_to)) => {
                 let num_ops = signature_from.input.len();
-                let idents = generate_identifiers(num_ops);
+                let idents = generate_identifiers(num_ops, &format!("_{}_", id));
                 let input_conversions = signature_from
                     .input
                     .iter()
                     .zip(signature_to.input.clone())
                     .zip(idents.clone())
                     .map(|((from, to), ident)| {
-                        Self::convert_type(&to, from, quote!(#ident), number_type.clone())
+                        Self::convert_type(&to, from, quote!(#ident), number_type.clone(), id)
                     })
                     .collect::<Result<Vec<_>>>()?;
-                let input_stream = quote! {#child_stream(#(#input_conversions),*)};
+                let input_stream = quote! {(#child_stream)(#(#input_conversions),*)};
                 let converted_stream = Self::convert_type(
                     signature_from.output.first().unwrap(),
                     signature_to.output.first().unwrap(),
                     input_stream,
                     number_type.clone(),
+                    id,
                 )?;
                 quote! {
-                    (|#(#idents),*| #converted_stream)
+                    (|#(#idents: ijzer::tensor::Tensor::<#number_type>),*| (#converted_stream))
                 }
             }
             _ => {
@@ -771,6 +773,7 @@ impl CompileNode for TypeConversion {
             &node.output_type,
             child_stream,
             number_type,
+            node.id,
         )
     }
 }
@@ -944,15 +947,15 @@ mod tests {
     #[test]
     fn test_function_composition() {
         let input = "@(-,+) 1 2";
-        let expected = "(| x1: ijzer::tensor::Tensor::<i64> , x2: ijzer::tensor::Tensor::<i64> | (| x: ijzer::tensor::Tensor::<i64> | x.map(|a: i64| -a)) ((| x1: ijzer::tensor::Tensor::<i64> , x2: ijzer::tensor::Tensor::<i64> | x1.apply_binary_op(&x2, |a: i64, b: i64| a + b).unwrap()) (x1 , x2))) (ijzer::tensor::Tensor::<i64>::scalar(1) , ijzer::tensor::Tensor::<i64>::scalar(2))";
+        let expected = "(| _15_1 : ijzer :: tensor :: Tensor :: < i64 > , _15_2 : ijzer :: tensor :: Tensor :: < i64 > | (| x : ijzer :: tensor :: Tensor :: < i64 > | x . map (| a : i64 | - a)) ((| x1 : ijzer :: tensor :: Tensor :: < i64 > , x2 : ijzer :: tensor :: Tensor :: < i64 > | x1 . apply_binary_op (& x2 , | a : i64 , b : i64 | a + b) . unwrap ()) (_15_1 , _15_2))) (ijzer :: tensor :: Tensor :: < i64 > :: scalar (1) , ijzer :: tensor :: Tensor :: < i64 > :: scalar (2))";
         compiler_compare(input, expected, "i64");
 
         let input = "@(+) 1 2";
-        let expected = "(| x1: ijzer::tensor::Tensor::<i64> , x2: ijzer::tensor::Tensor::<i64> | (| x1: ijzer::tensor::Tensor::<i64>, x2: ijzer::tensor::Tensor::<i64> | x1.apply_binary_op(&x2, |a: i64, b: i64| a + b).unwrap()) (x1 , x2)) (ijzer::tensor::Tensor::<i64>::scalar(1) , ijzer::tensor::Tensor::<i64>::scalar(2))";
+        let expected = "(| _7_1 : ijzer :: tensor :: Tensor :: < i64 > , _7_2 : ijzer :: tensor :: Tensor :: < i64 > | (| x1 : ijzer :: tensor :: Tensor :: < i64 > , x2 : ijzer :: tensor :: Tensor :: < i64 > | x1 . apply_binary_op (& x2 , | a : i64 , b : i64 | a + b) . unwrap ()) (_7_1 , _7_2)) (ijzer :: tensor :: Tensor :: < i64 > :: scalar (1) , ijzer :: tensor :: Tensor :: < i64 > :: scalar (2))";
         compiler_compare(input, expected, "i64");
 
         let input = "var f: Fn(T->T); @(f,-) [1]";
-        let expected = "(| x1: ijzer::tensor::Tensor::<i64> | (f) ((| x: ijzer::tensor::Tensor::<i64> | x.map(|a: i64| -a)) (x1))) (ijzer::tensor::Tensor::<i64>::from_vec(vec![1], None))";
+        let expected = "(|_11_1:ijzer::tensor::Tensor::<i64>|(f)((|x:ijzer::tensor::Tensor::<i64>|x.map(|a:i64|-a))(_11_1)))(ijzer::tensor::Tensor::<i64>::from_vec(vec![1],None))";
         compiler_compare(input, expected, "i64");
     }
 
@@ -972,15 +975,22 @@ mod tests {
         compiler_compare(input, expected, "i64");
 
         let input = "var f: Fn(T->T); <-Fn(S->T) f 1";
-        let expected = "(| x1 | f (x1)) (ijzer::tensor::Tensor::<i64>::scalar(1))";
+        let expected = "(| _2_1 : ijzer :: tensor :: Tensor :: < i64 > | ((f) (_2_1))) (ijzer :: tensor :: Tensor :: < i64 > :: scalar (1))";
         compiler_compare(input, expected, "i64");
 
         let input = "var f: Fn(T->N); <-Fn(S->T) f 1";
-        let expected = "(| x1 | ijzer::tensor::Tensor::<i64>::scalar(f(x1))) (ijzer::tensor::Tensor::<i64>::scalar(1))";
+        let expected = "(|_2_1:ijzer::tensor::Tensor::<i64>|(ijzer::tensor::Tensor::<i64>::scalar((f)(_2_1))))(ijzer::tensor::Tensor::<i64>::scalar(1))";
         compiler_compare(input, expected, "i64");
 
         let input = "var f: Fn(S,S->S); /<-Fn(N,N->N) f [1]";
-        let expected = "ijzer::tensor::Tensor::<i64>::from_vec(vec![1], None).reduce((|x1, x2| f(ijzer::tensor::Tensor::<i64>::scalar(x1), ijzer::tensor::Tensor::<i64>::scalar(x2)).extract_scalar()))";
+        let expected = "ijzer::tensor::Tensor::<i64>::from_vec(vec![1],None).reduce((|_2_1:ijzer::tensor::Tensor::<i64>,_2_2:ijzer::tensor::Tensor::<i64>|((f)(ijzer::tensor::Tensor::<i64>::scalar(_2_1),ijzer::tensor::Tensor::<i64>::scalar(_2_2)).extract_scalar())))";
+        compiler_compare(input, expected, "i64");
+    }
+
+    #[test]
+    fn test_type_implicit_function() {
+        let input = "<-Fn(T,T->T) + $x $y";
+        let expected = "(|_5_1:ijzer::tensor::Tensor::<i64>,_5_2:ijzer::tensor::Tensor::<i64>|((|x1:ijzer::tensor::Tensor::<i64>,x2:ijzer::tensor::Tensor::<i64>|x1.apply_binary_op(&x2,|a:i64,b:i64|a+b).unwrap())(_5_1,_5_2)))(_x,_y)";
         compiler_compare(input, expected, "i64");
     }
 }

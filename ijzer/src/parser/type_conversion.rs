@@ -375,4 +375,13 @@ mod tests {
         println!("{:?}", node);
         assert_eq!(node.op, Operation::Reduce);
     }
+
+    #[test]
+    fn test_type_implicit_function() {
+        let mut context = ASTContext::new();
+        let maybe_node = parse_str("<-Fn(T,T->T) + $x $y", &mut context);
+        assert!(maybe_node.is_ok());
+        let node = maybe_node.unwrap();
+        println!("{:?}", node);
+    }
 }
