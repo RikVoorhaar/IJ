@@ -142,7 +142,8 @@ impl CompilerContext {
                 FunctionComposition::compile(node, self, child_streams)?
             }
             Operation::Apply => Apply::compile(node, self, child_streams)?,
-            _ => NotImplemented::compile(node, self, child_streams)?,
+            Operation::TypeConversion => TypeConversion::compile(node, self, child_streams)?,
+            // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
         Ok(stream)
@@ -699,7 +700,7 @@ impl CompileNode for Apply {
         let operand_streams = child_streams.iter().skip(1);
 
         Ok(quote! {
-            (#function_stream)(#(#operand_streams),*)
+            #function_stream(#(#operand_streams),*)
         })
     }
 }
@@ -713,6 +714,7 @@ impl TypeConversion {
         number_type: TokenStream,
     ) -> Result<TokenStream> {
         let res = match (from, to) {
+            (IJType::Tensor, IJType::Tensor) => quote! {#child_stream},
             (IJType::Scalar, IJType::Scalar) => quote! {#child_stream},
             (IJType::Scalar, IJType::Tensor) => quote! {#child_stream},
             (IJType::Scalar, IJType::Number) => quote! {#child_stream.extract_scalar()},
@@ -735,14 +737,15 @@ impl TypeConversion {
                         Self::convert_type(&to, from, quote!(#ident), number_type.clone())
                     })
                     .collect::<Result<Vec<_>>>()?;
-                let output_conversion = Self::convert_type(
+                let input_stream = quote! {#child_stream(#(#input_conversions),*)};
+                let converted_stream = Self::convert_type(
                     signature_from.output.first().unwrap(),
                     signature_to.output.first().unwrap(),
-                    quote!(),
+                    input_stream,
                     number_type.clone(),
                 )?;
                 quote! {
-                    (|#(#idents),*| #child_stream(#(#input_conversions),*).#output_conversion)
+                    (|#(#idents),*| #converted_stream)
                 }
             }
             _ => {
@@ -960,5 +963,24 @@ mod tests {
 
         let tokens = number_type_from_string("f64").unwrap();
         assert_eq!(tokens.to_string(), (quote! {f64}).to_string());
+    }
+
+    #[test]
+    fn test_type_conersion() {
+        let input = "var x: S; <-T x";
+        let expected = "x";
+        compiler_compare(input, expected, "i64");
+
+        let input = "var f: Fn(T->T); <-Fn(S->T) f 1";
+        let expected = "(| x1 | f (x1)) (ijzer::tensor::Tensor::<i64>::scalar(1))";
+        compiler_compare(input, expected, "i64");
+
+        let input = "var f: Fn(T->N); <-Fn(S->T) f 1";
+        let expected = "(| x1 | ijzer::tensor::Tensor::<i64>::scalar(f(x1))) (ijzer::tensor::Tensor::<i64>::scalar(1))";
+        compiler_compare(input, expected, "i64");
+
+        let input = "var f: Fn(S,S->S); /<-Fn(N,N->N) f [1]";
+        let expected = "ijzer::tensor::Tensor::<i64>::from_vec(vec![1], None).reduce((|x1, x2| f(ijzer::tensor::Tensor::<i64>::scalar(x1), ijzer::tensor::Tensor::<i64>::scalar(x2)).extract_scalar()))";
+        compiler_compare(input, expected, "i64");
     }
 }
