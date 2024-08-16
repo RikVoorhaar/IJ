@@ -120,4 +120,7 @@ pub enum SyntaxError {
 
     #[error("The slice {0} cannot be parsed as a function")]
     SliceCannotBeParsedAsFunction(String),
+
+    #[error("At least one argument is required")]
+    EmptyFunctionComposition,
 }

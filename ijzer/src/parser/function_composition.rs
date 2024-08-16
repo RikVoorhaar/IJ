@@ -169,20 +169,10 @@ impl ParseNode for FunctionComposition {
         let slice = slice
             .move_end(rparen_index)
             .map_err(|e| context.add_context_to_syntax_error(e.into(), slice))?;
-
-        // Debug stuff
-        let _remainder_tokens = context.get_tokens_from_slice(remainder);
-        let _remainder_string = _remainder_tokens
-            .iter()
-            .map(|t| t.to_string())
-            .collect::<Vec<String>>()
-            .join(" ");
-        let _slice_tokens = context.get_tokens_from_slice(slice);
-        let _slice_string = _slice_tokens
-            .iter()
-            .map(|t| t.to_string())
-            .collect::<Vec<String>>()
-            .join(" ");
+        if slice.is_empty() {
+            return Err(context
+                .add_context_to_syntax_error(SyntaxError::EmptyFunctionComposition.into(), slice));
+        }
 
         let slices = comma_separate(slice, context)?;
         let function_operands = slices
@@ -462,7 +452,7 @@ mod tests {
     }
 
     #[test]
-    fn test_function_composition_parser_custom_functoin() {
+    fn test_function_composition_parser_custom_function() {
         let mut context = ASTContext::new();
         parse_str("var f: Fn(S,S->S)", &mut context).unwrap();
         let result = parse_str("@(-, f) 1 2", &mut context);
@@ -490,5 +480,10 @@ mod tests {
         assert_eq!(node3.output_type, IJType::Scalar);
         let node4 = operands[3].clone();
         assert_eq!(node4.output_type, IJType::Scalar);
+    }
+
+    #[test]
+    fn test_function_composition_empty() {
+        assert!(parse_str_no_context("@()").is_err());
     }
 }
