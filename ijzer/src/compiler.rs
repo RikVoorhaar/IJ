@@ -805,7 +805,7 @@ mod tests {
     fn compiler_compare(input: &str, expected: &str, number_type: &str) {
         let compiled_stream_result = compile(input, number_type);
         if let Err(e) = &compiled_stream_result {
-            println!("Error: {}", e);
+            println!("Error: {:?}", e);
             panic!("Compilation failed");
         }
         let compiled_stream = compiled_stream_result.unwrap();
@@ -1022,13 +1022,27 @@ mod tests {
 
         let input = "~+: Fn(S,S->S)";
         let expected = "| x1 : ijzer :: tensor :: Tensor :: < i64 > , x2 : ijzer :: tensor :: Tensor :: < i64 > | x1 . apply_binary_op (& x2 , | a : i64 , b : i64 | a + b) . unwrap ()";
-    compiler_compare(input, expected, "i64");
+        compiler_compare(input, expected, "i64");
     }
 
     #[test]
     fn test_type_conversion_with_as_function() {
         let input = "~(<-Fn(S,S->T) +)";
         let expected = "(| _5_1 : ijzer :: tensor :: Tensor :: < i64 > , _5_2 : ijzer :: tensor :: Tensor :: < i64 > | ((| x1 : ijzer :: tensor :: Tensor :: < i64 > , x2 : ijzer :: tensor :: Tensor :: < i64 > | x1 . apply_binary_op (& x2 , | a : i64 , b : i64 | a + b) . unwrap ()) (_5_1 , _5_2)))";
+        compiler_compare(input, expected, "i64");
+    }
+     #[test]
+    fn test_function_composition_functional() {
+        let input = "~@(-,+):Fn(S,S->S)";
+        let expected = "";
+        compiler_compare(input, expected, "i64");
+    }
+   
+
+    #[test]
+    fn test_reduction_in_composition() {
+        let input = "~@(/+,+):Fn(T,T->S)";
+        let expected = "";
         compiler_compare(input, expected, "i64");
     }
 }

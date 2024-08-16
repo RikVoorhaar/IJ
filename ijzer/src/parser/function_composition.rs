@@ -1,9 +1,9 @@
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
-use crate::parser::{comma_separate, find_matching_parenthesis, ParseNode};
+use crate::parser::{comma_separate, find_matching_parenthesis, ParseNode, ParseNodeFunctional};
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
-use crate::types::IJType;
+use crate::types::{FunctionSignature, IJType};
 use anyhow::{Error, Result};
 use itertools::Itertools;
 use std::rc::Rc;
@@ -56,6 +56,16 @@ impl FunctionChain {
             SyntaxError::FunctionChainInconsistency("Function chain is empty".to_string())
         })?;
         _get_input_types_from_function(last_function.clone())
+    }
+
+    fn get_node_types(&self) -> Vec<IJType> {
+        self.functions.iter().map(|node| node.output_type.clone()).collect()
+    }
+
+    fn get_chain_type(&self) -> Result<IJType, SyntaxError> {
+        let input_types = self.get_input_types()?;
+        let output_types = self.get_output_type()?;
+        Ok(IJType::Function(FunctionSignature::new(input_types, output_types)))
     }
 
     fn verify_consistency(&self) -> Result<(), SyntaxError> {
@@ -147,12 +157,11 @@ fn extend_chains(
 }
 
 pub struct FunctionComposition;
-impl ParseNode for FunctionComposition {
-    fn next_node(
-        _op: Token,
+impl FunctionComposition {
+    fn get_chains_from_slice(
         slice: TokenSlice,
         context: &mut ASTContext,
-    ) -> Result<(Rc<Node>, TokenSlice)> {
+    ) -> Result<(Vec<FunctionChain>, TokenSlice)> {
         let next_token = context.get_token_at_index(slice.start)?;
         if next_token != &Token::LParen {
             return Err(SyntaxError::ExpectedToken(
@@ -192,6 +201,17 @@ impl ParseNode for FunctionComposition {
         let chains = function_operands
             .into_iter()
             .try_fold(vec![FunctionChain::empty()], extend_chains)?;
+        Ok((chains, remainder))
+    }
+}
+
+impl ParseNode for FunctionComposition {
+    fn next_node(
+        _op: Token,
+        slice: TokenSlice,
+        context: &mut ASTContext,
+    ) -> Result<(Rc<Node>, TokenSlice)> {
+        let (chains, remainder) = Self::get_chains_from_slice(slice, context)?;
         let types = chains
             .iter()
             .map(|chain| chain.get_input_types())
@@ -256,6 +276,48 @@ impl ParseNode for FunctionComposition {
             )),
             rest,
         ))
+    }
+}
+
+impl ParseNodeFunctional for FunctionComposition {
+    fn next_node_functional_impl(
+        _op: Token,
+        slice: TokenSlice,
+        context: &mut ASTContext,
+        needed_outputs: Option<&[Vec<IJType>]>,
+    ) -> Result<(Vec<Rc<Node>>, TokenSlice), Error> {
+        let slice = slice.move_start(1)?;
+        let (chains, remainder) = Self::get_chains_from_slice(slice, context)?;
+
+        let matching_chains = match needed_outputs {
+            Some(needed_outputs) => chains
+                .into_iter()
+                .filter(|chain| {
+                    needed_outputs
+                        .iter()
+                        .any(|output_type| match chain.get_output_type() {
+                            Ok(chain_output_type) => chain_output_type == output_type.clone(),
+                            Err(_) => false,
+                        })
+                })
+                .collect(),
+            None => chains,
+        };
+
+        let nodes: Vec<Rc<Node>> = matching_chains
+            .into_iter()
+            .map(|chain| {
+                Ok(Rc::new(Node::new(
+                    Operation::FunctionComposition(chain.len()),
+                    chain.get_node_types(),
+                    chain.get_chain_type()?,
+                    chain.functions.clone(),
+                    context.get_increment_id(),
+                )))
+            })
+            .collect::<Result<Vec<Rc<Node>>, SyntaxError>>()?;
+
+        Ok((nodes, remainder))
     }
 }
 
@@ -485,5 +547,15 @@ mod tests {
     #[test]
     fn test_function_composition_empty() {
         assert!(parse_str_no_context("@()").is_err());
+    }
+
+    #[test]
+    fn test_function_composition_functional()->Result<()> {
+        let (node,_) = parse_str_no_context("~@(+): Fn(S,S->S)")?;
+        assert_eq!(node.op, Operation::FunctionComposition(1));
+
+        let (node,_) = parse_str_no_context("~@(-,+): Fn(S,S->S)")?;
+        assert_eq!(node.op, Operation::FunctionComposition(2));
+        Ok(())
     }
 }
