@@ -1022,7 +1022,7 @@ mod tests {
 
         let input = "~+: Fn(S,S->S)";
         let expected = "| x1 : ijzer :: tensor :: Tensor :: < i64 > , x2 : ijzer :: tensor :: Tensor :: < i64 > | x1 . apply_binary_op (& x2 , | a : i64 , b : i64 | a + b) . unwrap ()";
-        compiler_compare(input, expected, "i64");
+    compiler_compare(input, expected, "i64");
     }
 
     #[test]
