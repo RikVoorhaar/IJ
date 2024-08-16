@@ -143,6 +143,7 @@ impl CompilerContext {
             }
             Operation::Apply => Apply::compile(node, self, child_streams)?,
             Operation::TypeConversion => TypeConversion::compile(node, self, child_streams)?,
+            Operation::AsFunction => AsFunction::compile(node, self, child_streams)?,
             // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
@@ -777,6 +778,25 @@ impl CompileNode for TypeConversion {
         )
     }
 }
+
+struct AsFunction;
+impl CompileNode for AsFunction {
+    fn compile(
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        if node.operands.len() != 1 {
+            panic!(
+                "Expected 1 operand for AsFunction, found {}",
+                node.operands.len()
+            );
+        }
+        let child_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
+        Ok(child_stream)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -991,6 +1011,24 @@ mod tests {
     fn test_type_implicit_function() {
         let input = "<-Fn(T,T->T) + $x $y";
         let expected = "(|_5_1:ijzer::tensor::Tensor::<i64>,_5_2:ijzer::tensor::Tensor::<i64>|((|x1:ijzer::tensor::Tensor::<i64>,x2:ijzer::tensor::Tensor::<i64>|x1.apply_binary_op(&x2,|a:i64,b:i64|a+b).unwrap())(_5_1,_5_2)))(_x,_y)";
+        compiler_compare(input, expected, "i64");
+    }
+
+    #[test]
+    fn test_as_function() {
+        let input = "var f: Fn(T->T); ~f";
+        let expected = "f";
+        compiler_compare(input, expected, "i64");
+
+        let input = "~+: Fn(S,S->S)";
+        let expected = "| x1 : ijzer :: tensor :: Tensor :: < i64 > , x2 : ijzer :: tensor :: Tensor :: < i64 > | x1 . apply_binary_op (& x2 , | a : i64 , b : i64 | a + b) . unwrap ()";
+        compiler_compare(input, expected, "i64");
+    }
+
+    #[test]
+    fn test_type_conversion_with_as_function() {
+        let input = "~(<-Fn(S,S->T) +)";
+        let expected = "(| _5_1 : ijzer :: tensor :: Tensor :: < i64 > , _5_2 : ijzer :: tensor :: Tensor :: < i64 > | ((| x1 : ijzer :: tensor :: Tensor :: < i64 > , x2 : ijzer :: tensor :: Tensor :: < i64 > | x1 . apply_binary_op (& x2 , | a : i64 , b : i64 | a + b) . unwrap ()) (_5_1 , _5_2)))";
         compiler_compare(input, expected, "i64");
     }
 }

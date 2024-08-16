@@ -84,7 +84,7 @@ impl ParseNodeFunctional for Symbol {
             if !check_ok_needed_outputs(needed_outputs, &func_signature.output) {
                 let err_string = format!(
                     "{:?}, which has outputs: {:?}, but we expected output types to be one of {:?}",
-                    context.tokens_to_string(slice),
+                    context.token_slice_to_string(slice),
                     func_signature.output,
                     needed_outputs.unwrap()
                 );
@@ -102,7 +102,7 @@ impl ParseNodeFunctional for Symbol {
                 slice.move_start(1)?,
             ))
         } else {
-            Err(SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into())
+            Err(SyntaxError::ExpectedFunction(context.token_slice_to_string(slice)).into())
         }
     }
 }

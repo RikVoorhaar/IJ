@@ -133,7 +133,7 @@ impl ASTContext {
         Rc::clone(&self.tokens)
     }
 
-    pub fn tokens_to_string(&self, slice: TokenSlice) -> String {
+    pub fn token_slice_to_string(&self, slice: TokenSlice) -> String {
         self.get_tokens()[slice.start..slice.end]
             .iter()
             .map(|t| format!("{}", t))

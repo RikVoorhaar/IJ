@@ -21,7 +21,7 @@ impl ParseNode for LSqBracket {
                 .map_err(|e| context.add_context_to_syntax_error(e, slice))?;
         let remainder = slice.move_start(rparen_index + 1)?;
         let slice = slice.move_end(rparen_index)?;
-        let contents = context.tokens_to_string(slice);
+        let contents = context.token_slice_to_string(slice);
 
         Ok((
             Rc::new(Node::new(

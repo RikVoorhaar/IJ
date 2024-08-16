@@ -46,6 +46,9 @@ use function_composition::FunctionComposition;
 mod type_conversion;
 use type_conversion::TypeConversion;
 
+mod as_function;
+use as_function::AsFunction;
+
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
@@ -57,7 +60,7 @@ use std::rc::Rc;
 trait ParseNode {
     fn next_node(
         op: Token,
-        tokens: TokenSlice,
+        slice: TokenSlice,
         context: &mut ASTContext,
     ) -> Result<(Rc<Node>, TokenSlice)>;
 }
@@ -65,7 +68,7 @@ trait ParseNode {
 trait ParseNodeFunctional {
     fn next_node_functional_impl(
         op: Token,
-        tokens: TokenSlice,
+        slice: TokenSlice,
         context: &mut ASTContext,
         needed_outputs: Option<&[Vec<IJType>]>,
     ) -> Result<(Vec<Rc<Node>>, TokenSlice)>;
@@ -88,7 +91,7 @@ pub fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node
         Token::LambdaVariable(_) => LambdaVariable::next_node(op.clone(), rest, context),
         Token::FunctionComposition => FunctionComposition::next_node(op.clone(), rest, context),
         Token::TypeConversion => TypeConversion::next_node(op.clone(), rest, context),
-
+        Token::AsFunction => AsFunction::next_node(op.clone(), rest, context),
         _ => Err(SyntaxError::UnexpectedToken(op.clone()).into()),
     }
 }
@@ -124,7 +127,21 @@ fn next_node_functional(
             context,
             needed_outputs,
         )?,
-        _ => return Err(SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into()),
+        Token::LParen => {
+            LParen::next_node_functional_impl(Token::LParen, slice, context, needed_outputs)?
+        }
+        Token::AsFunction => AsFunction::next_node_functional_impl(
+            Token::AsFunction,
+            slice,
+            context,
+            needed_outputs,
+        )?,
+        _ => {
+            return Err(SyntaxError::SliceCannotBeParsedAsFunction(
+                context.token_slice_to_string(slice),
+            )
+            .into())
+        }
     };
     Ok((nodes, rest))
 }

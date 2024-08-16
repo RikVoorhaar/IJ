@@ -65,7 +65,7 @@ fn parse_ast(context: &mut ASTContext) -> Result<Rc<Node>> {
             let (node, remainder) = super::next_node(context.full_slice(), context)?;
             if !remainder.is_empty() {
                 return Err(context.add_context_to_syntax_error(
-                    SyntaxError::UnhandledTokens(context.tokens_to_string(remainder)).into(),
+                    SyntaxError::UnhandledTokens(context.token_slice_to_string(remainder)).into(),
                     remainder,
                 ));
             }
@@ -83,7 +83,7 @@ fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
 
             if remainder_slice.is_empty() {
                 return Err(context.add_context_to_syntax_error(
-                    SyntaxError::UnhandledTokens(context.tokens_to_string(remainder_slice)).into(),
+                    SyntaxError::UnhandledTokens(context.token_slice_to_string(remainder_slice)).into(),
                     remainder_slice,
                 ));
             }
@@ -101,7 +101,7 @@ fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
             )))
         }
         _ => Err(
-            SyntaxError::InvalidVarStatement(context.tokens_to_string(context.full_slice())).into(),
+            SyntaxError::InvalidVarStatement(context.token_slice_to_string(context.full_slice())).into(),
         ),
     }
 }
@@ -145,7 +145,7 @@ pub fn parse_assign(variable_name: String, context: &mut ASTContext) -> Result<R
     let expressions = get_variable_expression(context)?;
     if expressions.len() != 1 {
         return Err(context.add_context_to_syntax_error(
-            SyntaxError::InvalidAssignmentStatement(context.tokens_to_string(context.full_slice()))
+            SyntaxError::InvalidAssignmentStatement(context.token_slice_to_string(context.full_slice()))
                 .into(),
             context.full_slice(),
         ));
@@ -165,7 +165,7 @@ pub fn parse_assign(variable_name: String, context: &mut ASTContext) -> Result<R
         _ => {
             return Err(context.add_context_to_syntax_error(
                 SyntaxError::InvalidAssignmentStatement(
-                    context.tokens_to_string(context.full_slice()),
+                    context.token_slice_to_string(context.full_slice()),
                 )
                 .into(),
                 context.full_slice(),

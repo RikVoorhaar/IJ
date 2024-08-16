@@ -103,9 +103,21 @@ pub enum SyntaxError {
     #[error("Function chain has ambiguous type. It should match exactly one type of the following: {0}")]
     FunctionChainAmbiguousType(String),
 
+    #[error("Function type ambiguous. The slice {0} can resolve to types {1}")]
+    FunctionTypeAmbiguous(String, String),
+
     #[error("Not implemented: {0}")]
     NotImplemented(String),
 
     #[error("Type conversion not possible from {0} to {1}")]
     TypeConversionNotPossible(String, String),
+
+    #[error("Groups can only return a single function, remaining tokens: {0}")]
+    GroupReturnsMultipleFunctions(String),
+
+    #[error("Empty group")]
+    EmptyGroup,
+
+    #[error("The slice {0} cannot be parsed as a function")]
+    SliceCannotBeParsedAsFunction(String),
 }

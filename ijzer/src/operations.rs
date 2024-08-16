@@ -22,6 +22,7 @@ pub enum Operation {
     TypeConversion,
     LambdaVariable(String),
     Apply,
+    AsFunction,
 }
 
 impl Debug for Operation {
@@ -45,6 +46,7 @@ impl Debug for Operation {
             Self::TypeConversion => write!(f, "TypeConversion"),
             Self::LambdaVariable(s) => write!(f, "LambdaVariable({})", s),
             Self::Apply => write!(f, "Apply"),
+            Self::AsFunction => write!(f, "AsFunction"),
         }
     }
 }

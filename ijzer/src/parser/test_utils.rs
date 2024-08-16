@@ -73,7 +73,17 @@ pub fn verify_types_tree(node: &Node) -> Result<(), anyhow::Error> {
     }
     for (operand, input_type) in node.operands.iter().zip(node.input_types.iter()) {
         if operand.output_type != *input_type {
-            return Err(anyhow!("Operand and input type mismatch"));
+            return Err(anyhow!(
+                "Operand and input type mismatch:\n\
+                Node: {:?}\n\
+                Operand: {:?}\n\
+                Operand output type: {:?}\n\
+                Expected input type: {:?}",
+                node,
+                operand,
+                operand.output_type,
+                input_type
+            ));
         }
     }
 

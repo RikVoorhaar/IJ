@@ -73,8 +73,8 @@ impl ParseNodeFunctional for Reduction {
         let node = Rc::new(Node::new(
             Operation::Reduce,
             vec![IJType::Function(FunctionSignature::new(
-                vec![IJType::Scalar, IJType::Scalar],
-                vec![IJType::Scalar],
+                vec![IJType::Number, IJType::Number],
+                vec![IJType::Number],
             ))],
             IJType::Function(FunctionSignature::new(
                 vec![IJType::Tensor],
@@ -123,14 +123,15 @@ mod tests {
     }
 
     #[test]
-    fn test_next_node_functional() {
-        let (mut context, slice) = tokenize_str_no_context("/+ [1,2]").unwrap();
+    fn test_next_node_functional() -> Result<()> {
+        let (mut context, slice) = tokenize_str_no_context("/+ [1,2]")?;
         let result = Reduction::next_node_functional_impl(
             Token::Reduction,
             slice,
             &mut context,
             Some(&[vec![IJType::Scalar]]),
-        );
-        assert!(result.is_ok());
+        )?;
+        println!("{:?}", result);
+        Ok(())
     }
 }
