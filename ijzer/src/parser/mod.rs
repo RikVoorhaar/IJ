@@ -65,7 +65,7 @@ trait ParseNode {
 trait ParseNodeFunctional {
     fn next_node_functional_impl(
         op: Token,
-        tokens: TokenSlice,
+        slice: TokenSlice,
         context: &mut ASTContext,
         needed_outputs: Option<&[Vec<IJType>]>,
     ) -> Result<(Vec<Rc<Node>>, TokenSlice)>;
@@ -124,7 +124,10 @@ fn next_node_functional(
             context,
             needed_outputs,
         )?,
-        _ => return Err(SyntaxError::ExpectedFunction(context.tokens_to_string(slice)).into()),
+        Token::LParen => {
+            LParen::next_node_functional_impl(Token::LParen, slice, context, needed_outputs)?
+        }
+        _ => return Err(SyntaxError::SliceCannotBeParsedAsFunction(context.tokens_to_string(slice)).into()),
     };
     Ok((nodes, rest))
 }

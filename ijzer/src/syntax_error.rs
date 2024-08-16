@@ -108,4 +108,13 @@ pub enum SyntaxError {
 
     #[error("Type conversion not possible from {0} to {1}")]
     TypeConversionNotPossible(String, String),
+
+    #[error("Groups can only return a single function, remaining tokens: {0}")]
+    GroupReturnsMultipleFunctions(String),
+
+    #[error("Empty group")]
+    EmptyGroup,
+
+    #[error("The slice {0} cannot be parsed as a function")]
+    SliceCannotBeParsedAsFunction(String),
 }
