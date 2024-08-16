@@ -69,7 +69,7 @@ impl ParseNodeFunctional for LParen {
         let (operand_variants, rest) = next_node_functional(slice, context, needed_outputs)?;
         if !rest.is_empty() {
             return Err(
-                SyntaxError::GroupReturnsMultipleFunctions(context.tokens_to_string(rest)).into(),
+                SyntaxError::GroupReturnsMultipleFunctions(context.token_slice_to_string(rest)).into(),
             );
         }
         Ok((operand_variants, remainder))

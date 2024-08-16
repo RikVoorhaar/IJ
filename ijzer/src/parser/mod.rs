@@ -46,6 +46,9 @@ use function_composition::FunctionComposition;
 mod type_conversion;
 use type_conversion::TypeConversion;
 
+mod as_function;
+use as_function::AsFunction;
+
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
@@ -57,7 +60,7 @@ use std::rc::Rc;
 trait ParseNode {
     fn next_node(
         op: Token,
-        tokens: TokenSlice,
+        slice: TokenSlice,
         context: &mut ASTContext,
     ) -> Result<(Rc<Node>, TokenSlice)>;
 }
@@ -127,7 +130,7 @@ fn next_node_functional(
         Token::LParen => {
             LParen::next_node_functional_impl(Token::LParen, slice, context, needed_outputs)?
         }
-        _ => return Err(SyntaxError::SliceCannotBeParsedAsFunction(context.tokens_to_string(slice)).into()),
+        _ => return Err(SyntaxError::SliceCannotBeParsedAsFunction(context.token_slice_to_string(slice)).into()),
     };
     Ok((nodes, rest))
 }

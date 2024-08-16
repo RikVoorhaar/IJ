@@ -100,7 +100,7 @@ pub fn find_matching_parenthesis(
     let maybe_index = find_matching_parenthesis_on_tokens(tokens, lparen, rparen);
     match maybe_index {
         Some(index) => Ok(index),
-        None => Err(SyntaxError::UnmatchedParenthesis(context.tokens_to_string(slice)).into()),
+        None => Err(SyntaxError::UnmatchedParenthesis(context.token_slice_to_string(slice)).into()),
     }
 }
 

@@ -103,6 +103,9 @@ pub enum SyntaxError {
     #[error("Function chain has ambiguous type. It should match exactly one type of the following: {0}")]
     FunctionChainAmbiguousType(String),
 
+    #[error("Function type ambiguous. The slice {0} can resolve to types {1}")]
+    FunctionTypeAmbiguous(String, String),
+
     #[error("Not implemented: {0}")]
     NotImplemented(String),
 

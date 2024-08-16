@@ -119,7 +119,7 @@ fn type_conversion_functional_part(
         }
         None => Err(SyntaxError::TypeConversionNotPossible(
             desired_type.to_string(),
-            context.tokens_to_string(rest),
+            context.token_slice_to_string(rest),
         )
         .into()),
     }
@@ -185,7 +185,7 @@ impl ParseNode for TypeConversion {
                 ))
             }
             _ => Err(SyntaxError::TypeConversionNotPossible(
-                context.tokens_to_string(rest),
+                context.token_slice_to_string(rest),
                 desired_type.to_string(),
             )
             .into()),
@@ -211,7 +211,7 @@ impl ParseNodeFunctional for TypeConversion {
                     if !outputs.contains(&signature.output) {
                         return Err(SyntaxError::TypeConversionNotPossible(
                             desired_type.to_string(),
-                            context.tokens_to_string(slice),
+                            context.token_slice_to_string(slice),
                         )
                         .into());
                     }
@@ -220,7 +220,7 @@ impl ParseNodeFunctional for TypeConversion {
                     type_conversion_functional_part(rest, context, signature.clone())?;
                 Ok((vec![converted_function], rest))
             }
-            _ => Err(SyntaxError::ExpectedFunction(context.tokens_to_string(rest)).into()),
+            _ => Err(SyntaxError::ExpectedFunction(context.token_slice_to_string(rest)).into()),
         }
     }
 }

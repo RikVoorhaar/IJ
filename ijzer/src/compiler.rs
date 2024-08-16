@@ -143,6 +143,7 @@ impl CompilerContext {
             }
             Operation::Apply => Apply::compile(node, self, child_streams)?,
             Operation::TypeConversion => TypeConversion::compile(node, self, child_streams)?,
+            Operation::AsFunction => NotImplemented::compile(node, self, child_streams)?,
             // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 

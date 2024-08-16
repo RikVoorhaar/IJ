@@ -187,6 +187,9 @@ pub enum Token {
 
     #[token("<-")]
     TypeConversion,
+
+    #[token("~")]
+    AsFunction,
 }
 
 impl Display for Token {
@@ -219,6 +222,7 @@ impl Display for Token {
             Self::FunctionComposition => write!(f, "@"),
             Self::Comment => write!(f, "//"),
             Self::TypeConversion => write!(f, "<-"),
+            Self::AsFunction => write!(f, "~"),
         }
     }
 }
