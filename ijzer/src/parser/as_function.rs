@@ -24,7 +24,10 @@ impl ParseNode for AsFunction {
             let rest = rest.move_start(type_end)?;
             if let IJType::Function(_) = fn_type {
             } else {
-                return Err(SyntaxError::ExpectedFunction(fn_type.to_string()).into());
+                return Err(context.add_context_to_syntax_error(
+                    SyntaxError::ExpectedFunction(fn_type.to_string()).into(),
+                    slice,
+                ));
             }
 
             let node = nodes
@@ -44,17 +47,54 @@ impl ParseNode for AsFunction {
             return Ok((node.clone(), rest));
         }
         if nodes.len() != 1 {
-            Err(SyntaxError::FunctionTypeAmbiguous(
-                context.token_slice_to_string(slice),
-                nodes
-                    .iter()
-                    .map(|n| n.output_type.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", "),
-            )
-            .into())
+            Err(context.add_context_to_syntax_error(
+                SyntaxError::FunctionTypeAmbiguous(
+                    context.token_slice_to_string(slice),
+                    nodes
+                        .iter()
+                        .map(|n| n.output_type.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                )
+                .into(),
+                slice,
+            ))
         } else {
             Ok((nodes[0].clone(), rest))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::operations::Operation;
+    use crate::parser::{parse_str, parse_str_no_context};
+
+    #[test]
+    fn test_as_function_simple() -> Result<()> {
+        let mut context = ASTContext::new();
+        parse_str("var f: Fn(S,S->S)", &mut context)?;
+
+        let node = parse_str("~f", &mut context)?;
+        assert!(node.op == Operation::Function("f".to_string()));
+        assert!(node.output_type == IJType::scalar_function(2, 1));
+        Ok(())
+    }
+
+    #[test]
+    fn test_as_function_declaration() -> Result<()> {
+        let (node, _) = parse_str_no_context("~+:Fn(S,S->S)")?;
+
+        assert!(node.op == Operation::Add);
+        assert!(node.output_type == IJType::scalar_function(2, 1));
+        Ok(())
+    }
+
+    #[test]
+    fn test_as_function_ambiguous() -> Result<()> {
+        assert!(parse_str_no_context("~+").is_err());
+
+        Ok(())
     }
 }

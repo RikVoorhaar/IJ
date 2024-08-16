@@ -91,7 +91,7 @@ pub fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node
         Token::LambdaVariable(_) => LambdaVariable::next_node(op.clone(), rest, context),
         Token::FunctionComposition => FunctionComposition::next_node(op.clone(), rest, context),
         Token::TypeConversion => TypeConversion::next_node(op.clone(), rest, context),
-
+        Token::AsFunction => AsFunction::next_node(op.clone(), rest, context),
         _ => Err(SyntaxError::UnexpectedToken(op.clone()).into()),
     }
 }
