@@ -130,7 +130,18 @@ fn next_node_functional(
         Token::LParen => {
             LParen::next_node_functional_impl(Token::LParen, slice, context, needed_outputs)?
         }
-        _ => return Err(SyntaxError::SliceCannotBeParsedAsFunction(context.token_slice_to_string(slice)).into()),
+        Token::AsFunction => AsFunction::next_node_functional_impl(
+            Token::AsFunction,
+            slice,
+            context,
+            needed_outputs,
+        )?,
+        _ => {
+            return Err(SyntaxError::SliceCannotBeParsedAsFunction(
+                context.token_slice_to_string(slice),
+            )
+            .into())
+        }
     };
     Ok((nodes, rest))
 }

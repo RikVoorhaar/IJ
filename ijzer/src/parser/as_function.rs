@@ -1,4 +1,4 @@
-use super::{next_node_functional, ParseNode};
+use super::{next_node_functional, ParseNode, ParseNodeFunctional};
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
@@ -10,13 +10,13 @@ use std::rc::Rc;
 #[derive(Debug, PartialEq, Clone)]
 pub struct AsFunction;
 
-impl ParseNode for AsFunction {
-    fn next_node(
-        _op: Token,
+impl AsFunction {
+    fn next_node_functoinal_part(
         slice: TokenSlice,
         context: &mut ASTContext,
-    ) -> Result<(Rc<Node>, TokenSlice)> {
-        let (nodes, rest) = next_node_functional(slice, context, None)?;
+        needed_outputs: Option<&[Vec<IJType>]>,
+    ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
+        let (nodes, rest) = next_node_functional(slice, context, needed_outputs)?;
 
         if !rest.is_empty() && context.get_token_at_index(rest.start)? == &Token::TypeDeclaration {
             let rest = rest.move_start(1)?;
@@ -44,8 +44,20 @@ impl ParseNode for AsFunction {
                     )
                 })?;
 
-            return Ok((node.clone(), rest));
+            return Ok((vec![node.clone()], rest));
         }
+
+        Ok((nodes, rest))
+    }
+}
+
+impl ParseNode for AsFunction {
+    fn next_node(
+        _op: Token,
+        slice: TokenSlice,
+        context: &mut ASTContext,
+    ) -> Result<(Rc<Node>, TokenSlice)> {
+        let (nodes, rest) = AsFunction::next_node_functoinal_part(slice, context, None)?;
         if nodes.len() != 1 {
             Err(context.add_context_to_syntax_error(
                 SyntaxError::FunctionTypeAmbiguous(
@@ -65,11 +77,24 @@ impl ParseNode for AsFunction {
     }
 }
 
+impl ParseNodeFunctional for AsFunction {
+    fn next_node_functional_impl(
+        _op: Token,
+        slice: TokenSlice,
+        context: &mut ASTContext,
+        needed_outputs: Option<&[Vec<IJType>]>,
+    ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
+        let slice = slice.move_start(1)?;
+        AsFunction::next_node_functoinal_part(slice, context, needed_outputs)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::operations::Operation;
     use crate::parser::{parse_str, parse_str_no_context};
+    use crate::types::FunctionSignature;
 
     #[test]
     fn test_as_function_simple() -> Result<()> {
@@ -77,8 +102,8 @@ mod tests {
         parse_str("var f: Fn(S,S->S)", &mut context)?;
 
         let node = parse_str("~f", &mut context)?;
-        assert!(node.op == Operation::Function("f".to_string()));
-        assert!(node.output_type == IJType::scalar_function(2, 1));
+        assert_eq!(node.op, Operation::Function("f".to_string()));
+        assert_eq!(node.output_type, IJType::scalar_function(2, 1));
         Ok(())
     }
 
@@ -86,8 +111,8 @@ mod tests {
     fn test_as_function_declaration() -> Result<()> {
         let (node, _) = parse_str_no_context("~+:Fn(S,S->S)")?;
 
-        assert!(node.op == Operation::Add);
-        assert!(node.output_type == IJType::scalar_function(2, 1));
+        assert_eq!(node.op, Operation::Add);
+        assert_eq!(node.output_type, IJType::scalar_function(2, 1));
         Ok(())
     }
 
@@ -95,6 +120,30 @@ mod tests {
     fn test_as_function_ambiguous() -> Result<()> {
         assert!(parse_str_no_context("~+").is_err());
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_as_function_function() -> Result<()> {
+        let (node, _) = parse_str_no_context("~(/ ~+)")?;
+        assert_eq!(node.op, Operation::Reduce);
+
+        assert_eq!(
+            node.output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor],
+                vec![IJType::Scalar]
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_as_function_double() -> Result<()> {
+        let (node, _) = parse_str_no_context("~~+:Fn(S,S->S)")?;
+
+        assert_eq!(node.op, Operation::Add);
+        assert_eq!(node.output_type, IJType::scalar_function(2, 1));
         Ok(())
     }
 }
