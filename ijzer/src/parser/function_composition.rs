@@ -59,13 +59,19 @@ impl FunctionChain {
     }
 
     fn get_node_types(&self) -> Vec<IJType> {
-        self.functions.iter().map(|node| node.output_type.clone()).collect()
+        self.functions
+            .iter()
+            .map(|node| node.output_type.clone())
+            .collect()
     }
 
     fn get_chain_type(&self) -> Result<IJType, SyntaxError> {
         let input_types = self.get_input_types()?;
         let output_types = self.get_output_type()?;
-        Ok(IJType::Function(FunctionSignature::new(input_types, output_types)))
+        Ok(IJType::Function(FunctionSignature::new(
+            input_types,
+            output_types,
+        )))
     }
 
     fn verify_consistency(&self) -> Result<(), SyntaxError> {
@@ -258,6 +264,7 @@ impl ParseNode for FunctionComposition {
             all_nodes.push(node.clone());
         }
         full_input_type.extend(operand_types);
+        let num_value_operands = value_operands.len();
         all_nodes.extend(value_operands);
 
         let output_type = matching_chain.get_output_type()?;
@@ -268,7 +275,7 @@ impl ParseNode for FunctionComposition {
 
         Ok((
             Rc::new(Node::new(
-                Operation::FunctionComposition(matching_chain.len()),
+                Operation::FunctionComposition(matching_chain.len(), num_value_operands),
                 full_input_type,
                 output_type,
                 all_nodes,
@@ -307,13 +314,23 @@ impl ParseNodeFunctional for FunctionComposition {
         let nodes: Vec<Rc<Node>> = matching_chains
             .into_iter()
             .map(|chain| {
-                Ok(Rc::new(Node::new(
-                    Operation::FunctionComposition(chain.len()),
-                    chain.get_node_types(),
-                    chain.get_chain_type()?,
-                    chain.functions.clone(),
-                    context.get_increment_id(),
-                )))
+                let chain_type = chain.get_chain_type()?;
+                if let IJType::Function(function_signature) = chain_type.clone() {
+                    let num_value_operands = function_signature.input.len();
+
+                    Ok(Rc::new(Node::new(
+                        Operation::FunctionComposition(chain.len(), num_value_operands),
+                        chain.get_node_types(),
+                        chain_type,
+                        chain.functions.clone(),
+                        context.get_increment_id(),
+                    )))
+                } else {
+                    Err(SyntaxError::TypeError(
+                        "Function".to_string(),
+                        format!("{:?}", chain_type),
+                    ))
+                }
             })
             .collect::<Result<Vec<Rc<Node>>, SyntaxError>>()?;
 
@@ -550,12 +567,12 @@ mod tests {
     }
 
     #[test]
-    fn test_function_composition_functional()->Result<()> {
-        let (node,_) = parse_str_no_context("~@(+): Fn(S,S->S)")?;
-        assert_eq!(node.op, Operation::FunctionComposition(1));
+    fn test_function_composition_functional() -> Result<()> {
+        let (node, _) = parse_str_no_context("~@(+): Fn(S,S->S)")?;
+        assert_eq!(node.op, Operation::FunctionComposition(1, 2));
 
-        let (node,_) = parse_str_no_context("~@(-,+): Fn(S,S->S)")?;
-        assert_eq!(node.op, Operation::FunctionComposition(2));
+        let (node, _) = parse_str_no_context("~@(-,+): Fn(S,S->S)")?;
+        assert_eq!(node.op, Operation::FunctionComposition(2, 2));
         Ok(())
     }
 }
