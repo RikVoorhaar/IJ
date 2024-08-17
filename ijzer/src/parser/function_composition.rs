@@ -575,4 +575,15 @@ mod tests {
         assert_eq!(node.op, Operation::FunctionComposition(2, 2));
         Ok(())
     }
+
+    #[test]
+    fn test_function_composition_nested() -> Result<()> {
+        let (node, _) = parse_str_no_context("~@(@(-,-),+): Fn(S,S->S)")?;
+        assert_eq!(node.op, Operation::FunctionComposition(2, 2));
+        let child1 = node.operands[0].clone();
+        assert_eq!(child1.op, Operation::FunctionComposition(2, 1));
+        let child2 = node.operands[1].clone();
+        assert_eq!(child2.op, Operation::Add);
+        Ok(())
+    }
 }

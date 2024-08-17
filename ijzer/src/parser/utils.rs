@@ -4,6 +4,7 @@ use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::syntax_error::SyntaxError;
 use crate::tokens::{find_matching_parenthesis_on_tokens, Token};
 use crate::types::IJType;
+use crate::operations::Operation;
 use anyhow::Result;
 use std::rc::Rc;
 
@@ -30,7 +31,12 @@ pub fn gather_operands(
 
         let (node, new_rest) = result.unwrap();
         rest = new_rest;
-        operands.push(node);
+        match node.op {
+            Operation::Group => {
+                operands.extend(node.operands.clone().into_iter());
+            }
+            _ => operands.push(node),
+        }
         let operands_types = operands
             .iter()
             .map(|n| n.output_type.clone())
@@ -69,12 +75,15 @@ pub fn gather_operands(
 /// Always consumes the entire token slice
 pub fn gather_all(slice: TokenSlice, context: &mut ASTContext) -> Result<Vec<Rc<Node>>> {
     let mut operands = Vec::new();
-    let mut rest = slice;
-    while !rest.is_empty() {
-        let (node, new_rest) =
-            next_node(rest, context).map_err(|e| context.add_context_to_syntax_error(e, rest))?;
-        operands.push(node);
-        rest = new_rest;
+    let slices = comma_separate(slice, context)?;
+    for sub_slice in slices {
+        let mut rest = sub_slice;
+        while !rest.is_empty() {
+            let (node, new_rest) = next_node(rest, context)
+                .map_err(|e| context.add_context_to_syntax_error(e, rest))?;
+            operands.push(node);
+            rest = new_rest;
+        }
     }
     Ok(operands)
 }
