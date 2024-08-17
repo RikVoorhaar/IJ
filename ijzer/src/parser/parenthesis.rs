@@ -118,4 +118,32 @@ mod tests {
         assert!(result.is_err());
         Ok(())
     }
+    
+    #[test]
+    fn test_group_with_comma() -> Result<(), Error> {
+        let (node, _) = parse_str_no_context("(1, 2)")?;
+        assert_eq!(node.op, Operation::Group);
+        assert_eq!(node.operands.len(), 2);
+
+        let (node, _) = parse_str_no_context("(1, 2 3)")?;
+        assert_eq!(node.op, Operation::Group);
+        assert_eq!(node.operands.len(), 3);
+        Ok(())
+    }
+
+    #[test]
+    fn test_add_group() -> Result<(), Error> {
+        let (node, _) = parse_str_no_context("+(1, 2)")?;
+        assert_eq!(node.op, Operation::Add);
+        assert_eq!(node.operands.len(), 2);
+
+        let (node, _) = parse_str_no_context("+(1 2)")?;
+        assert_eq!(node.op, Operation::Add);
+        assert_eq!(node.operands.len(), 2);
+
+        let (node, _) = parse_str_no_context("+([1] [1])")?;
+        assert_eq!(node.op, Operation::Add);
+        assert_eq!(node.operands.len(), 2);
+        Ok(())
+    }
 }

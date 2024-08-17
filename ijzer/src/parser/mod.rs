@@ -130,6 +130,12 @@ fn next_node_functional(
         Token::LParen => {
             LParen::next_node_functional_impl(Token::LParen, slice, context, needed_outputs)?
         }
+        Token::FunctionComposition => FunctionComposition::next_node_functional_impl(
+            Token::FunctionComposition,
+            slice,
+            context,
+            needed_outputs,
+        )?,
         Token::AsFunction => AsFunction::next_node_functional_impl(
             Token::AsFunction,
             slice,
@@ -139,6 +145,7 @@ fn next_node_functional(
         _ => {
             return Err(SyntaxError::SliceCannotBeParsedAsFunction(
                 context.token_slice_to_string(slice),
+                token.to_string(),
             )
             .into())
         }

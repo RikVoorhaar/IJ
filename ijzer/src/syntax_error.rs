@@ -118,6 +118,9 @@ pub enum SyntaxError {
     #[error("Empty group")]
     EmptyGroup,
 
-    #[error("The slice {0} cannot be parsed as a function")]
-    SliceCannotBeParsedAsFunction(String),
+    #[error("The slice {0} cannot be parsed as a function because {1} is a token without a functional variant")]
+    SliceCannotBeParsedAsFunction(String, String),
+
+    #[error("At least one argument is required")]
+    EmptyFunctionComposition,
 }

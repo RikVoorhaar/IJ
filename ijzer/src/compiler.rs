@@ -138,7 +138,7 @@ impl CompilerContext {
             Operation::Reduce => Reduce::compile(node, self, child_streams)?,
             Operation::Scalar => NotImplemented::compile(node, self, child_streams)?,
             Operation::LambdaVariable(_) => LambdaVariable::compile(node, self, child_streams)?,
-            Operation::FunctionComposition(_) => {
+            Operation::FunctionComposition(_, _) => {
                 FunctionComposition::compile(node, self, child_streams)?
             }
             Operation::Apply => Apply::compile(node, self, child_streams)?,
@@ -572,7 +572,7 @@ struct Reduce;
 impl CompileNode for Reduce {
     fn compile(
         node: Rc<Node>,
-        _compiler: &mut CompilerContext,
+        compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::Reduce = &node.op {
@@ -580,21 +580,33 @@ impl CompileNode for Reduce {
             panic!("Expected reduce node, found {:?}", node.op);
         }
         let operands = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
-        if operands.len() != 2 {
-            panic!(
-                "Expected 2 operands for reduce operation, found {}",
-                operands.len()
-            );
+        let number_type = compiler.number_type.clone();
+        match operands.len() {
+            1 => {
+                let functional_operand = &operands[0];
+                let functional_operand_stream = child_streams.get(functional_operand).unwrap();
+                let ident = compiler.get_varname(node.id);
+                Ok(quote! {
+                    |#ident: ijzer::tensor::Tensor::<#number_type>| #ident.reduce(#functional_operand_stream)
+                })
+            }
+            2 => {
+                let functional_operand = &operands[0];
+                let functional_operand_stream = child_streams.get(functional_operand).unwrap();
+
+                let data_stream = child_streams.get(&operands[1]).unwrap();
+
+                Ok(quote! {
+                    #data_stream.reduce(#functional_operand_stream)
+                })
+            }
+            _ => {
+                panic!(
+                    "Expected 1 or 2 operands for reduce operation, found {}",
+                    operands.len()
+                );
+            }
         }
-
-        let functional_operand = &operands[0];
-        let functional_operand_stream = child_streams.get(functional_operand).unwrap();
-
-        let data_stream = child_streams.get(&operands[1]).unwrap();
-
-        Ok(quote! {
-            #data_stream.reduce(#functional_operand_stream)
-        })
     }
 }
 
@@ -613,15 +625,16 @@ impl CompileNode for FunctionComposition {
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         let number_type = compiler.number_type.clone();
-        let num_functions = if let Operation::FunctionComposition(n) = &node.op {
-            *n
+        let (num_functions, num_operands) = if let Operation::FunctionComposition(n, m) = &node.op {
+            (*n, *m)
         } else {
             panic!(
                 "Expected FunctionComposition operation, found {:?}",
                 node.op
             );
         };
-        let num_data_operands = node.operands.len() - num_functions;
+
+        // let num_data_operands = node.operands.len() - num_functions;
         let operands = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
         let functional_operands = operands.iter().take(num_functions);
         let data_operands = operands.iter().skip(num_functions);
@@ -629,7 +642,7 @@ impl CompileNode for FunctionComposition {
             .map(|id| child_streams[id].clone())
             .collect::<Vec<_>>();
 
-        let identifiers = generate_identifiers(num_data_operands, &format!("_{}_", node.id));
+        let identifiers = generate_identifiers(num_operands, &format!("_{}_", node.id));
         let closure = functional_operands.rev().fold(
             quote! {
                 #(#identifiers),*
@@ -638,9 +651,13 @@ impl CompileNode for FunctionComposition {
         );
         let closure = quote! {|#(#identifiers: ijzer::tensor::Tensor::<#number_type>),*| #closure};
 
-        Ok(quote! {
-            (#closure)(#(#data_streams),*)
-        })
+        if data_streams.is_empty() {
+            Ok(closure)
+        } else {
+            Ok(quote! {
+                (#closure)(#(#data_streams),*)
+            })
+        }
     }
 }
 
@@ -805,7 +822,7 @@ mod tests {
     fn compiler_compare(input: &str, expected: &str, number_type: &str) {
         let compiled_stream_result = compile(input, number_type);
         if let Err(e) = &compiled_stream_result {
-            println!("Error: {}", e);
+            println!("Error: {:?}", e);
             panic!("Compilation failed");
         }
         let compiled_stream = compiled_stream_result.unwrap();
@@ -1029,6 +1046,19 @@ mod tests {
     fn test_type_conversion_with_as_function() {
         let input = "~(<-Fn(S,S->T) +)";
         let expected = "(| _5_1 : ijzer :: tensor :: Tensor :: < i64 > , _5_2 : ijzer :: tensor :: Tensor :: < i64 > | ((| x1 : ijzer :: tensor :: Tensor :: < i64 > , x2 : ijzer :: tensor :: Tensor :: < i64 > | x1 . apply_binary_op (& x2 , | a : i64 , b : i64 | a + b) . unwrap ()) (_5_1 , _5_2)))";
+        compiler_compare(input, expected, "i64");
+    }
+    #[test]
+    fn test_function_composition_functional() {
+        let input = "~@(-,+):Fn(S,S->S)";
+        let expected = "| _13_1 : ijzer :: tensor :: Tensor :: < i64 > , _13_2 : ijzer :: tensor :: Tensor :: < i64 > | (| x : ijzer :: tensor :: Tensor :: < i64 > | x . map (| a : i64 | - a)) ((| x1 : ijzer :: tensor :: Tensor :: < i64 > , x2 : ijzer :: tensor :: Tensor :: < i64 > | x1 . apply_binary_op (& x2 , | a : i64 , b : i64 | a + b) . unwrap ()) (_13_1 , _13_2))";
+        compiler_compare(input, expected, "i64");
+    }
+
+    #[test]
+    fn test_reduction_in_composition() {
+        let input = "~@(/+,+):Fn(T,T->S)";
+        let expected = "| _7_1 : ijzer :: tensor :: Tensor :: < i64 > , _7_2 : ijzer :: tensor :: Tensor :: < i64 > | (| _1 : ijzer :: tensor :: Tensor :: < i64 > | _1 . reduce (| a : i64 , b : i64 | a + b)) ((| x1 : ijzer :: tensor :: Tensor :: < i64 > , x2 : ijzer :: tensor :: Tensor :: < i64 > | x1 . apply_binary_op (& x2 , | a : i64 , b : i64 | a + b) . unwrap ()) (_7_1 , _7_2))";
         compiler_compare(input, expected, "i64");
     }
 }

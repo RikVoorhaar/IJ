@@ -49,9 +49,9 @@ impl ParseNode for MinusOp {
                     Operation::Number(Number {
                         value: modified_x_val,
                     }),
-                    input_types,
+                    vec![],
                     output_type,
-                    operands,
+                    vec![],
                     context.get_increment_id(),
                 );
                 return Ok((Rc::new(node), rest));
@@ -176,6 +176,9 @@ impl ParseNodeFunctional for MinusOp {
 mod tests {
     use super::*;
     use crate::parser::parse_str_no_context;
+    use crate::tokens::Number;
+    use anyhow::Error;
+    use std::str::FromStr;
 
     #[test]
     fn test_negate_with_scalar() {
@@ -188,7 +191,7 @@ mod tests {
                 value: "-1.0".to_string()
             })
         );
-        assert_eq!(node.input_types, vec![IJType::Scalar]);
+        assert_eq!(node.input_types, vec![]);
         assert_eq!(node.output_type, IJType::Scalar);
     }
     #[test]
@@ -202,7 +205,7 @@ mod tests {
                 value: "1.0".to_string()
             })
         );
-        assert_eq!(node.input_types, vec![IJType::Scalar]);
+        assert_eq!(node.input_types, vec![]);
         assert_eq!(node.output_type, IJType::Scalar);
     }
 
@@ -244,5 +247,13 @@ mod tests {
         assert_eq!(node.op, Operation::Subtract);
         assert_eq!(node.input_types, vec![IJType::Scalar, IJType::Scalar]);
         assert_eq!(node.output_type, IJType::Scalar);
+    }
+
+    #[test]
+    fn test_negate_single_group() -> Result<(), Error> {
+        let (node, _) = parse_str_no_context("-(1)")?;
+        assert_eq!(node.op, Operation::Number(Number::from_str("-1")?));
+        assert_eq!(node.operands.len(), 0);
+        Ok(())
     }
 }
