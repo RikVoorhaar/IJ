@@ -44,12 +44,9 @@ impl ParseNode for LambdaVariable {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast_node::ASTContext;
-    use crate::parser::{parse_str, parse_str_no_context};
-    use crate::tokens::Token;
+    use crate::parser::parse_str_no_context;
     use crate::types::IJType;
     use anyhow::Result;
-    use std::rc::Rc;
 
     #[test]
     fn test_lambda_variable() -> Result<()> {
@@ -95,6 +92,19 @@ mod tests {
             node.operands[1].output_type,
             IJType::Scalar
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_assign_with_lambda_variable() -> Result<()> {
+        let (node, _) = parse_str_no_context("g: Fn(S,S->S) = +($x:S, $y:S)")?;
+        assert_eq!(node.operands.len(), 2);
+        let lhs = node.operands[0].clone();
+        let rhs = node.operands[1].clone();
+        assert_eq!(lhs.op, Operation::Symbol("g".to_string()));
+        assert_eq!(lhs.output_type, IJType::scalar_function(2,1));
+        assert_eq!(rhs.op, Operation::Add);
 
         Ok(())
     }
