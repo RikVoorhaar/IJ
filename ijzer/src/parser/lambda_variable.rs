@@ -108,4 +108,17 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_assign_with_reused_lambda_variable() -> Result<()> {
+        let (node, _) = parse_str_no_context("g: Fn(S->S) = +($x:S, $x:S)")?;
+        assert_eq!(node.operands.len(), 2);
+        let lhs = node.operands[0].clone();
+        let rhs = node.operands[1].clone();
+        assert_eq!(lhs.op, Operation::Symbol("g".to_string()));
+        assert_eq!(lhs.output_type, IJType::scalar_function(1,1));
+        assert_eq!(rhs.op, Operation::Add);
+
+        Ok(())
+    }
 }

@@ -142,6 +142,12 @@ fn next_node_functional(
             context,
             needed_outputs,
         )?,
+        Token::Identity => IdentityNode::next_node_functional_impl(
+            Token::Identity,
+            slice,
+            context,
+            needed_outputs,
+        )?,
         _ => {
             return Err(SyntaxError::SliceCannotBeParsedAsFunction(
                 context.token_slice_to_string(slice),

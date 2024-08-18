@@ -272,7 +272,7 @@ impl CompileNode for Identity {
             let varname = _compiler.get_varname(node.id);
 
             let res = quote! {
-                #varname
+                |#varname| #varname
             };
             Ok(res)
         } else {

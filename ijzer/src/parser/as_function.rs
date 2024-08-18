@@ -11,7 +11,7 @@ use std::rc::Rc;
 pub struct AsFunction;
 
 impl AsFunction {
-    fn next_node_functoinal_part(
+    fn next_node_functional_part(
         slice: TokenSlice,
         context: &mut ASTContext,
         needed_outputs: Option<&[Vec<IJType>]>,
@@ -57,7 +57,7 @@ impl ParseNode for AsFunction {
         slice: TokenSlice,
         context: &mut ASTContext,
     ) -> Result<(Rc<Node>, TokenSlice)> {
-        let (nodes, rest) = AsFunction::next_node_functoinal_part(slice, context, None)?;
+        let (nodes, rest) = AsFunction::next_node_functional_part(slice, context, None)?;
         if nodes.len() != 1 {
             Err(context.add_context_to_syntax_error(
                 SyntaxError::FunctionTypeAmbiguous(
@@ -85,7 +85,7 @@ impl ParseNodeFunctional for AsFunction {
         needed_outputs: Option<&[Vec<IJType>]>,
     ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
         let slice = slice.move_start(1)?;
-        AsFunction::next_node_functoinal_part(slice, context, needed_outputs)
+        AsFunction::next_node_functional_part(slice, context, needed_outputs)
     }
 }
 
