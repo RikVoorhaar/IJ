@@ -1,6 +1,10 @@
+use crate::ast_node::Variable;
 use crate::operations::Operation;
+use crate::parser::lambda_variable::parse_lambda_assign_lhs;
 use crate::parser::utils::{comma_separate, find_matching_parenthesis};
-use crate::parser::{next_node, next_node_functional, ASTContext, LambdaVariable, Node, ParseNode};
+use crate::parser::{
+    next_node, next_node_functional, ASTContext, LambdaVariable, Node, ParseNode, TokenSlice,
+};
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
 use crate::types::{FunctionSignature, IJType};
@@ -11,9 +15,10 @@ use std::rc::Rc;
 /// Returns a Symbol node for the assignment target, a list of strings for each argument, and an optional type in case it is annotated.
 fn parse_assign_lhs(
     context: &mut ASTContext,
-    tokens: &[Token],
+    slice: TokenSlice,
 ) -> Result<(String, Vec<Rc<Node>>, Option<IJType>)> {
-    let symbol_name = if let [Token::Symbol(symbol_token), ..] = tokens {
+    let tokens = context.get_tokens_from_slice(slice);
+    let symbol_name = if let [Token::Symbol(symbol_token), ..] = tokens.as_slice() {
         symbol_token.name.clone()
     } else {
         return Err(SyntaxError::InvalidAssignmentStatement(format!(
@@ -24,6 +29,9 @@ fn parse_assign_lhs(
     };
     let mut args = vec![];
     let mut slice = context.full_slice().move_start(1)?;
+    if slice.is_empty() {
+        return Ok((symbol_name, args, None));
+    }
 
     if context.get_token_at_index(slice.start)? == &Token::LParen {
         slice = slice.move_start(1)?;
@@ -36,7 +44,7 @@ fn parse_assign_lhs(
             let op = context.get_token_at_index(arg_slice.start)?;
             match op {
                 Token::LambdaVariable(_) => {
-                    let (node, rest) = LambdaVariable::next_node(
+                    let (node, rest) = parse_lambda_assign_lhs(
                         op.clone(),
                         arg_slice.move_start_saturating(1),
                         context,
@@ -64,6 +72,9 @@ fn parse_assign_lhs(
             _ => unreachable!(),
         };
         context.insert_lambda_variable(arg_name, arg.output_type.clone());
+    }
+    if slice.is_empty() {
+        return Ok((symbol_name, args, None));
     }
     let output_type = match context.get_token_at_index(slice.start)? {
         Token::TypeDeclaration => {
@@ -102,18 +113,58 @@ pub fn parse_assign(context: &mut ASTContext) -> Result<Rc<Node>> {
     let tokens = context.get_tokens();
 
     let (lhs, rhs) = if let Some(pos) = tokens.iter().position(|t| matches!(t, Token::Assign)) {
-        let (lhs, rhs) = tokens.split_at(pos);
-        let rhs = &rhs[1..]; // Skip the `Assign` token
-        (lhs.to_vec(), rhs.to_vec())
+        (
+            context.full_slice().move_end(pos)?,
+            context.full_slice().move_start(pos + 1)?,
+        )
     } else {
         return Err(SyntaxError::InvalidAssignmentStatement(
             context.token_slice_to_string(context.full_slice()),
         )
         .into());
     };
-    let (symbol_name, args, output_type) = parse_assign_lhs(context, &lhs)?;
+    let (symbol_name, args, output_type) = parse_assign_lhs(context, lhs)?;
+    let (rhs_node, rest) = next_node(rhs, context)?;
+    if !rest.is_empty() {
+        return Err(SyntaxError::InvalidAssignmentStatement(format!(
+            "Got unparsed tokens '{}' after assignment",
+            context.token_slice_to_string(rest)
+        ))
+        .into());
+    }
+    let symbol_type = match output_type {
+        Some(output_type) => output_type,
+        None => {
+            if args.is_empty() {
+                rhs_node.output_type.clone()
+            } else {
+                let args_types = args.iter().map(|arg| arg.output_type.clone()).collect();
+                IJType::Function(FunctionSignature::new(
+                    args_types,
+                    vec![rhs_node.output_type.clone()],
+                ))
+            }
+        }
+    };
+    let symbol_node = Rc::new(Node::new(
+        Operation::Symbol(symbol_name.clone()),
+        vec![],
+        symbol_type.clone(),
+        vec![],
+        context.get_increment_id(),
+    ));
+    context.insert_variable(Variable {
+        name: symbol_name,
+        typ: symbol_type.clone(),
+    });
 
-    Err(anyhow::anyhow!("Not implemented"))
+    Ok(Rc::new(Node::new(
+        Operation::Assign,
+        vec![symbol_type, rhs_node.output_type.clone()],
+        IJType::Void,
+        vec![symbol_node, rhs_node],
+        context.get_increment_id(),
+    )))
 }
 
 #[cfg(test)]
@@ -127,7 +178,8 @@ mod tests {
     fn test_parse_assign_lhs_simple() -> Result<()> {
         let tokens = lexer("g")?;
         let mut context = ASTContext::from_tokens(tokens.clone());
-        let (symbol_name, args, output_type) = parse_assign_lhs(&mut context, &tokens)?;
+        let slice = context.full_slice();
+        let (symbol_name, args, output_type) = parse_assign_lhs(&mut context, slice)?;
         assert_eq!(symbol_name, "g");
         assert!(args.is_empty());
         assert_eq!(output_type, None);
@@ -139,7 +191,8 @@ mod tests {
     fn test_parse_assign_type() -> Result<()> {
         let tokens = lexer("g: T")?;
         let mut context = ASTContext::from_tokens(tokens.clone());
-        let (symbol_name, args, output_type) = parse_assign_lhs(&mut context, &tokens)?;
+        let slice = context.full_slice();
+        let (symbol_name, args, output_type) = parse_assign_lhs(&mut context, slice)?;
         assert_eq!(symbol_name, "g");
         assert!(args.is_empty());
         assert_eq!(output_type, Some(IJType::Tensor));
@@ -151,7 +204,8 @@ mod tests {
     fn test_parse_assign_args() -> Result<()> {
         let tokens = lexer("g($x, $y)")?;
         let mut context = ASTContext::from_tokens(tokens.clone());
-        let (symbol_name, args, output_type) = parse_assign_lhs(&mut context, &tokens)?;
+        let slice = context.full_slice();
+        let (symbol_name, args, output_type) = parse_assign_lhs(&mut context, slice)?;
         assert_eq!(symbol_name, "g");
         assert_eq!(args.len(), 2);
         println!("{:?}", args);
@@ -164,7 +218,8 @@ mod tests {
     fn test_parse_assign_args_type() -> Result<()> {
         let tokens = lexer("g($x: T, $y: S)")?;
         let mut context = ASTContext::from_tokens(tokens.clone());
-        let (symbol_name, args, output_type) = parse_assign_lhs(&mut context, &tokens)?;
+        let slice = context.full_slice();
+        let (symbol_name, args, output_type) = parse_assign_lhs(&mut context, slice)?;
         assert_eq!(symbol_name, "g");
         assert_eq!(args.len(), 2);
         let arg0 = args[0].clone();
@@ -180,7 +235,8 @@ mod tests {
     fn test_parse_assign_args_type_output_arrow() -> Result<()> {
         let tokens = lexer("g($x: T, $y: S) -> T")?;
         let mut context = ASTContext::from_tokens(tokens.clone());
-        let (symbol_name, args, output_type) = parse_assign_lhs(&mut context, &tokens)?;
+        let slice = context.full_slice();
+        let (symbol_name, args, output_type) = parse_assign_lhs(&mut context, slice)?;
         assert_eq!(symbol_name, "g");
         assert_eq!(args.len(), 2);
         let arg0 = args[0].clone();
@@ -197,7 +253,8 @@ mod tests {
 
         let tokens = lexer("g($x: T, $y: S) -> T,S")?;
         let mut context = ASTContext::from_tokens(tokens.clone());
-        let (symbol_name, args, output_type) = parse_assign_lhs(&mut context, &tokens)?;
+        let slice = context.full_slice();
+        let (symbol_name, args, output_type) = parse_assign_lhs(&mut context, slice)?;
         assert_eq!(symbol_name, "g");
         assert_eq!(args.len(), 2);
         let arg0 = args[0].clone();
@@ -219,7 +276,8 @@ mod tests {
     fn test_parse_assign_args_type_output_declaration() -> Result<()> {
         let tokens = lexer("g($x: T, $y: S): Fn(T,S->T)")?;
         let mut context = ASTContext::from_tokens(tokens.clone());
-        let (symbol_name, args, output_type) = parse_assign_lhs(&mut context, &tokens)?;
+        let slice = context.full_slice();
+        let (symbol_name, args, output_type) = parse_assign_lhs(&mut context, slice)?;
         assert_eq!(symbol_name, "g");
         assert_eq!(args.len(), 2);
         let arg0 = args[0].clone();
@@ -236,7 +294,8 @@ mod tests {
 
         let tokens = lexer("g($x: T, $y: S): Fn(T,S->T,S)")?;
         let mut context = ASTContext::from_tokens(tokens.clone());
-        let (symbol_name, args, output_type) = parse_assign_lhs(&mut context, &tokens)?;
+        let slice = context.full_slice();
+        let (symbol_name, args, output_type) = parse_assign_lhs(&mut context, slice)?;
         assert_eq!(symbol_name, "g");
         assert_eq!(args.len(), 2);
         let arg0 = args[0].clone();

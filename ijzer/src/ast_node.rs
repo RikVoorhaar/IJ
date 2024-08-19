@@ -146,10 +146,10 @@ impl ASTContext {
         );
     }
 
-    pub fn get_lambda_var_type(&self, name: String) -> Result<IJType> {
+    pub fn get_lambda_var_type(&self, name: String) -> Option<IJType> {
         match self.symbols.get(&format!("_arg_{}_{}", self.line_no, name)) {
-            Some(var) => Ok(var.typ.clone()),
-            None => Err(SyntaxError::UnknownSymbol(name.clone()).into()),
+            Some(var) => Some(var.typ.clone()),
+            None => None,
         }
     }
 
@@ -176,7 +176,9 @@ impl ASTContext {
     }
 
     pub fn get_token_at_index(&self, index: usize) -> Result<&Token, SyntaxError> {
-        self.tokens.get(index).ok_or(SyntaxError::EmptyStream)
+        self.tokens
+            .get(index)
+            .ok_or(SyntaxError::OutOfBoundsToken(index, self.tokens.len()))
     }
 
     pub fn get_tokens_from_slice(&self, slice: TokenSlice) -> Vec<Token> {

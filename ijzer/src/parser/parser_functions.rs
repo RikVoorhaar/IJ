@@ -1,5 +1,6 @@
 use crate::ast_node::{ASTContext, LineHasSemicolon, Node, Variable};
 use crate::operations::Operation;
+use crate::parser::assign::parse_assign;
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
 use crate::types::{FunctionSignature, IJType};
@@ -58,9 +59,7 @@ fn parse_ast(context: &mut ASTContext) -> Result<Rc<Node>> {
     match context.tokens.as_slice() {
         [] => Err(SyntaxError::EmptyInput.into()),
         [Token::Variable, ..] => parse_var_statement(context),
-        [Token::Symbol(symbol), rest @ ..] if rest.contains(&Token::Assign) => {
-            parse_assign(symbol.name.clone(), context)
-        }
+        [Token::Symbol(_), rest @ ..] if rest.contains(&Token::Assign) => parse_assign(context),
         _ => {
             let (node, remainder) = super::next_node(context.full_slice(), context)?;
             if !remainder.is_empty() {
@@ -83,7 +82,8 @@ fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
 
             if remainder_slice.is_empty() {
                 return Err(context.add_context_to_syntax_error(
-                    SyntaxError::UnhandledTokens(context.token_slice_to_string(remainder_slice)).into(),
+                    SyntaxError::UnhandledTokens(context.token_slice_to_string(remainder_slice))
+                        .into(),
                     remainder_slice,
                 ));
             }
@@ -100,9 +100,10 @@ fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
                 context.get_increment_id(),
             )))
         }
-        _ => Err(
-            SyntaxError::InvalidVarStatement(context.token_slice_to_string(context.full_slice())).into(),
-        ),
+        _ => Err(SyntaxError::InvalidVarStatement(
+            context.token_slice_to_string(context.full_slice()),
+        )
+        .into()),
     }
 }
 
@@ -141,78 +142,79 @@ pub fn compute_input_type(node: &Rc<Node>) -> Result<Vec<IJType>> {
 }
 
 /// Parses a variable assignment statement.
-pub fn parse_assign(variable_name: String, context: &mut ASTContext) -> Result<Rc<Node>> {
-    let expressions = get_variable_expression(context)?;
-    if expressions.len() != 1 {
-        return Err(context.add_context_to_syntax_error(
-            SyntaxError::InvalidAssignmentStatement(context.token_slice_to_string(context.full_slice()))
-                .into(),
-            context.full_slice(),
-        ));
-    }
-    let expression = expressions.into_iter().next().unwrap();
-    let left_of_assign = context.tokens.split(|t| t == &Token::Assign).next().ok_or(
-        context.add_context_to_syntax_error(
-            SyntaxError::UnresolvedGroup("=".to_string()).into(),
-            context.full_slice(),
-        ),
-    )?;
-    let expected_type = match left_of_assign {
-        [Token::Symbol(_), Token::TypeDeclaration, rest @ ..] => {
-            Some(IJType::parse_tokens(rest)?.0)
-        }
-        [Token::Symbol(_)] => None,
-        _ => {
-            return Err(context.add_context_to_syntax_error(
-                SyntaxError::InvalidAssignmentStatement(
-                    context.token_slice_to_string(context.full_slice()),
-                )
-                .into(),
-                context.full_slice(),
-            ))
-        }
-    };
+/// Deprecated: use `assign.rs` instead.
+// pub fn parse_assign(variable_name: String, context: &mut ASTContext) -> Result<Rc<Node>> {
+//     let expressions = get_variable_expression(context)?;
+//     if expressions.len() != 1 {
+//         return Err(context.add_context_to_syntax_error(
+//             SyntaxError::InvalidAssignmentStatement(context.token_slice_to_string(context.full_slice()))
+//                 .into(),
+//             context.full_slice(),
+//         ));
+//     }
+//     let expression = expressions.into_iter().next().unwrap();
+//     let left_of_assign = context.tokens.split(|t| t == &Token::Assign).next().ok_or(
+//         context.add_context_to_syntax_error(
+//             SyntaxError::UnresolvedGroup("=".to_string()).into(),
+//             context.full_slice(),
+//         ),
+//     )?;
+//     let expected_type = match left_of_assign {
+//         [Token::Symbol(_), Token::TypeDeclaration, rest @ ..] => {
+//             Some(IJType::parse_tokens(rest)?.0)
+//         }
+//         [Token::Symbol(_)] => None,
+//         _ => {
+//             return Err(context.add_context_to_syntax_error(
+//                 SyntaxError::InvalidAssignmentStatement(
+//                     context.token_slice_to_string(context.full_slice()),
+//                 )
+//                 .into(),
+//                 context.full_slice(),
+//             ))
+//         }
+//     };
 
-    let input_type = compute_input_type(&expression)?;
-    let output_type = expression.output_type.clone();
-    let expression_type = match input_type.is_empty() {
-        true => output_type.clone(),
-        false => IJType::Function(FunctionSignature {
-            input: input_type,
-            output: vec![output_type.clone()],
-        }),
-    };
+//     let input_type = compute_input_type(&expression)?;
+//     let output_type = expression.output_type.clone();
+//     let expression_type = match input_type.is_empty() {
+//         true => output_type.clone(),
+//         false => IJType::Function(FunctionSignature {
+//             input: input_type,
+//             output: vec![output_type.clone()],
+//         }),
+//     };
 
-    if let Some(expected_type) = expected_type {
-        if expression_type != expected_type {
-            return Err(context.add_context_to_syntax_error(
-                SyntaxError::TypeError(expression_type.to_string(), expected_type.to_string())
-                    .into(),
-                context.full_slice(),
-            ));
-        }
-    }
-    context.insert_variable(Variable {
-        name: variable_name.clone(),
-        typ: expression_type.clone(),
-    });
-    let symbol_node = Rc::new(Node::new(
-        Operation::Symbol(variable_name.clone()),
-        vec![],
-        expression_type.clone(),
-        Vec::new(),
-        context.get_increment_id(),
-    ));
-    let operand_node = expression.clone();
-    let assign_node = Rc::new(Node::new(
-        Operation::Assign,
-        vec![expression_type, output_type],
-        IJType::Void,
-        vec![symbol_node, operand_node],
-        context.get_increment_id(),
-    ));
-    Ok(assign_node)
-}
+//     if let Some(expected_type) = expected_type {
+//         if expression_type != expected_type {
+//             return Err(context.add_context_to_syntax_error(
+//                 SyntaxError::TypeError(expression_type.to_string(), expected_type.to_string())
+//                     .into(),
+//                 context.full_slice(),
+//             ));
+//         }
+//     }
+//     context.insert_variable(Variable {
+//         name: variable_name.clone(),
+//         typ: expression_type.clone(),
+//     });
+//     let symbol_node = Rc::new(Node::new(
+//         Operation::Symbol(variable_name.clone()),
+//         vec![],
+//         expression_type.clone(),
+//         Vec::new(),
+//         context.get_increment_id(),
+//     ));
+//     let operand_node = expression.clone();
+//     let assign_node = Rc::new(Node::new(
+//         Operation::Assign,
+//         vec![expression_type, output_type],
+//         IJType::Void,
+//         vec![symbol_node, operand_node],
+//         context.get_increment_id(),
+//     ));
+//     Ok(assign_node)
+// }
 
 #[cfg(test)]
 mod tests {

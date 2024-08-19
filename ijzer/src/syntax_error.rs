@@ -123,4 +123,7 @@ pub enum SyntaxError {
 
     #[error("At least one argument is required")]
     EmptyFunctionComposition,
+
+    #[error("Tried to retrieve out of bounds token. Index: {0}, length: {1}")]
+    OutOfBoundsToken(usize, usize),
 }
