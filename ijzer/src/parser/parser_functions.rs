@@ -3,7 +3,7 @@ use crate::operations::Operation;
 use crate::parser::assign::parse_assign;
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
-use crate::types::{FunctionSignature, IJType};
+use crate::types::IJType;
 use anyhow::Result;
 use std::rc::Rc;
 
@@ -107,119 +107,11 @@ fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
     }
 }
 
-/// Get the nodes expressed on the right hand side of an assignment token.
-fn get_variable_expression(context: &mut ASTContext) -> Result<Vec<Rc<Node>>> {
-    let tokens = context.get_tokens();
-    let mut split = tokens.split(|t| t == &Token::Assign);
-    let assign_index: usize = split
-        .next()
-        .ok_or(context.add_context_to_syntax_error(
-            SyntaxError::UnresolvedGroup("=".to_string()).into(),
-            context.full_slice(),
-        ))?
-        .len();
-    let mut slice = context.full_slice().move_start(assign_index + 1)?;
-
-    let mut expressions = Vec::new();
-    while !slice.is_empty() {
-        let (expression, rest) = super::next_node(slice, context)?;
-        expressions.push(expression);
-        slice = rest;
-    }
-    Ok(expressions)
-}
-
-/// Recursively walk down AST. If we reach a leaf node without an operand, add it to the input types. Otherwise concatenate the input types of its operands.
-pub fn compute_input_type(node: &Rc<Node>) -> Result<Vec<IJType>> {
-    if node.operands.is_empty() {
-        return Ok(node.input_types.clone());
-    }
-    let mut input_types = Vec::new();
-    for operand in node.operands.iter() {
-        input_types.extend(compute_input_type(operand)?);
-    }
-    Ok(input_types)
-}
-
-/// Parses a variable assignment statement.
-/// Deprecated: use `assign.rs` instead.
-// pub fn parse_assign(variable_name: String, context: &mut ASTContext) -> Result<Rc<Node>> {
-//     let expressions = get_variable_expression(context)?;
-//     if expressions.len() != 1 {
-//         return Err(context.add_context_to_syntax_error(
-//             SyntaxError::InvalidAssignmentStatement(context.token_slice_to_string(context.full_slice()))
-//                 .into(),
-//             context.full_slice(),
-//         ));
-//     }
-//     let expression = expressions.into_iter().next().unwrap();
-//     let left_of_assign = context.tokens.split(|t| t == &Token::Assign).next().ok_or(
-//         context.add_context_to_syntax_error(
-//             SyntaxError::UnresolvedGroup("=".to_string()).into(),
-//             context.full_slice(),
-//         ),
-//     )?;
-//     let expected_type = match left_of_assign {
-//         [Token::Symbol(_), Token::TypeDeclaration, rest @ ..] => {
-//             Some(IJType::parse_tokens(rest)?.0)
-//         }
-//         [Token::Symbol(_)] => None,
-//         _ => {
-//             return Err(context.add_context_to_syntax_error(
-//                 SyntaxError::InvalidAssignmentStatement(
-//                     context.token_slice_to_string(context.full_slice()),
-//                 )
-//                 .into(),
-//                 context.full_slice(),
-//             ))
-//         }
-//     };
-
-//     let input_type = compute_input_type(&expression)?;
-//     let output_type = expression.output_type.clone();
-//     let expression_type = match input_type.is_empty() {
-//         true => output_type.clone(),
-//         false => IJType::Function(FunctionSignature {
-//             input: input_type,
-//             output: vec![output_type.clone()],
-//         }),
-//     };
-
-//     if let Some(expected_type) = expected_type {
-//         if expression_type != expected_type {
-//             return Err(context.add_context_to_syntax_error(
-//                 SyntaxError::TypeError(expression_type.to_string(), expected_type.to_string())
-//                     .into(),
-//                 context.full_slice(),
-//             ));
-//         }
-//     }
-//     context.insert_variable(Variable {
-//         name: variable_name.clone(),
-//         typ: expression_type.clone(),
-//     });
-//     let symbol_node = Rc::new(Node::new(
-//         Operation::Symbol(variable_name.clone()),
-//         vec![],
-//         expression_type.clone(),
-//         Vec::new(),
-//         context.get_increment_id(),
-//     ));
-//     let operand_node = expression.clone();
-//     let assign_node = Rc::new(Node::new(
-//         Operation::Assign,
-//         vec![expression_type, output_type],
-//         IJType::Void,
-//         vec![symbol_node, operand_node],
-//         context.get_increment_id(),
-//     ));
-//     Ok(assign_node)
-// }
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::parser::{is_specific_syntax_error, parse_str_no_context};
+    use crate::types::FunctionSignature;
 
     #[test]
     fn test_empty_input() {

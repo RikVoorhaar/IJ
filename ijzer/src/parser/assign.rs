@@ -2,9 +2,7 @@ use crate::ast_node::Variable;
 use crate::operations::Operation;
 use crate::parser::lambda_variable::parse_lambda_assign_lhs;
 use crate::parser::utils::{comma_separate, find_matching_parenthesis};
-use crate::parser::{
-    next_node, next_node_functional, ASTContext, LambdaVariable, Node, ParseNode, TokenSlice,
-};
+use crate::parser::{next_node, ASTContext, Node, TokenSlice};
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
 use crate::types::{FunctionSignature, IJType};
@@ -176,9 +174,8 @@ pub fn parse_assign(context: &mut ASTContext) -> Result<Rc<Node>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::test_utils::parse_str;
     use crate::parser::ASTContext;
-    use crate::tokens::{lexer, Number};
+    use crate::tokens::lexer;
 
     #[test]
     fn test_parse_assign_lhs_simple() -> Result<()> {

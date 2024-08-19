@@ -50,7 +50,6 @@ mod as_function;
 use as_function::AsFunction;
 
 mod assign;
-use assign::parse_assign;
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
@@ -256,10 +255,6 @@ mod tests {
         assert_eq!(second_operand.op, Operation::Add);
         assert_eq!(second_operand.output_type, IJType::Tensor);
 
-        assert_eq!(
-            parser_functions::compute_input_type(second_operand).unwrap(),
-            expected_signature.input.clone()
-        );
 
         let expected_var = Variable {
             typ: IJType::Function(FunctionSignature {

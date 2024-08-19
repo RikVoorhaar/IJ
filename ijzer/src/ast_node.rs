@@ -4,7 +4,7 @@ use crate::tokens::Token;
 use crate::types::IJType;
 use anyhow::{anyhow, Error, Result};
 use std::collections::HashMap;
-use std::fmt::{format, Debug};
+use std::fmt::Debug;
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -72,8 +72,7 @@ impl TokenSlice {
     /// If the start moves past the end, return an empty slice.
     pub fn move_start_saturating(&self, amount: usize) -> Self {
         let new_start = (self.start + amount).min(self.end);
-        let out = TokenSlice::new(new_start, self.end, self.max);
-        out
+        TokenSlice::new(new_start, self.end, self.max)
     }
 
     /// Moves the end of the slice to a new length, relative to the start of the slice.
@@ -88,8 +87,7 @@ impl TokenSlice {
 
     pub fn move_end_saturating(&self, new_length: usize) -> Self {
         let new_end = (self.start + new_length).min(self.max);
-        let out = TokenSlice::new(self.start, new_end, self.max);
-        out
+        TokenSlice::new(self.start, new_end, self.max)
     }
 
     /// Returns the length of the slice.
@@ -147,10 +145,9 @@ impl ASTContext {
     }
 
     pub fn get_lambda_var_type(&self, name: String) -> Option<IJType> {
-        match self.symbols.get(&format!("_arg_{}_{}", self.line_no, name)) {
-            Some(var) => Some(var.typ.clone()),
-            None => None,
-        }
+        self.symbols
+            .get(&format!("_arg_{}_{}", self.line_no, name))
+            .map(|var| var.typ.clone())
     }
 
     pub fn get_increment_id(&mut self) -> usize {
