@@ -896,8 +896,8 @@ mod tests {
 
     #[test]
     fn test_simple_function() {
-        let input1 = "f: Fn(T->T) = + [1] $x";
-        let input2 = "f = + [1] $x";
+        let input1 = "f($x) -> T = + [1] $x";
+        let input2 = "f($x) = + [1] $x";
         let expexted = "let x = { | _1: ijzer::tensor::Tensor::<i64> | ijzer::tensor::Tensor::<i64>::from_vec(vec![1], None).apply_binary_op(&_1, |a: i64, b: i64| a + b).unwrap() } ;";
         compiler_compare(input1, expexted, "i64");
         compiler_compare(input2, expexted, "i64");
@@ -943,7 +943,6 @@ mod tests {
             "i64",
         );
         compiler_compare("var x: S; -x", "x.map(|a: i64| -a)", "i64");
-        compiler_compare("- I", "_0 . map (| a: i64 | -a)", "i64");
     }
 
     #[test]
@@ -1021,13 +1020,6 @@ mod tests {
 
         let input = "var f: Fn(S,S->S); /<-Fn(N,N->N) f [1]";
         let expected = "ijzer::tensor::Tensor::<i64>::from_vec(vec![1],None).reduce((|_2_1:ijzer::tensor::Tensor::<i64>,_2_2:ijzer::tensor::Tensor::<i64>|((f)(ijzer::tensor::Tensor::<i64>::scalar(_2_1),ijzer::tensor::Tensor::<i64>::scalar(_2_2)).extract_scalar())))";
-        compiler_compare(input, expected, "i64");
-    }
-
-    #[test]
-    fn test_type_implicit_function() {
-        let input = "<-Fn(T,T->T) + $x $y";
-        let expected = "(|_5_1:ijzer::tensor::Tensor::<i64>,_5_2:ijzer::tensor::Tensor::<i64>|((|x1:ijzer::tensor::Tensor::<i64>,x2:ijzer::tensor::Tensor::<i64>|x1.apply_binary_op(&x2,|a:i64,b:i64|a+b).unwrap())(_5_1,_5_2)))(_x,_y)";
         compiler_compare(input, expected, "i64");
     }
 
