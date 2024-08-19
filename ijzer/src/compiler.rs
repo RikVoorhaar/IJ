@@ -896,8 +896,8 @@ mod tests {
 
     #[test]
     fn test_simple_function() {
-        let input1 = "x: Fn(T->T) = + [1] I";
-        let input2 = "x = + [1] I";
+        let input1 = "f: Fn(T->T) = + [1] $x";
+        let input2 = "f = + [1] $x";
         let expexted = "let x = { | _1: ijzer::tensor::Tensor::<i64> | ijzer::tensor::Tensor::<i64>::from_vec(vec![1], None).apply_binary_op(&_1, |a: i64, b: i64| a + b).unwrap() } ;";
         compiler_compare(input1, expexted, "i64");
         compiler_compare(input2, expexted, "i64");

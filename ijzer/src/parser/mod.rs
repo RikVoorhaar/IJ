@@ -49,6 +49,9 @@ use type_conversion::TypeConversion;
 mod as_function;
 use as_function::AsFunction;
 
+mod assign;
+use assign::parse_assign;
+
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;

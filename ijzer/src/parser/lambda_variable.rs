@@ -6,6 +6,11 @@ use crate::tokens::Token;
 use crate::types::IJType;
 use anyhow::Result;
 use std::rc::Rc;
+use std::task::Context;
+
+pub fn extract_lambda_from_slice(slice: &TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node>, TokenSlice)> {
+
+}
 
 pub struct LambdaVariable;
 impl ParseNode for LambdaVariable {
@@ -40,6 +45,7 @@ impl ParseNode for LambdaVariable {
         Ok((Rc::new(node), rest))
     }
 }
+
 
 #[cfg(test)]
 mod tests {

@@ -4,7 +4,7 @@ use crate::tokens::Token;
 use crate::types::IJType;
 use anyhow::{anyhow, Error, Result};
 use std::collections::HashMap;
-use std::fmt::Debug;
+use std::fmt::{format, Debug};
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -61,12 +61,22 @@ impl TokenSlice {
         Ok(())
     }
 
+    /// Moves the start of the slice to a new length, relative to the start of the slice.
     pub fn move_start(&self, amount: usize) -> Result<Self, SyntaxError> {
         let out = TokenSlice::new(self.start + amount, self.end, self.max);
         out.check_valid()?;
         Ok(out)
     }
 
+    /// Moves the start of the slice to a new length, relative to the start of the slice.
+    /// If the start moves past the end, return an empty slice.
+    pub fn move_start_saturating(&self, amount: usize) -> Self {
+        let new_start = (self.start + amount).min(self.end);
+        let out = TokenSlice::new(new_start, self.end, self.max);
+        out
+    }
+
+    /// Moves the end of the slice to a new length, relative to the start of the slice.
     pub fn move_end(&self, new_length: usize) -> Result<Self, SyntaxError> {
         if self.start + new_length > self.max {
             return Err(SyntaxError::InvalidSlice);
@@ -76,6 +86,13 @@ impl TokenSlice {
         Ok(out)
     }
 
+    pub fn move_end_saturating(&self, new_length: usize) -> Self {
+        let new_end = (self.start + new_length).min(self.max);
+        let out = TokenSlice::new(self.start, new_end, self.max);
+        out
+    }
+
+    /// Returns the length of the slice.
     pub fn len(&self) -> usize {
         self.end - self.start
     }
@@ -117,6 +134,23 @@ impl ASTContext {
 
     pub fn insert_variable(&mut self, var: Variable) {
         self.symbols.insert(var.name.clone(), var);
+    }
+
+    pub fn insert_lambda_variable(&mut self, name: String, var_type: IJType) {
+        self.symbols.insert(
+            format!("_arg_{}_{}", self.line_no, name),
+            Variable {
+                name,
+                typ: var_type,
+            },
+        );
+    }
+
+    pub fn get_lambda_var_type(&self, name: String) -> Result<IJType> {
+        match self.symbols.get(&format!("_arg_{}_{}", self.line_no, name)) {
+            Some(var) => Ok(var.typ.clone()),
+            None => Err(SyntaxError::UnknownSymbol(name.clone()).into()),
+        }
     }
 
     pub fn get_increment_id(&mut self) -> usize {
