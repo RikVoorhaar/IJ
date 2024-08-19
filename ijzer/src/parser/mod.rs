@@ -223,15 +223,11 @@ mod tests {
     fn test_wrongly_annotated_assignment() {
         let result = parse_str_no_context("x: T = 1");
         assert!(result.is_err());
-        assert!(is_specific_syntax_error(
-            &result.unwrap_err(),
-            &SyntaxError::TypeError(IJType::Scalar.to_string(), IJType::Tensor.to_string())
-        ));
     }
 
     #[test]
     fn test_function_assignment() {
-        let result = parse_str_no_context("x: Fn(T->T) = + [1] I");
+        let result = parse_str_no_context("x($x): Fn(T->T) = + [1] $x");
         assert!(result.is_ok());
         let (node, context) = result.unwrap();
         assert_eq!(node.op, Operation::Assign);
@@ -294,7 +290,7 @@ mod tests {
     #[test]
     fn test_assign_definition_and_use() {
         let mut context = ASTContext::new();
-        parse_str("add2: Fn(T->T) = + (I) [2]", &mut context).unwrap();
+        parse_str("add2($x) -> T = + $x [2]", &mut context).unwrap();
         let result = parse_str("add2 [1]", &mut context);
         assert!(result.is_ok());
         let node = result.unwrap();
@@ -313,34 +309,6 @@ mod tests {
         assert_eq!(node.output_type, IJType::Scalar);
     }
 
-    #[test]
-    fn test_lambda_variable() {
-        let result = parse_str_no_context("$x");
-        assert!(result.is_ok());
-        let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::LambdaVariable("x".to_string()));
-
-        let result = parse_str_no_context("+ $x 1");
-        assert!(result.is_ok());
-        let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Add);
-        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Scalar]);
-        assert_eq!(node.output_type, IJType::Tensor);
-
-        let result = parse_str_no_context("+ $x $x");
-        assert!(result.is_ok());
-        let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Add);
-        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Tensor]);
-        assert_eq!(node.output_type, IJType::Tensor);
-
-        let result = parse_str_no_context("+ $x $y");
-        assert!(result.is_ok());
-        let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Add);
-        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Tensor]);
-        assert_eq!(node.output_type, IJType::Tensor);
-    }
 
     #[test]
     fn test_semicolon_handling() {

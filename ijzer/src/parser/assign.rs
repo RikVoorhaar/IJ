@@ -16,6 +16,7 @@ fn parse_assign_lhs(
     slice: TokenSlice,
 ) -> Result<(String, Vec<Rc<Node>>, Option<IJType>)> {
     let tokens = context.get_tokens_from_slice(slice);
+    println!("{:?}", tokens);
     let symbol_name = if let [Token::Symbol(symbol_token), ..] = tokens.as_slice() {
         symbol_token.name.clone()
     } else {
@@ -26,7 +27,7 @@ fn parse_assign_lhs(
         .into());
     };
     let mut args = vec![];
-    let mut slice = context.full_slice().move_start(1)?;
+    let mut slice = slice.move_start(1)?;
     if slice.is_empty() {
         return Ok((symbol_name, args, None));
     }
@@ -330,6 +331,21 @@ mod tests {
         println!("{:?}", node);
         Ok(())
     }
+    #[test]
+    fn test_assign_simple_tensor_type() -> Result<()> {
+        let tokens = lexer("g: T = [1]")?;
+        let mut context = ASTContext::from_tokens(tokens.clone());
+        let node = parse_assign(&mut context)?;
+        assert_eq!(node.op, Operation::Assign);
+        assert_eq!(node.operands.len(), 2);
+        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(node.operands[0].output_type, IJType::Tensor);
+        assert_eq!(node.operands[1].op, Operation::Array("1".to_string()));
+        assert_eq!(node.operands[1].output_type, IJType::Tensor);
+        println!("{:?}", node);
+        Ok(())
+    }
+
 
     #[test]
     fn test_assign_simple_scalar() -> Result<()> {
