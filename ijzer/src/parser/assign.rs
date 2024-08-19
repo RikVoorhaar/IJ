@@ -8,7 +8,7 @@ use crate::parser::{
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
 use crate::types::{FunctionSignature, IJType};
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use std::rc::Rc;
 
 /// Parses the left hand side of an assignment statement.
@@ -132,20 +132,24 @@ pub fn parse_assign(context: &mut ASTContext) -> Result<Rc<Node>> {
         ))
         .into());
     }
-    let symbol_type = match output_type {
-        Some(output_type) => output_type,
-        None => {
-            if args.is_empty() {
-                rhs_node.output_type.clone()
-            } else {
-                let args_types = args.iter().map(|arg| arg.output_type.clone()).collect();
-                IJType::Function(FunctionSignature::new(
-                    args_types,
-                    vec![rhs_node.output_type.clone()],
-                ))
-            }
-        }
+    let symbol_type = if args.is_empty() {
+        rhs_node.output_type.clone()
+    } else {
+        let args_types = args.iter().map(|arg| arg.output_type.clone()).collect();
+        IJType::Function(FunctionSignature::new(
+            args_types,
+            vec![rhs_node.output_type.clone()],
+        ))
     };
+    if let Some(output_type) = output_type {
+        if output_type != symbol_type {
+            return Err(SyntaxError::InvalidAssignmentStatement(format!(
+                "LHS has type '{}' but RHS has type '{}'",
+                output_type, symbol_type
+            ))
+            .into());
+        }
+    }
     let symbol_node = Rc::new(Node::new(
         Operation::Symbol(symbol_name.clone()),
         vec![],
@@ -157,12 +161,14 @@ pub fn parse_assign(context: &mut ASTContext) -> Result<Rc<Node>> {
         name: symbol_name,
         typ: symbol_type.clone(),
     });
+    let mut operands = vec![symbol_node, rhs_node.clone()];
+    operands.extend(args.iter().cloned());
 
     Ok(Rc::new(Node::new(
         Operation::Assign,
         vec![symbol_type, rhs_node.output_type.clone()],
         IJType::Void,
-        vec![symbol_node, rhs_node],
+        operands,
         context.get_increment_id(),
     )))
 }
@@ -172,7 +178,7 @@ mod tests {
     use super::*;
     use crate::parser::test_utils::parse_str;
     use crate::parser::ASTContext;
-    use crate::tokens::lexer;
+    use crate::tokens::{lexer, Number};
 
     #[test]
     fn test_parse_assign_lhs_simple() -> Result<()> {
@@ -310,6 +316,161 @@ mod tests {
             )))
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_assign_simple_tensor() -> Result<()> {
+        let tokens = lexer("g = [1]")?;
+        let mut context = ASTContext::from_tokens(tokens.clone());
+        let node = parse_assign(&mut context)?;
+        assert_eq!(node.op, Operation::Assign);
+        assert_eq!(node.operands.len(), 2);
+        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(node.operands[0].output_type, IJType::Tensor);
+        assert_eq!(node.operands[1].op, Operation::Array("1".to_string()));
+        assert_eq!(node.operands[1].output_type, IJType::Tensor);
+        println!("{:?}", node);
+        Ok(())
+    }
+
+    #[test]
+    fn test_assign_simple_scalar() -> Result<()> {
+        let tokens = lexer("g = 1")?;
+        let mut context = ASTContext::from_tokens(tokens.clone());
+        let node = parse_assign(&mut context)?;
+        assert_eq!(node.op, Operation::Assign);
+        assert_eq!(node.operands.len(), 2);
+        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(node.operands[0].output_type, IJType::Scalar);
+        assert_eq!(node.operands[1].output_type, IJType::Scalar);
+        Ok(())
+    }
+
+    #[test]
+    fn test_assign_simple_function() -> Result<()> {
+        let tokens = lexer("g($x) = $x")?;
+        let mut context = ASTContext::from_tokens(tokens.clone());
+        let node = parse_assign(&mut context)?;
+        println!("{:?}", node);
+        assert_eq!(node.op, Operation::Assign);
+        assert_eq!(node.operands.len(), 3);
+        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(
+            node.operands[0].output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor],
+                vec![IJType::Tensor]
+            ))
+        );
+        assert_eq!(node.operands[1].output_type, IJType::Tensor);
+        assert_eq!(node.operands[2].output_type, IJType::Tensor);
+        Ok(())
+    }
+
+    #[test]
+    fn test_assign_simple_function_scalar() -> Result<()> {
+        let tokens = lexer("g($x: S) = $x")?;
+        let mut context = ASTContext::from_tokens(tokens.clone());
+        let node = parse_assign(&mut context)?;
+        println!("{:?}", node);
+        assert_eq!(node.op, Operation::Assign);
+        assert_eq!(node.operands.len(), 3);
+        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(
+            node.operands[0].output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Scalar],
+                vec![IJType::Scalar]
+            ))
+        );
+        assert_eq!(node.operands[1].output_type, IJType::Scalar);
+        assert_eq!(node.operands[2].output_type, IJType::Scalar);
+        Ok(())
+    }
+
+    #[test]
+    fn test_assign_simple_function_tensor() -> Result<()> {
+        let tokens = lexer("g($x) = /+ $x")?;
+        let mut context = ASTContext::from_tokens(tokens.clone());
+        let node = parse_assign(&mut context)?;
+        println!("{:?}", node);
+        assert_eq!(node.op, Operation::Assign);
+        assert_eq!(node.operands.len(), 3);
+        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(
+            node.operands[0].output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor],
+                vec![IJType::Scalar]
+            ))
+        );
+        assert_eq!(node.operands[1].output_type, IJType::Scalar);
+        assert_eq!(node.operands[2].output_type, IJType::Tensor);
+        Ok(())
+    }
+
+    #[test]
+    fn test_assign_simple_reuse_var() -> Result<()> {
+        let tokens = lexer("g($x) = + $x $x")?;
+        let mut context = ASTContext::from_tokens(tokens.clone());
+        let node = parse_assign(&mut context)?;
+        println!("{:?}", node);
+        assert_eq!(node.op, Operation::Assign);
+        assert_eq!(node.operands.len(), 3);
+        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(
+            node.operands[0].output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor],
+                vec![IJType::Tensor]
+            ))
+        );
+        assert_eq!(node.operands[1].output_type, IJType::Tensor);
+        assert_eq!(node.operands[2].output_type, IJType::Tensor);
+        Ok(())
+    }
+
+    #[test]
+    fn test_assign_simple_reuse_var_annotated() -> Result<()> {
+        let tokens = lexer("g($x:T) -> S = /+ + $x $x")?;
+        let mut context = ASTContext::from_tokens(tokens.clone());
+        let node = parse_assign(&mut context)?;
+        println!("{:?}", node);
+        assert_eq!(node.op, Operation::Assign);
+        assert_eq!(node.operands.len(), 3);
+        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(
+            node.operands[0].output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor],
+                vec![IJType::Scalar]
+            ))
+        );
+        assert_eq!(node.operands[1].output_type, IJType::Scalar);
+        assert_eq!(node.operands[2].output_type, IJType::Tensor);
+        Ok(())
+    }
+
+    #[test]
+    fn test_assign_multiple_args() -> Result<()> {
+        let tokens = lexer("g($x:T, $y:S) -> S = /+ + $x $y")?;
+        let mut context = ASTContext::from_tokens(tokens.clone());
+        let node = parse_assign(&mut context)?;
+        println!("{:?}", node);
+        assert_eq!(node.op, Operation::Assign);
+        assert_eq!(node.operands.len(), 4);
+        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(
+            node.operands[0].output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor, IJType::Scalar],
+                vec![IJType::Scalar]
+            ))
+        );
+        assert_eq!(node.operands[1].output_type, IJType::Scalar);
+        assert_eq!(node.operands[2].output_type, IJType::Tensor);
+        assert_eq!(node.operands[3].output_type, IJType::Scalar);
         Ok(())
     }
 }
