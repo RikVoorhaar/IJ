@@ -285,7 +285,7 @@ struct LambdaVariable;
 impl CompileNode for LambdaVariable {
     fn compile(
         node: Rc<Node>,
-        _compiler: &mut CompilerContext,
+        compiler: &mut CompilerContext,
         _child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::LambdaVariable(name) = &node.op {
@@ -294,7 +294,8 @@ impl CompileNode for LambdaVariable {
                 panic!("Expected 0 child, found {:?}", children.len());
             }
             let name_with_underscore = format!("_{}", name);
-            _compiler
+            let number_type = compiler.number_type.clone();
+            compiler
                 .inputs
                 .push((node.id, name_with_underscore.clone()));
             let varname = Ident::new(name_with_underscore.as_str(), Span::call_site());
@@ -316,34 +317,31 @@ impl CompileNode for Assign {
         compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
+        let number_type = compiler.number_type.clone();
         if let Operation::Assign = &node.op {
         } else {
             panic!("Expected assign node, found {:?}", node);
         }
-        let left_member = &node.operands[0];
-        let left_stream = child_streams[&left_member.id].clone();
-        let right_member = &node.operands[1];
-        let right_stream = child_streams[&right_member.id].clone();
+        let lhs_stream = child_streams[&node.operands[0].id].clone();
+        let rhs_stream = child_streams[&node.operands[1].id].clone();
+        let args_streams = node
+            .operands
+            .iter()
+            .skip(2)
+            .map(|n| {
+                let s = child_streams[&n.id].clone();
+                quote!(#s: ijzer::tensor::Tensor::<#number_type>)
+            })
+            .collect::<Vec<_>>();
 
-        match node.input_types.first() {
-            Some(IJType::Function(_)) => {
-                let input_varnames = compiler
-                    .inputs
-                    .iter()
-                    .map(|(_, name)| Ident::new(name, Span::call_site()))
-                    .collect::<Vec<_>>();
-
-                let number_type = compiler.number_type.clone();
-                Ok(quote!(
-                    let #left_stream = {|#(#input_varnames: ijzer::tensor::Tensor::<#number_type>),*| #right_stream};
-                ))
-            }
-            Some(_) => Ok(quote!(
-                let #left_stream = #right_stream;
-            )),
-            None => {
-                panic!("Expected function node, found {:?}", node);
-            }
+        if args_streams.is_empty() {
+            Ok(quote!(
+                let #lhs_stream = #rhs_stream;
+            ))
+        } else {
+            Ok(quote!(
+                let #lhs_stream = {|#(#args_streams),*| #rhs_stream};
+            ))
         }
     }
 }
@@ -898,7 +896,7 @@ mod tests {
     fn test_simple_function() {
         let input1 = "f($x) -> T = + [1] $x";
         let input2 = "f($x) = + [1] $x";
-        let expexted = "let x = { | _1: ijzer::tensor::Tensor::<i64> | ijzer::tensor::Tensor::<i64>::from_vec(vec![1], None).apply_binary_op(&_1, |a: i64, b: i64| a + b).unwrap() } ;";
+        let expexted = "let f = { | _x: ijzer::tensor::Tensor::<i64> | ijzer::tensor::Tensor::<i64>::from_vec(vec![1], None).apply_binary_op(&_x, |a: i64, b: i64| a + b).unwrap() } ;";
         compiler_compare(input1, expexted, "i64");
         compiler_compare(input2, expexted, "i64");
     }
@@ -962,22 +960,15 @@ mod tests {
     #[test]
     fn test_lambda_variable() {
         let expected1 =
-            "let f = { | _x: ijzer::tensor::Tensor::<i64> , _x: ijzer::tensor::Tensor::<i64> | _x . apply_binary_op (& _x , | a: i64 , b: i64 | a + b) . unwrap () } ;";
-        compiler_compare("f = + $x $x", expected1, "i64");
-        compiler_compare("f: Fn(T,T->T) = + $x $x", expected1, "i64");
+            "let f = { | _x: ijzer::tensor::Tensor::<i64>| _x . apply_binary_op (& _x , | a: i64 , b: i64 | a + b) . unwrap () } ;";
+        compiler_compare("f($x) = + $x $x", expected1, "i64");
 
         let expected2 =
             "let f = { | _x: ijzer::tensor::Tensor::<i64> , _y: ijzer::tensor::Tensor::<i64> | _x . apply_binary_op (& _y , | a: i64 , b: i64 | a + b) . unwrap () } ;";
-        compiler_compare("f = + $x $y", expected2, "i64");
-        compiler_compare("f: Fn(T,T->T) = + $x $y", expected2, "i64");
+        compiler_compare("f($x, $y) = + $x $y", expected2, "i64");
 
-        let expected3="let h = { | _x: ijzer::tensor::Tensor::<i64> | k (_x , ijzer::tensor::Tensor::<i64>::from_vec(vec![1,2], None)) } ;";
-        compiler_compare(
-            "var k: Fn(T,T->T); h: Fn(T->T) = k $x [1,2]",
-            expected3,
-            "i64",
-        );
-        compiler_compare("var k: Fn(T,T->T); h = k $x [1,2]", expected3, "i64");
+        let expected3 = "let h = { | _x: ijzer::tensor::Tensor::<i64> | k (_x , ijzer::tensor::Tensor::<i64>::from_vec(vec![1,2], None)) } ;";
+        compiler_compare("var k: Fn(T,T->T); h($x) = k $x [1,2]", expected3, "i64");
     }
 
     #[test]
