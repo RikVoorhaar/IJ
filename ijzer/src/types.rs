@@ -149,6 +149,13 @@ impl IJType {
         let tokens = lexer(s).map_err(|e| SyntaxError::LexerError(e.to_string()))?;
         Self::parse_tokens(&tokens).map(|(t, _)| t)
     }
+
+    pub fn extract_signature(&self) -> Option<FunctionSignature> {
+        match self {
+            IJType::Function(sig) => Some(sig.clone()),
+            _ => None,
+        }
+    }
 }
 
 impl std::fmt::Display for IJType {

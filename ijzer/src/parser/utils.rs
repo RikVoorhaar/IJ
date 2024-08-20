@@ -1,10 +1,10 @@
 use super::next_node;
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};
+use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
 use crate::tokens::{find_matching_parenthesis_on_tokens, Token};
 use crate::types::IJType;
-use crate::operations::Operation;
 use anyhow::Result;
 use std::rc::Rc;
 
@@ -21,6 +21,9 @@ pub fn gather_operands(
     let mut rest = slice;
     let mut longest_match_length = 0;
     for _ in 0..longest_variant_length {
+        if rest.is_empty() {
+            break;
+        }
         let result = next_node(rest, context);
         if let Err(e) = result {
             if longest_match_length < shortest_variant_length {

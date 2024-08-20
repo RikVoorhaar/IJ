@@ -9,11 +9,11 @@ fn test_function(x: Tensor<f64>) -> Tensor<f64> {
     var x: T
     y = (+ x [1.0])
     z = - x y
-    z = * y I
+    z($x) = * y $x
     u = [1.0,2.0,3.0]
     v = @(-,+) [1.0] [2.0]
     // g: Fn(N,N -> N) = <-Fn(N,N->N) + ((I) I)
-    g = <-Fn(T,T->T) + $x $y
+    g($x, $y) = + $x $y
     // (z [1.0] [-2.0])
     v
     "#

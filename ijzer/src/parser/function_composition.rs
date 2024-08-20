@@ -264,7 +264,6 @@ impl ParseNode for FunctionComposition {
             all_nodes.push(node.clone());
         }
         full_input_type.extend(operand_types);
-        let num_value_operands = value_operands.len();
         all_nodes.extend(value_operands);
 
         let output_type = matching_chain.get_output_type()?;
@@ -275,7 +274,7 @@ impl ParseNode for FunctionComposition {
 
         Ok((
             Rc::new(Node::new(
-                Operation::FunctionComposition(matching_chain.len(), num_value_operands),
+                Operation::FunctionComposition(matching_chain.len()),
                 full_input_type,
                 output_type,
                 all_nodes,
@@ -315,11 +314,9 @@ impl ParseNodeFunctional for FunctionComposition {
             .into_iter()
             .map(|chain| {
                 let chain_type = chain.get_chain_type()?;
-                if let IJType::Function(function_signature) = chain_type.clone() {
-                    let num_value_operands = function_signature.input.len();
-
+                if let IJType::Function(_) = chain_type.clone() {
                     Ok(Rc::new(Node::new(
-                        Operation::FunctionComposition(chain.len(), num_value_operands),
+                        Operation::FunctionComposition(chain.len()),
                         chain.get_node_types(),
                         chain_type,
                         chain.functions.clone(),
@@ -569,19 +566,19 @@ mod tests {
     #[test]
     fn test_function_composition_functional() -> Result<()> {
         let (node, _) = parse_str_no_context("~@(+): Fn(S,S->S)")?;
-        assert_eq!(node.op, Operation::FunctionComposition(1, 2));
+        assert_eq!(node.op, Operation::FunctionComposition(1));
 
         let (node, _) = parse_str_no_context("~@(-,+): Fn(S,S->S)")?;
-        assert_eq!(node.op, Operation::FunctionComposition(2, 2));
+        assert_eq!(node.op, Operation::FunctionComposition(2));
         Ok(())
     }
 
     #[test]
     fn test_function_composition_nested() -> Result<()> {
         let (node, _) = parse_str_no_context("~@(@(-,-),+): Fn(S,S->S)")?;
-        assert_eq!(node.op, Operation::FunctionComposition(2, 2));
+        assert_eq!(node.op, Operation::FunctionComposition(2));
         let child1 = node.operands[0].clone();
-        assert_eq!(child1.op, Operation::FunctionComposition(2, 1));
+        assert_eq!(child1.op, Operation::FunctionComposition(2));
         let child2 = node.operands[1].clone();
         assert_eq!(child2.op, Operation::Add);
         Ok(())

@@ -61,12 +61,21 @@ impl TokenSlice {
         Ok(())
     }
 
+    /// Moves the start of the slice to a new length, relative to the start of the slice.
     pub fn move_start(&self, amount: usize) -> Result<Self, SyntaxError> {
         let out = TokenSlice::new(self.start + amount, self.end, self.max);
         out.check_valid()?;
         Ok(out)
     }
 
+    /// Moves the start of the slice to a new length, relative to the start of the slice.
+    /// If the start moves past the end, return an empty slice.
+    pub fn move_start_saturating(&self, amount: usize) -> Self {
+        let new_start = (self.start + amount).min(self.end);
+        TokenSlice::new(new_start, self.end, self.max)
+    }
+
+    /// Moves the end of the slice to a new length, relative to the start of the slice.
     pub fn move_end(&self, new_length: usize) -> Result<Self, SyntaxError> {
         if self.start + new_length > self.max {
             return Err(SyntaxError::InvalidSlice);
@@ -76,6 +85,12 @@ impl TokenSlice {
         Ok(out)
     }
 
+    pub fn move_end_saturating(&self, new_length: usize) -> Self {
+        let new_end = (self.start + new_length).min(self.max);
+        TokenSlice::new(self.start, new_end, self.max)
+    }
+
+    /// Returns the length of the slice.
     pub fn len(&self) -> usize {
         self.end - self.start
     }
@@ -119,6 +134,22 @@ impl ASTContext {
         self.symbols.insert(var.name.clone(), var);
     }
 
+    pub fn insert_lambda_variable(&mut self, name: String, var_type: IJType) {
+        self.symbols.insert(
+            format!("_arg_{}_{}", self.line_no, name),
+            Variable {
+                name,
+                typ: var_type,
+            },
+        );
+    }
+
+    pub fn get_lambda_var_type(&self, name: String) -> Option<IJType> {
+        self.symbols
+            .get(&format!("_arg_{}_{}", self.line_no, name))
+            .map(|var| var.typ.clone())
+    }
+
     pub fn get_increment_id(&mut self) -> usize {
         let id = self.id_counter;
         self.id_counter += 1;
@@ -142,7 +173,9 @@ impl ASTContext {
     }
 
     pub fn get_token_at_index(&self, index: usize) -> Result<&Token, SyntaxError> {
-        self.tokens.get(index).ok_or(SyntaxError::EmptyStream)
+        self.tokens
+            .get(index)
+            .ok_or(SyntaxError::OutOfBoundsToken(index, self.tokens.len()))
     }
 
     pub fn get_tokens_from_slice(&self, slice: TokenSlice) -> Vec<Token> {

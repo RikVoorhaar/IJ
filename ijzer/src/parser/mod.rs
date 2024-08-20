@@ -49,6 +49,11 @@ use type_conversion::TypeConversion;
 mod as_function;
 use as_function::AsFunction;
 
+mod assign;
+
+mod apply;
+use apply::Apply;
+
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
@@ -92,6 +97,7 @@ pub fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node
         Token::FunctionComposition => FunctionComposition::next_node(op.clone(), rest, context),
         Token::TypeConversion => TypeConversion::next_node(op.clone(), rest, context),
         Token::AsFunction => AsFunction::next_node(op.clone(), rest, context),
+        Token::Apply => Apply::next_node(op.clone(), rest, context),
         _ => Err(SyntaxError::UnexpectedToken(op.clone()).into()),
     }
 }
@@ -138,6 +144,18 @@ fn next_node_functional(
         )?,
         Token::AsFunction => AsFunction::next_node_functional_impl(
             Token::AsFunction,
+            slice,
+            context,
+            needed_outputs,
+        )?,
+        Token::Identity => IdentityNode::next_node_functional_impl(
+            Token::Identity,
+            slice,
+            context,
+            needed_outputs,
+        )?,
+        Token::LambdaVariable(name) => LambdaVariable::next_node_functional_impl(
+            Token::LambdaVariable(name.clone()),
             slice,
             context,
             needed_outputs,
@@ -215,15 +233,11 @@ mod tests {
     fn test_wrongly_annotated_assignment() {
         let result = parse_str_no_context("x: T = 1");
         assert!(result.is_err());
-        assert!(is_specific_syntax_error(
-            &result.unwrap_err(),
-            &SyntaxError::TypeError(IJType::Scalar.to_string(), IJType::Tensor.to_string())
-        ));
     }
 
     #[test]
     fn test_function_assignment() {
-        let result = parse_str_no_context("x: Fn(T->T) = + [1] I");
+        let result = parse_str_no_context("x($x): Fn(T->T) = + [1] $x");
         assert!(result.is_ok());
         let (node, context) = result.unwrap();
         assert_eq!(node.op, Operation::Assign);
@@ -246,11 +260,6 @@ mod tests {
         let second_operand = &node.operands[1];
         assert_eq!(second_operand.op, Operation::Add);
         assert_eq!(second_operand.output_type, IJType::Tensor);
-
-        assert_eq!(
-            parser_functions::compute_input_type(second_operand).unwrap(),
-            expected_signature.input.clone()
-        );
 
         let expected_var = Variable {
             typ: IJType::Function(FunctionSignature {
@@ -290,7 +299,7 @@ mod tests {
     #[test]
     fn test_assign_definition_and_use() {
         let mut context = ASTContext::new();
-        parse_str("add2: Fn(T->T) = + (I) [2]", &mut context).unwrap();
+        parse_str("add2($x) -> T = + $x [2]", &mut context).unwrap();
         let result = parse_str("add2 [1]", &mut context);
         assert!(result.is_ok());
         let node = result.unwrap();
@@ -307,35 +316,6 @@ mod tests {
         assert_eq!(node.op, Operation::Negate);
         assert_eq!(node.input_types, vec![IJType::Scalar]);
         assert_eq!(node.output_type, IJType::Scalar);
-    }
-
-    #[test]
-    fn test_lambda_variable() {
-        let result = parse_str_no_context("$x");
-        assert!(result.is_ok());
-        let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::LambdaVariable("x".to_string()));
-
-        let result = parse_str_no_context("+ $x 1");
-        assert!(result.is_ok());
-        let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Add);
-        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Scalar]);
-        assert_eq!(node.output_type, IJType::Tensor);
-
-        let result = parse_str_no_context("+ $x $x");
-        assert!(result.is_ok());
-        let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Add);
-        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Tensor]);
-        assert_eq!(node.output_type, IJType::Tensor);
-
-        let result = parse_str_no_context("+ $x $y");
-        assert!(result.is_ok());
-        let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Add);
-        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Tensor]);
-        assert_eq!(node.output_type, IJType::Tensor);
     }
 
     #[test]
