@@ -1043,4 +1043,16 @@ mod tests {
         let expected = "| _7_1 : ijzer :: tensor :: Tensor :: < i64 > , _7_2 : ijzer :: tensor :: Tensor :: < i64 > | (| _1 : ijzer :: tensor :: Tensor :: < i64 > | _1 . reduce (| a : i64 , b : i64 | a + b)) ((| x1 : ijzer :: tensor :: Tensor :: < i64 > , x2 : ijzer :: tensor :: Tensor :: < i64 > | x1 . apply_binary_op (& x2 , | a : i64 , b : i64 | a + b) . unwrap ()) (_7_1 , _7_2))";
         compiler_compare(input, expected, "i64");
     }
+
+    #[test]
+    fn test_apply() -> Result<()> {
+        let input = "var f: Fn(S,S->S); .~f 1 2";
+        let expected = "f (ijzer :: tensor :: Tensor :: < i64 > :: scalar (1) , ijzer :: tensor :: Tensor :: < i64 > :: scalar (2))";
+        compiler_compare(input, expected, "i64");
+
+        let input = "var f: Fn(S->Fn(S->S)); .(f 1) 2";
+        let expected = "f (ijzer :: tensor :: Tensor :: < i64 > :: scalar (1)) (ijzer :: tensor :: Tensor :: < i64 > :: scalar (2))";
+        compiler_compare(input, expected, "i64");
+        Ok(())
+    }
 }
