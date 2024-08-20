@@ -36,6 +36,7 @@ pub fn parse_str(input: &str, context: &mut ASTContext) -> Result<Rc<Node>, anyh
         println!("Error veryfing tree:\n {:?}", e);
     }
 
+    println!("Node: {:?}", result);
     Ok(result)
 }
 
@@ -44,10 +45,7 @@ pub fn parse_str(input: &str, context: &mut ASTContext) -> Result<Rc<Node>, anyh
 pub fn parse_str_no_context(input: &str) -> Result<(Rc<Node>, ASTContext)> {
     let mut context = ASTContext::new();
     let node = match parse_str(input, &mut context) {
-        Ok(node) => {
-            println!("Node: {:?}", node);
-            node
-        }
+        Ok(node) => node,
         Err(e) => {
             println!("Error: {:?}", e);
             return Err(e);

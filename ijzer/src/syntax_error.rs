@@ -1,6 +1,5 @@
 use crate::tokens::Token;
 
-
 use thiserror::Error;
 #[derive(Error, Debug, PartialEq)]
 pub enum SyntaxError {
@@ -37,7 +36,9 @@ pub enum SyntaxError {
     #[error("Variable is not allowed to have input arguments")]
     VariableWithInput,
 
-    #[error("Number of variables does not match output arity; got {0} variables but output arity {1}")]
+    #[error(
+        "Number of variables does not match output arity; got {0} variables but output arity {1}"
+    )]
     IncorrectNumVariables(usize, usize),
 
     #[error("Invalid number format: {0}")]
@@ -67,7 +68,9 @@ pub enum SyntaxError {
     #[error("Function with multiple outputs is not supported yet. Use a group as output instead.")]
     FunctionWithMultipleOutputs(usize),
 
-    #[error("Tried to match multiple types {0} but none of them matched. Longest string has type {1}")]
+    #[error(
+        "Tried to match multiple types {0} but none of them matched. Longest string has type {1}"
+    )]
     GatherMismatch(String, String),
 
     #[error("Created invalid slice")]
@@ -100,7 +103,9 @@ pub enum SyntaxError {
     #[error("Function chain is not consistent: {0}")]
     FunctionChainInconsistency(String),
 
-    #[error("Function chain has ambiguous type. It should match exactly one type of the following: {0}")]
+    #[error(
+        "Function chain has ambiguous type. It should match exactly one type of the following: {0}"
+    )]
     FunctionChainAmbiguousType(String),
 
     #[error("Function type ambiguous. The slice {0} can resolve to types {1}")]
@@ -126,4 +131,7 @@ pub enum SyntaxError {
 
     #[error("Tried to retrieve out of bounds token. Index: {0}, length: {1}")]
     OutOfBoundsToken(usize, usize),
+
+    #[error("None of the function variants {0} match the types of the gathered operands {1}")]
+    FunctionVariantMismatch(String, String),
 }

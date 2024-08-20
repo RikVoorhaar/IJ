@@ -51,6 +51,9 @@ use as_function::AsFunction;
 
 mod assign;
 
+mod apply;
+use apply::Apply;
+
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
@@ -94,6 +97,7 @@ pub fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node
         Token::FunctionComposition => FunctionComposition::next_node(op.clone(), rest, context),
         Token::TypeConversion => TypeConversion::next_node(op.clone(), rest, context),
         Token::AsFunction => AsFunction::next_node(op.clone(), rest, context),
+        Token::Apply => Apply::next_node(op.clone(), rest, context),
         _ => Err(SyntaxError::UnexpectedToken(op.clone()).into()),
     }
 }
@@ -251,7 +255,6 @@ mod tests {
         assert_eq!(second_operand.op, Operation::Add);
         assert_eq!(second_operand.output_type, IJType::Tensor);
 
-
         let expected_var = Variable {
             typ: IJType::Function(FunctionSignature {
                 input: vec![IJType::Tensor],
@@ -308,7 +311,6 @@ mod tests {
         assert_eq!(node.input_types, vec![IJType::Scalar]);
         assert_eq!(node.output_type, IJType::Scalar);
     }
-
 
     #[test]
     fn test_semicolon_handling() {
