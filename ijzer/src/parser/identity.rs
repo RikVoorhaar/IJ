@@ -100,7 +100,7 @@ mod tests {
             })
         );
         let (node, _) = parse_str_no_context("@(~-:Fn(T->T), I) [1]")?;
-        assert_eq!(node.op, Operation::FunctionComposition(2, 1));
+        assert_eq!(node.op, Operation::FunctionComposition(2));
         assert_eq!(node.output_type, IJType::Tensor);
 
         Ok(())
