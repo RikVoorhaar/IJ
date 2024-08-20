@@ -154,6 +154,12 @@ fn next_node_functional(
             context,
             needed_outputs,
         )?,
+        Token::LambdaVariable(name) => LambdaVariable::next_node_functional_impl(
+            Token::LambdaVariable(name.clone()),
+            slice,
+            context,
+            needed_outputs,
+        )?,
         _ => {
             return Err(SyntaxError::SliceCannotBeParsedAsFunction(
                 context.token_slice_to_string(slice),

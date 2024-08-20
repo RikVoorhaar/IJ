@@ -346,7 +346,6 @@ mod tests {
         Ok(())
     }
 
-
     #[test]
     fn test_assign_simple_scalar() -> Result<()> {
         let tokens = lexer("g = 1")?;
@@ -484,6 +483,88 @@ mod tests {
         assert_eq!(node.operands[1].output_type, IJType::Scalar);
         assert_eq!(node.operands[2].output_type, IJType::Tensor);
         assert_eq!(node.operands[3].output_type, IJType::Scalar);
+        Ok(())
+    }
+
+    #[test]
+    fn test_assign_functional_args() -> Result<()> {
+        let tokens = lexer("g($x:Fn(N,N->N)) -> S = /$x [1]")?;
+        let mut context = ASTContext::from_tokens(tokens.clone());
+        let node = parse_assign(&mut context)?;
+        println!("{:?}", node);
+        assert_eq!(node.op, Operation::Assign);
+        assert_eq!(node.operands.len(), 3);
+        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(
+            node.operands[0].output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Function(FunctionSignature::new(
+                    vec![IJType::Number, IJType::Number],
+                    vec![IJType::Number],
+                ))],
+                vec![IJType::Scalar]
+            ))
+        );
+        assert_eq!(node.operands[1].output_type, IJType::Scalar);
+        assert_eq!(
+            node.operands[2].output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Number, IJType::Number],
+                vec![IJType::Number],
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_assign_functional_args_composition() -> Result<()> {
+        let tokens = lexer("g($x:Fn(S->T), $y:Fn(T->S)) -> Fn(T->T) = ~@($x,$y)")?;
+        let mut context = ASTContext::from_tokens(tokens.clone());
+        let node = parse_assign(&mut context)?;
+        println!("{:?}", node);
+        assert_eq!(node.op, Operation::Assign);
+        assert_eq!(node.operands.len(), 4);
+        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(
+            node.operands[0].output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![
+                    IJType::Function(FunctionSignature::new(
+                        vec![IJType::Scalar],
+                        vec![IJType::Tensor],
+                    )),
+                    IJType::Function(FunctionSignature::new(
+                        vec![IJType::Tensor],
+                        vec![IJType::Scalar],
+                    ))
+                ],
+                vec![IJType::Function(FunctionSignature::new(
+                    vec![IJType::Tensor],
+                    vec![IJType::Tensor],
+                ))]
+            ))
+        );
+        assert_eq!(
+            node.operands[1].output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor],
+                vec![IJType::Tensor],
+            ))
+        );
+        assert_eq!(
+            node.operands[2].output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Scalar],
+                vec![IJType::Tensor],
+            ))
+        );
+        assert_eq!(
+            node.operands[3].output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor],
+                vec![IJType::Scalar],
+            ))
+        );
         Ok(())
     }
 }

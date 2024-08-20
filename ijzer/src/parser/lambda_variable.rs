@@ -1,4 +1,4 @@
-use super::ParseNode;
+use super::{ParseNode, ParseNodeFunctional};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
@@ -61,5 +61,53 @@ impl ParseNode for LambdaVariable {
             context.get_increment_id(),
         );
         Ok((Rc::new(node), slice))
+    }
+}
+
+impl ParseNodeFunctional for LambdaVariable {
+    fn next_node_functional_impl(
+        op: Token,
+        slice: TokenSlice,
+        context: &mut ASTContext,
+        needed_outputs: Option<&[Vec<IJType>]>,
+    ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
+        let name = match op {
+            Token::LambdaVariable(v) => v.name,
+            _ => unreachable!(),
+        };
+        let signature = match context.get_lambda_var_type(name.clone()) {
+            Some(IJType::Function(signature)) => signature,
+            Some(_) => return Err(SyntaxError::ExpectedFunction(name.clone()).into()),
+            _ => return Err(SyntaxError::UnknownSymbol(name.clone()).into()),
+        };
+
+        if let Some(outputs) = needed_outputs {
+            if outputs.iter().any(|output| output != &signature.output) {
+                return Err(SyntaxError::RequiredOutputsDoNotMatchFunctionOutputs(
+                    needed_outputs
+                        .unwrap()
+                        .iter()
+                        .map(|output| format!("{:?}", output))
+                        .collect::<Vec<String>>()
+                        .join(", "),
+                    signature
+                        .output
+                        .iter()
+                        .map(|output| output.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", "),
+                )
+                .into());
+            }
+        }
+
+        let node = Node::new(
+            Operation::LambdaVariable(name),
+            vec![],
+            IJType::Function(signature),
+            vec![],
+            context.get_increment_id(),
+        );
+        Ok((vec![Rc::new(node)], slice.move_start(1)?))
     }
 }

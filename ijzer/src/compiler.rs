@@ -1055,4 +1055,17 @@ mod tests {
         compiler_compare(input, expected, "i64");
         Ok(())
     }
+
+    #[test]
+    fn test_lambda_variable_functional() -> Result<()> {
+        let input = "g($x:Fn(N,N->N)) -> S = /$x [1]";
+        let expected = "";
+        // compiler_compare(input, expected, "i64");
+
+        let input = "g($x:Fn(S->T), $y:Fn(T->S)) -> Fn(T->T) = ~@($x,$y)";
+        let expected = "";
+        compiler_compare(input, expected, "i64");
+
+        Ok(())
+    }
 }

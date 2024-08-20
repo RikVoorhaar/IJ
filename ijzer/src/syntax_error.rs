@@ -134,4 +134,7 @@ pub enum SyntaxError {
 
     #[error("None of the function variants {0} match the types of the gathered operands {1}")]
     FunctionVariantMismatch(String, String),
+
+    #[error("None of the required outputs {0} match the function outputs {1}")]
+    RequiredOutputsDoNotMatchFunctionOutputs(String, String),
 }
