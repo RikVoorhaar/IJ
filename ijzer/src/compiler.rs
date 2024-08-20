@@ -294,7 +294,6 @@ impl CompileNode for LambdaVariable {
                 panic!("Expected 0 child, found {:?}", children.len());
             }
             let name_with_underscore = format!("_{}", name);
-            let number_type = compiler.number_type.clone();
             compiler
                 .inputs
                 .push((node.id, name_with_underscore.clone()));
