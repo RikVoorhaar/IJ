@@ -211,6 +211,35 @@ impl<T: Clone + Num> Tensor<T> {
         }
         Ok(output)
     }
+    pub fn dot(
+        &self,
+        other: &Tensor<T>,
+        f: impl Fn(&Tensor<T>) -> T,
+        g: impl Fn(T, T) -> T,
+    ) -> Result<Tensor<T>, &'static str> {
+        if self.shape.last() != other.shape.first() {
+            return Err("Incompatible shapes for dot product");
+        }
+        let left_shape = self.shape[..self.shape.len() - 1].to_vec();
+        let right_shape = other.shape[1..].to_vec();
+        let output_shape = [left_shape.clone(), right_shape.clone()].concat();
+        let middle_len = *self.shape.last().unwrap();
+        let mut result = Tensor::zeros(&output_shape);
+        let mut reduc_tensor = Tensor::zeros(&[middle_len]);
+        for idx_left in left_shape.iter().map(|&s| 0..s).multi_cartesian_product() {
+            for idx_right in right_shape.iter().map(|&s| 0..s).multi_cartesian_product() {
+                for idx_middle in 0..middle_len {
+                    let val1 = self.index(&[idx_left.clone(), vec![idx_middle]].concat());
+                    let val2 = other.index(&[vec![idx_middle], idx_right.clone()].concat());
+                    reduc_tensor[&[idx_middle]] = g(val1.clone(), val2.clone());
+                }
+                let val_reduc = f(&reduc_tensor);
+                *result.index_mut(&[idx_left.clone(), idx_right.clone()].concat()) = val_reduc;
+            }
+        }
+
+        Ok(result)
+    }
 }
 impl<T: Clone + Float> Tensor<T> {
     pub fn randn(shape: &[usize]) -> Tensor<T> {
@@ -567,5 +596,33 @@ mod tests {
         let mut reshaped_tensor = Tensor::from_vec(vec![5.0], Some(vec![1]));
         reshaped_tensor.reshape(&[1]).unwrap();
         assert_eq!(reshaped_tensor.extract_scalar().unwrap(), 5.0);
+    }
+
+    #[test]
+    fn test_dot_matrix_multiplication_diagonal() {
+        let tensor1 = Tensor::from_vec(vec![1.0, 0.0, 0.0, 1.0], Some(vec![2, 2]));
+        let tensor2 = Tensor::from_vec(vec![2.0, 0.0, 0.0, 3.0], Some(vec![2, 2]));
+        let result = tensor1
+            .dot(
+                &tensor2,
+                |x| x.reduce(|a, b| a + b).extract_scalar().unwrap(),
+                |a, b| a * b,
+            )
+            .unwrap();
+        assert_eq!(result.to_vec(), vec![2.0, 0.0, 0.0, 3.0]);
+    }
+
+    #[test]
+    fn test_dot_matrix_multiplication_non_diagonal() {
+        let tensor1 = Tensor::from_vec(vec![1.0, 2.0, 3.0, 4.0], Some(vec![2, 2]));
+        let tensor2 = Tensor::from_vec(vec![5.0, 6.0, 7.0, 8.0], Some(vec![2, 2]));
+        let result = tensor1
+            .dot(
+                &tensor2,
+                |x| x.reduce(|a, b| a + b).extract_scalar().unwrap(),
+                |a, b| a * b,
+            )
+            .unwrap();
+        assert_eq!(result.to_vec(), vec![19.0, 22.0, 43.0, 50.0]);
     }
 }
