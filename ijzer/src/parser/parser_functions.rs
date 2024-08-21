@@ -158,10 +158,7 @@ mod tests {
         let (node, context) = result.unwrap();
         assert_eq!(node.op, Operation::Nothing);
         let expected_var = Variable {
-            typ: IJType::Function(FunctionSignature {
-                input: vec![IJType::Tensor, IJType::Tensor],
-                output: vec![IJType::Tensor],
-            }),
+            typ: IJType::tensor_function(2),
             name: "add".to_string(),
         };
         let actual_var = context.symbols.get("add").unwrap();
@@ -175,10 +172,7 @@ mod tests {
         let (node, context) = result.unwrap();
         assert_eq!(node.op, Operation::Nothing);
         let expected_var = Variable {
-            typ: IJType::Function(FunctionSignature {
-                input: vec![IJType::Scalar],
-                output: vec![IJType::Tensor],
-            }),
+            typ: IJType::Function(FunctionSignature::new(vec![IJType::Scalar], IJType::Tensor)),
             name: "scale".to_string(),
         };
         let actual_var = context.symbols.get("scale").unwrap();

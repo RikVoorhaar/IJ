@@ -29,9 +29,7 @@ impl ParseNode for Apply {
             .collect::<Vec<IJType>>();
 
         let node_input_types = [vec![function_node.output_type.clone()], operands_types].concat();
-        let output_type = signature.output.first().ok_or(SyntaxError::InvalidType(
-            "Function has no output type".to_string(),
-        ))?;
+        let output_type = *signature.output;
         let operands = [vec![function_node.clone()], operands].concat();
 
         Ok((

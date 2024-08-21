@@ -107,21 +107,11 @@ pub fn find_matching_parenthesis(
     }
 }
 
-pub fn check_ok_needed_outputs(
-    needed_outputs: Option<&[Vec<IJType>]>,
-    actual_outputs: &[IJType],
-) -> bool {
-    let num_outputs = actual_outputs.len();
-    if let Some(needed_outputs) = needed_outputs {
-        if needed_outputs
-            .iter()
-            .filter(|outputs| outputs.len() <= num_outputs)
-            .all(|outputs| actual_outputs != &outputs[..num_outputs])
-        {
-            return false;
-        }
+pub fn check_ok_needed_outputs(needed_outputs: Option<&[IJType]>, actual_output: &IJType) -> bool {
+    match needed_outputs {
+        Some(outputs) => outputs.iter().any(|output| actual_output == output),
+        None => true,
     }
-    true
 }
 
 /// Splits out a token slice into a vector of token slices, separated by commas.

@@ -57,7 +57,7 @@ impl ParseNodeFunctional for LParen {
         _op: Token,
         slice: TokenSlice,
         context: &mut ASTContext,
-        needed_outputs: Option<&[Vec<IJType>]>,
+        needed_outputs: Option<&[IJType]>,
     ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
         let slice = slice.move_start(1)?;
         let rparen_index =

@@ -75,7 +75,7 @@ trait ParseNodeFunctional {
         op: Token,
         slice: TokenSlice,
         context: &mut ASTContext,
-        needed_outputs: Option<&[Vec<IJType>]>,
+        needed_outputs: Option<&[IJType]>,
     ) -> Result<(Vec<Rc<Node>>, TokenSlice)>;
 }
 
@@ -107,7 +107,7 @@ pub fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node
 fn next_node_functional(
     slice: TokenSlice,
     context: &mut ASTContext,
-    needed_outputs: Option<&[Vec<IJType>]>,
+    needed_outputs: Option<&[IJType]>,
 ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
     let token = context.get_token_at_index(slice.start)?;
     let (nodes, rest) = match token {
@@ -241,10 +241,7 @@ mod tests {
         assert!(result.is_ok());
         let (node, context) = result.unwrap();
         assert_eq!(node.op, Operation::Assign);
-        let expected_signature = FunctionSignature {
-            input: vec![IJType::Tensor],
-            output: vec![IJType::Tensor],
-        };
+        let expected_signature = FunctionSignature::tensor_function(1);
         assert_eq!(
             node.input_types,
             vec![IJType::Function(expected_signature.clone()), IJType::Tensor]
@@ -262,10 +259,7 @@ mod tests {
         assert_eq!(second_operand.output_type, IJType::Tensor);
 
         let expected_var = Variable {
-            typ: IJType::Function(FunctionSignature {
-                input: vec![IJType::Tensor],
-                output: vec![IJType::Tensor],
-            }),
+            typ: IJType::tensor_function(1),
             name: "x".to_string(),
         };
         let actual_var = context.symbols.get("x").unwrap();

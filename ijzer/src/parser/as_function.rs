@@ -14,7 +14,7 @@ impl AsFunction {
     fn next_node_functional_part(
         slice: TokenSlice,
         context: &mut ASTContext,
-        needed_outputs: Option<&[Vec<IJType>]>,
+        needed_outputs: Option<&[IJType]>,
     ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
         let (nodes, rest) = next_node_functional(slice, context, needed_outputs)?;
 
@@ -82,7 +82,7 @@ impl ParseNodeFunctional for AsFunction {
         _op: Token,
         slice: TokenSlice,
         context: &mut ASTContext,
-        needed_outputs: Option<&[Vec<IJType>]>,
+        needed_outputs: Option<&[IJType]>,
     ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
         let slice = slice.move_start(1)?;
         AsFunction::next_node_functional_part(slice, context, needed_outputs)
@@ -103,7 +103,7 @@ mod tests {
 
         let node = parse_str("~f", &mut context)?;
         assert_eq!(node.op, Operation::Function("f".to_string()));
-        assert_eq!(node.output_type, IJType::scalar_function(2, 1));
+        assert_eq!(node.output_type, IJType::scalar_function(2));
         Ok(())
     }
 
@@ -112,7 +112,7 @@ mod tests {
         let (node, _) = parse_str_no_context("~+:Fn(S,S->S)")?;
 
         assert_eq!(node.op, Operation::Add);
-        assert_eq!(node.output_type, IJType::scalar_function(2, 1));
+        assert_eq!(node.output_type, IJType::scalar_function(2));
         Ok(())
     }
 
@@ -132,7 +132,7 @@ mod tests {
             node.output_type,
             IJType::Function(FunctionSignature::new(
                 vec![IJType::Tensor],
-                vec![IJType::Scalar]
+                IJType::Scalar
             ))
         );
         Ok(())
@@ -143,7 +143,7 @@ mod tests {
         let (node, _) = parse_str_no_context("~~+:Fn(S,S->S)")?;
 
         assert_eq!(node.op, Operation::Add);
-        assert_eq!(node.output_type, IJType::scalar_function(2, 1));
+        assert_eq!(node.output_type, IJType::scalar_function(2));
         Ok(())
     }
 }

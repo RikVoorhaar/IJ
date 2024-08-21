@@ -164,7 +164,7 @@ impl CompilerContext {
                     .iter()
                     .map(|t| self.annotation_from_type(t))
                     .collect::<Vec<_>>();
-                let output_type = self.annotation_from_type(&signature.output[0]);
+                let output_type = self.annotation_from_type(&signature.output);
                 quote! {
                     fn(#(#input_types),*) -> #output_type
                 }
@@ -389,7 +389,7 @@ impl CompileNode for Add {
                 }
             }
             IJType::Function(f) => {
-                let output_type = f.output.first().unwrap();
+                let output_type = *f.output;
                 match output_type {
                     IJType::Number => {
                         quote! { |a: #number_t, b: #number_t| a + b }
@@ -435,7 +435,7 @@ impl CompileNode for Subtract {
                     }
                 }
                 IJType::Function(f) => {
-                    let output_type = f.output.first().unwrap();
+                    let output_type = *f.output;
                     match output_type {
                         IJType::Number => {
                             quote! { |a: #number_t, b: #number_t| a - b }
@@ -482,7 +482,7 @@ impl CompileNode for Negate {
                     }
                 }
                 IJType::Function(f) => {
-                    let output_type = f.output.first().unwrap();
+                    let output_type = *f.output;
                     match output_type {
                         IJType::Number => {
                             quote! { |a: #number_t| -a }
@@ -530,7 +530,7 @@ impl CompileNode for Multiply {
                     }
                 }
                 IJType::Function(f) => {
-                    let output_type = f.output.first().unwrap();
+                    let output_type = *f.output;
                     match output_type {
                         IJType::Number => {
                             quote! { |a: #number_t, b: #number_t| a * b }
@@ -804,8 +804,8 @@ impl TypeConversion {
                 }
                 let input_stream = quote! {(#child_stream)(#(#input_conversions),*)};
                 let converted_stream = Self::convert_type(
-                    signature_from.output.first().unwrap(),
-                    signature_to.output.first().unwrap(),
+                    &signature_from.output,
+                    &signature_to.output,
                     input_stream,
                     compiler,
                     id,
