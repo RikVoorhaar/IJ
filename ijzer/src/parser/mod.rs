@@ -101,6 +101,9 @@ pub fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node
         Token::TypeConversion => TypeConversion::next_node(op.clone(), rest, context),
         Token::AsFunction => AsFunction::next_node(op.clone(), rest, context),
         Token::Apply => Apply::next_node(op.clone(), rest, context),
+        Token::GeneralizedContraction => {
+            GeneralizedContraction::next_node(op.clone(), rest, context)
+        }
         _ => Err(SyntaxError::UnexpectedToken(op.clone()).into()),
     }
 }
@@ -163,6 +166,14 @@ fn next_node_functional(
             context,
             needed_outputs,
         )?,
+        Token::GeneralizedContraction => {
+            GeneralizedContraction::next_node_functional_impl(
+                Token::GeneralizedContraction,
+                slice,
+                context,
+                needed_outputs,
+            )?
+        }
         _ => {
             return Err(SyntaxError::SliceCannotBeParsedAsFunction(
                 context.token_slice_to_string(slice),

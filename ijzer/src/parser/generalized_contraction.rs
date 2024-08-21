@@ -1,6 +1,6 @@
 use super::{
-    check_ok_needed_outputs, gather_operands, next_node_functional, next_node_specific_function,
-    ParseNode, ParseNodeFunctional,
+    check_ok_needed_outputs, gather_operands, next_node_specific_function, ParseNode,
+    ParseNodeFunctional,
 };
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};
@@ -50,5 +50,63 @@ impl ParseNode for GeneralizedContraction {
             context.get_increment_id(),
         );
         Ok((Rc::new(node), rest))
+    }
+}
+impl ParseNodeFunctional for GeneralizedContraction {
+    fn next_node_functional_impl(
+        _op: Token,
+        slice: TokenSlice,
+        context: &mut ASTContext,
+        needed_outputs: Option<&[IJType]>,
+    ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
+        let slice = slice.move_start(1)?;
+        if !check_ok_needed_outputs(needed_outputs, &IJType::Tensor) {
+            return Err(SyntaxError::RequiredOutputsDoNotMatchFunctionOutputs(
+                format!("{:?}", needed_outputs),
+                IJType::Tensor.to_string(),
+            )
+            .into());
+        }
+        let (f_node, g_node, rest) = Self::get_functional_part(slice, context)?;
+        let node = Node::new(
+            Operation::GeneralizedContraction,
+            vec![
+                IJType::Function(Self::first_signature()),
+                IJType::Function(Self::second_signature()),
+            ],
+            IJType::tensor_function(2),
+            vec![f_node, g_node],
+            context.get_increment_id(),
+        );
+        Ok((vec![Rc::new(node)], rest))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::parse_str_no_context;
+
+    #[test]
+    fn test_generalized_contraction() -> Result<()> {
+        let (node, _) = parse_str_no_context("?/+* [1] [2]")?;
+        assert_eq!(node.op, Operation::GeneralizedContraction);
+        Ok(())
+    }
+
+    #[test]
+    fn test_generalized_contraction_functional() -> Result<()> {
+        let (node, _) = parse_str_no_context("~?/+*")?;
+        assert_eq!(node.op, Operation::GeneralizedContraction);
+        Ok(())
+    }
+    #[test]
+    fn test_generalized_contraction_functional_apply() -> Result<()> {
+        let (node, _) = parse_str_no_context(".~?/+* [1] [2]")?;
+        assert_eq!(node.op, Operation::Apply);
+        let node = node.operands[0].clone();
+        assert_eq!(node.op, Operation::GeneralizedContraction);
+
+        Ok(())
     }
 }
