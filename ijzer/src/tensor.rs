@@ -224,19 +224,60 @@ impl<T: Clone + Num> Tensor<T> {
         let right_shape = other.shape[1..].to_vec();
         let output_shape = [left_shape.clone(), right_shape.clone()].concat();
         let middle_len = *self.shape.last().unwrap();
-        let mut result = Tensor::zeros(&output_shape);
         let mut reduc_tensor = Tensor::zeros(&[middle_len]);
-        for idx_left in left_shape.iter().map(|&s| 0..s).multi_cartesian_product() {
-            for idx_right in right_shape.iter().map(|&s| 0..s).multi_cartesian_product() {
+        let result = match (left_shape.len(), right_shape.len()) {
+            (0, 0) => {
                 for idx_middle in 0..middle_len {
-                    let val1 = self.index(&[idx_left.clone(), vec![idx_middle]].concat());
-                    let val2 = other.index(&[vec![idx_middle], idx_right.clone()].concat());
+                    let val1 = self.index(&[idx_middle]);
+                    let val2 = other.index(&[idx_middle]);
                     reduc_tensor[&[idx_middle]] = g(val1.clone(), val2.clone());
                 }
                 let val_reduc = f(&reduc_tensor);
-                *result.index_mut(&[idx_left.clone(), idx_right.clone()].concat()) = val_reduc;
+                Tensor::scalar(val_reduc)
             }
-        }
+            (0, _) => {
+                let mut result = Tensor::zeros(&output_shape);
+                for idx_right in right_shape.iter().map(|&s| 0..s).multi_cartesian_product() {
+                    for idx_middle in 0..middle_len {
+                        let val1 = self.index(&[idx_middle]);
+                        let val2 = other.index(&[vec![idx_middle], idx_right.clone()].concat());
+                        reduc_tensor[&[idx_middle]] = g(val1.clone(), val2.clone());
+                    }
+                    let val_reduc = f(&reduc_tensor);
+                    *result.index_mut(&idx_right.clone()) = val_reduc;
+                }
+                result
+            }
+            (_, 0) => {
+                let mut result = Tensor::zeros(&output_shape);
+                for idx_left in left_shape.iter().map(|&s| 0..s).multi_cartesian_product() {
+                    for idx_middle in 0..middle_len {
+                        let val1 = self.index(&[idx_left.clone(), vec![idx_middle]].concat());
+                        let val2 = other.index(&[idx_middle]);
+                        reduc_tensor[&[idx_middle]] = g(val1.clone(), val2.clone());
+                    }
+                    let val_reduc = f(&reduc_tensor);
+                    *result.index_mut(&idx_left.clone()) = val_reduc;
+                }
+                result
+            }
+            (_, _) => {
+                let mut result = Tensor::zeros(&output_shape);
+                for idx_left in left_shape.iter().map(|&s| 0..s).multi_cartesian_product() {
+                    for idx_right in right_shape.iter().map(|&s| 0..s).multi_cartesian_product() {
+                        for idx_middle in 0..middle_len {
+                            let val1 = self.index(&[idx_left.clone(), vec![idx_middle]].concat());
+                            let val2 = other.index(&[vec![idx_middle], idx_right.clone()].concat());
+                            reduc_tensor[&[idx_middle]] = g(val1.clone(), val2.clone());
+                        }
+                        let val_reduc = f(&reduc_tensor);
+                        *result.index_mut(&[idx_left.clone(), idx_right.clone()].concat()) =
+                            val_reduc;
+                    }
+                }
+                result
+            }
+        };
 
         Ok(result)
     }
@@ -624,5 +665,47 @@ mod tests {
             )
             .unwrap();
         assert_eq!(result.to_vec(), vec![19.0, 22.0, 43.0, 50.0]);
+    }
+
+    #[test]
+    fn test_dot_matrix_multiplication_vector() {
+        let tensor1 = Tensor::from_vec(vec![1.0, 2.0], Some(vec![2]));
+        let tensor2 = Tensor::from_vec(vec![3.0, 4.0], Some(vec![2]));
+        let result = tensor1
+            .generalized_contraction(
+                &tensor2,
+                |x| x.reduce(|a, b| a + b).extract_scalar().unwrap(),
+                |a, b| a * b,
+            )
+            .unwrap();
+        assert_eq!(result.to_vec(), vec![11.0]);
+    }
+
+    #[test]
+    fn test_dot_matrix_multiplication_vector_matrix() {
+        let tensor1 = Tensor::from_vec(vec![1.0, 2.0], Some(vec![2]));
+        let tensor2 = Tensor::from_vec(vec![3.0, 4.0, 5.0, 6.0], Some(vec![2, 2]));
+        let result = tensor1
+            .generalized_contraction(
+                &tensor2,
+                |x| x.reduce(|a, b| a + b).extract_scalar().unwrap(),
+                |a, b| a * b,
+            )
+            .unwrap();
+        assert_eq!(result.to_vec(), vec![13.0, 16.0]);
+    }
+
+    #[test]
+    fn test_dot_matrix_multiplication_matrix_vector() {
+        let tensor1 = Tensor::from_vec(vec![1.0, 2.0, 3.0, 4.0], Some(vec![2, 2]));
+        let tensor2 = Tensor::from_vec(vec![5.0, 6.0], Some(vec![2]));
+        let result = tensor1
+            .generalized_contraction(
+                &tensor2,
+                |x| x.reduce(|a, b| a + b).extract_scalar().unwrap(),
+                |a, b| a * b,
+            )
+            .unwrap();
+        assert_eq!(result.to_vec(), vec![17.0, 39.0]);
     }
 }
