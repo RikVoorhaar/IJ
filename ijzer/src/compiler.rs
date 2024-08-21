@@ -144,7 +144,9 @@ impl CompilerContext {
             Operation::Apply => Apply::compile(node, self, child_streams)?,
             Operation::TypeConversion => TypeConversion::compile(node, self, child_streams)?,
             Operation::AsFunction => AsFunction::compile(node, self, child_streams)?,
-            // _ => NotImplemented::compile(node, self, child_streams)?,
+            Operation::GeneralizedContraction => {
+                GeneralizedContraction::compile(node, self, child_streams)?
+            } // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
         Ok(stream)
@@ -859,6 +861,45 @@ impl CompileNode for AsFunction {
     }
 }
 
+struct GeneralizedContraction;
+impl CompileNode for GeneralizedContraction {
+    fn compile(
+        node: Rc<Node>,
+        compiler: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        let child_streams = node
+            .operands
+            .iter()
+            .map(|n| child_streams[&n.id].clone())
+            .collect::<Vec<_>>();
+        let tensor_t = compiler.annotation_from_type(&IJType::Tensor);
+        let f_stream = child_streams[0].clone();
+        let f_stream_extract = quote! {
+            (|z: #tensor_t| (#f_stream)(z)).extract_scalar().unwrap()
+        };
+        let g_stream = child_streams[1].clone();
+        match node.operands.len() {
+            2 => Ok(quote! {
+                |x: #tensor_t, y: #tensor_t| x.generalized_contraction(&y, #f_stream_extract, #g_stream).unwrap()
+            }),
+            4 => {
+                let op1 = child_streams[2].clone();
+                let op2 = child_streams[3].clone();
+                Ok(quote! {
+                    #op1.generalized_contraction(&#op2, #f_stream_extract, #g_stream).unwrap()
+                })
+            }
+            _ => {
+                panic!(
+                    "Expected 2 or 4 operands for GeneralizedContraction, found {}",
+                    node.operands.len()
+                );
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1112,6 +1153,24 @@ mod tests {
 
         let input = "g($x:Fn(S->T), $y:Fn(T->S)) -> Fn(T->T) = ~@($x,$y)";
         let expected = "let g = { | _x : fn (ijzer :: tensor :: Tensor :: < i64 >) -> ijzer :: tensor :: Tensor :: < i64 > , _y : fn (ijzer :: tensor :: Tensor :: < i64 >) -> ijzer :: tensor :: Tensor :: < i64 > | | _4_1 : ijzer :: tensor :: Tensor :: < i64 > | (_x) ((_y) (_4_1)) } ;";
+        compiler_compare(input, expected, "i64");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_generalized_contraction() -> Result<()> {
+        let input = "?/+* [1] [2]";
+        let expected = "ijzer :: tensor :: Tensor :: < i64 > :: from_vec (vec ! [1] , None) . generalized_contraction (& ijzer :: tensor :: Tensor :: < i64 > :: from_vec (vec ! [2] , None) , (| z : ijzer :: tensor :: Tensor :: < i64 > | (| _1 : ijzer :: tensor :: Tensor :: < i64 > | _1 . reduce (| a : i64 , b : i64 | a + b)) (z)) . extract_scalar () . unwrap () , | a : i64 , b : i64 | a * b) . unwrap ()";
+        compiler_compare(input, expected, "i64");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_generalized_contraction_functional() -> Result<()> {
+        let input = "~?/+*";
+        let expected = "| x : ijzer :: tensor :: Tensor :: < i64 > , y : ijzer :: tensor :: Tensor :: < i64 > | x . generalized_contraction (& y , (| z : ijzer :: tensor :: Tensor :: < i64 > | (| _1 : ijzer :: tensor :: Tensor :: < i64 > | _1 . reduce (| a : i64 , b : i64 | a + b)) (z)) . extract_scalar () . unwrap () , | a : i64 , b : i64 | a * b) . unwrap ()";
         compiler_compare(input, expected, "i64");
 
         Ok(())

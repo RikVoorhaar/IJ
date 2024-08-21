@@ -54,11 +54,14 @@ mod assign;
 mod apply;
 use apply::Apply;
 
+mod generalized_contraction;
+use generalized_contraction::GeneralizedContraction;
+
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
-use crate::types::IJType;
+use crate::types::{FunctionSignature, IJType};
 use anyhow::Result;
 use std::rc::Rc;
 
@@ -98,6 +101,9 @@ pub fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node
         Token::TypeConversion => TypeConversion::next_node(op.clone(), rest, context),
         Token::AsFunction => AsFunction::next_node(op.clone(), rest, context),
         Token::Apply => Apply::next_node(op.clone(), rest, context),
+        Token::GeneralizedContraction => {
+            GeneralizedContraction::next_node(op.clone(), rest, context)
+        }
         _ => Err(SyntaxError::UnexpectedToken(op.clone()).into()),
     }
 }
@@ -160,6 +166,14 @@ fn next_node_functional(
             context,
             needed_outputs,
         )?,
+        Token::GeneralizedContraction => {
+            GeneralizedContraction::next_node_functional_impl(
+                Token::GeneralizedContraction,
+                slice,
+                context,
+                needed_outputs,
+            )?
+        }
         _ => {
             return Err(SyntaxError::SliceCannotBeParsedAsFunction(
                 context.token_slice_to_string(slice),
@@ -169,6 +183,29 @@ fn next_node_functional(
         }
     };
     Ok((nodes, rest))
+}
+
+/// Like next_node_functional, but will only match a specific function signature.
+pub fn next_node_specific_function(
+    slice: TokenSlice,
+    context: &mut ASTContext,
+    signature: FunctionSignature,
+) -> Result<(Rc<Node>, TokenSlice)> {
+    let function_type = IJType::Function(signature.clone());
+    let (function_options, rest) =
+        next_node_functional(slice, context, Some(&[*signature.output]))?;
+    let function = function_options
+        .into_iter()
+        .find(|n| n.output_type == function_type);
+
+    if function.is_none() {
+        return Err(SyntaxError::TypeError(
+            function_type.to_string(),
+            "Function type not found".to_string(),
+        )
+        .into());
+    }
+    Ok((function.unwrap(), rest))
 }
 
 #[cfg(test)]
