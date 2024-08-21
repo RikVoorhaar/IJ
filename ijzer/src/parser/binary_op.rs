@@ -62,12 +62,12 @@ fn _next_node_functional_binary(
     operation: Operation,
     slice: TokenSlice,
     context: &mut ASTContext,
-    needed_outputs: Option<&[Vec<IJType>]>,
+    needed_outputs: Option<&[IJType]>,
 ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
     let rest = slice.move_start(1)?;
     let mut nodes = vec![];
-    if check_ok_needed_outputs(needed_outputs, &[IJType::Scalar]) {
-        let output_type = vec![IJType::Scalar];
+    if check_ok_needed_outputs(needed_outputs, &IJType::Scalar) {
+        let output_type = IJType::Scalar;
         let input_type = vec![IJType::Scalar, IJType::Scalar];
         nodes.push(Rc::new(Node::new(
             operation.clone(),
@@ -77,8 +77,8 @@ fn _next_node_functional_binary(
             context.get_increment_id(),
         )));
     }
-    if check_ok_needed_outputs(needed_outputs, &[IJType::Number]) {
-        let output_type = vec![IJType::Number];
+    if check_ok_needed_outputs(needed_outputs, &IJType::Number) {
+        let output_type = IJType::Number;
         let input_type = vec![IJType::Number, IJType::Number];
         nodes.push(Rc::new(Node::new(
             operation.clone(),
@@ -88,8 +88,8 @@ fn _next_node_functional_binary(
             context.get_increment_id(),
         )));
     }
-    if check_ok_needed_outputs(needed_outputs, &[IJType::Tensor]) {
-        let output_type = vec![IJType::Tensor];
+    if check_ok_needed_outputs(needed_outputs, &IJType::Tensor) {
+        let output_type = IJType::Tensor;
         let input_types = vec![
             vec![IJType::Tensor, IJType::Tensor],
             vec![IJType::Scalar, IJType::Tensor],
@@ -121,7 +121,7 @@ impl ParseNodeFunctional for Add {
         _op: Token,
         slice: TokenSlice,
         context: &mut ASTContext,
-        needed_outputs: Option<&[Vec<IJType>]>,
+        needed_outputs: Option<&[IJType]>,
     ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
         _next_node_functional_binary(Operation::Add, slice, context, needed_outputs)
     }
@@ -132,7 +132,7 @@ impl ParseNodeFunctional for Multiply {
         _op: Token,
         slice: TokenSlice,
         context: &mut ASTContext,
-        needed_outputs: Option<&[Vec<IJType>]>,
+        needed_outputs: Option<&[IJType]>,
     ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
         _next_node_functional_binary(Operation::Multiply, slice, context, needed_outputs)
     }

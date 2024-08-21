@@ -88,58 +88,44 @@ impl ParseNodeFunctional for MinusOp {
         _op: Token,
         slice: TokenSlice,
         context: &mut ASTContext,
-        needed_outputs: Option<&[Vec<IJType>]>,
+        needed_outputs: Option<&[IJType]>,
     ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
         let rest = slice.move_start(1)?;
         let mut nodes = vec![];
-        if check_ok_needed_outputs(needed_outputs, &[IJType::Scalar]) {
-            let output_type = vec![IJType::Scalar];
+        if check_ok_needed_outputs(needed_outputs, &IJType::Scalar) {
             nodes.push(Rc::new(Node::new(
                 Operation::Subtract,
                 vec![],
-                IJType::Function(FunctionSignature::new(
-                    vec![IJType::Scalar, IJType::Scalar],
-                    output_type.clone(),
-                )),
+                IJType::scalar_function(2),
                 vec![],
                 context.get_increment_id(),
             )));
             nodes.push(Rc::new(Node::new(
                 Operation::Negate,
                 vec![],
-                IJType::Function(FunctionSignature::new(
-                    vec![IJType::Scalar],
-                    output_type.clone(),
-                )),
+                IJType::scalar_function(1),
                 vec![],
                 context.get_increment_id(),
             )));
         }
-        if check_ok_needed_outputs(needed_outputs, &[IJType::Number]) {
-            let output_type = vec![IJType::Number];
+        if check_ok_needed_outputs(needed_outputs, &IJType::Number) {
             nodes.push(Rc::new(Node::new(
                 Operation::Subtract,
                 vec![],
-                IJType::Function(FunctionSignature::new(
-                    vec![IJType::Number, IJType::Number],
-                    output_type.clone(),
-                )),
+                IJType::number_function(2),
                 vec![],
                 context.get_increment_id(),
             )));
             nodes.push(Rc::new(Node::new(
                 Operation::Negate,
                 vec![],
-                IJType::Function(FunctionSignature::new(
-                    vec![IJType::Number],
-                    output_type.clone(),
-                )),
+                IJType::number_function(1),
                 vec![],
                 context.get_increment_id(),
             )));
         }
-        if check_ok_needed_outputs(needed_outputs, &[IJType::Tensor]) {
-            let output_type = vec![IJType::Tensor];
+        if check_ok_needed_outputs(needed_outputs, &IJType::Tensor) {
+            let output_type = IJType::Tensor;
             let input_types = vec![
                 vec![IJType::Tensor, IJType::Tensor],
                 vec![IJType::Scalar, IJType::Tensor],

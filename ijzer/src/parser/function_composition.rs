@@ -15,11 +15,12 @@ struct FunctionChain {
     functions: Vec<Rc<Node>>,
 }
 
-fn _get_output_type_from_function(function: Rc<Node>) -> Result<Vec<IJType>, SyntaxError> {
-    match &function.output_type {
-        IJType::Function(function_signature) => Ok(function_signature.output.clone()),
-        _ => Err(SyntaxError::NotPureFunction(format!("{:?}", function))),
-    }
+fn _get_output_type_from_function(function: Rc<Node>) -> Result<IJType, SyntaxError> {
+    function
+        .output_type
+        .extract_signature()
+        .map(|sig| *sig.output)
+        .ok_or(SyntaxError::NotPureFunction(format!("{:?}", function)))
 }
 
 fn _get_input_types_from_function(function: Rc<Node>) -> Result<Vec<IJType>, SyntaxError> {
@@ -44,7 +45,7 @@ impl FunctionChain {
         Self { functions: vec![] }
     }
 
-    fn get_output_type(&self) -> Result<Vec<IJType>, SyntaxError> {
+    fn get_output_type(&self) -> Result<IJType, SyntaxError> {
         let first_function = self.functions.first().ok_or_else(|| {
             SyntaxError::FunctionChainInconsistency("Function chain is empty".to_string())
         })?;
@@ -93,15 +94,7 @@ impl FunctionChain {
                 );
             }
             let prev_input_type = prev_input_types[0].clone();
-            let next_output_types = _get_output_type_from_function(next_function.clone())?;
-            if next_output_types.len() != 1 {
-                return Err(SyntaxError::FunctionChainInconsistency(format!(
-                    "Function is not first in chain but does not have exactly one output type. Instead it has {:?}",
-                    next_output_types
-                ))
-                );
-            }
-            let next_output_type = next_output_types[0].clone();
+            let next_output_type = _get_output_type_from_function(next_function.clone())?;
             if prev_input_type != next_output_type {
                 return Err(SyntaxError::FunctionChainInconsistency(format!(
                     "Function chain is not consistent: {:?} -> {:?}",
@@ -130,11 +123,7 @@ impl FunctionChain {
         }
         let last_input_type = last_input_types[0].clone();
 
-        let node_output_types = _get_output_type_from_function(node.clone())?;
-        if node_output_types.len() != 1 {
-            return Ok(None);
-        }
-        let node_output_type = node_output_types[0].clone();
+        let node_output_type = _get_output_type_from_function(node.clone())?;
         if last_input_type != node_output_type {
             return Ok(None);
         }
@@ -267,10 +256,6 @@ impl ParseNode for FunctionComposition {
         all_nodes.extend(value_operands);
 
         let output_type = matching_chain.get_output_type()?;
-        if output_type.len() != 1 {
-            return Err(SyntaxError::MultipleOutputs.into());
-        }
-        let output_type = output_type[0].clone();
 
         Ok((
             Rc::new(Node::new(
@@ -290,7 +275,7 @@ impl ParseNodeFunctional for FunctionComposition {
         _op: Token,
         slice: TokenSlice,
         context: &mut ASTContext,
-        needed_outputs: Option<&[Vec<IJType>]>,
+        needed_outputs: Option<&[IJType]>,
     ) -> Result<(Vec<Rc<Node>>, TokenSlice), Error> {
         let slice = slice.move_start(1)?;
         let (chains, remainder) = Self::get_chains_from_slice(slice, context)?;
@@ -343,12 +328,8 @@ mod tests {
     use crate::parser::{parse_str, parse_str_no_context};
     use crate::types::FunctionSignature;
 
-    fn _create_function_node(
-        input_types: Vec<IJType>,
-        output_types: Vec<IJType>,
-        id: usize,
-    ) -> Rc<Node> {
-        let function_signature = FunctionSignature::new(input_types, output_types);
+    fn _create_function_node(input_types: Vec<IJType>, output_type: IJType, id: usize) -> Rc<Node> {
+        let function_signature = FunctionSignature::new(input_types, output_type);
         Rc::new(Node::new(
             Operation::Function("test_functoin".to_string()),
             vec![],
@@ -377,7 +358,7 @@ mod tests {
     #[test]
     fn test_function_chain_extend1() {
         let chain = FunctionChain::empty();
-        let node = _create_function_node(vec![IJType::Tensor], vec![IJType::Tensor], 0);
+        let node = _create_function_node(vec![IJType::Tensor], IJType::Tensor, 0);
         let result = chain.extend(node);
         assert!(result.is_ok());
         let new_chain = result.unwrap().unwrap();
@@ -387,8 +368,8 @@ mod tests {
     #[test]
     fn test_function_chain_extend2() {
         let chain = FunctionChain::empty();
-        let node1 = _create_function_node(vec![IJType::Tensor], vec![IJType::Tensor], 0);
-        let node2 = _create_function_node(vec![IJType::Tensor], vec![IJType::Tensor], 1);
+        let node1 = _create_function_node(vec![IJType::Tensor], IJType::Tensor, 0);
+        let node2 = _create_function_node(vec![IJType::Tensor], IJType::Tensor, 1);
         let result = chain.extend(node1);
         assert!(result.is_ok());
         let new_chain = result.unwrap().unwrap();
@@ -401,8 +382,8 @@ mod tests {
     #[test]
     fn test_function_chain_extend_incompatible() {
         let chain = FunctionChain::empty();
-        let node1 = _create_function_node(vec![IJType::Tensor], vec![IJType::Tensor], 0);
-        let node2 = _create_function_node(vec![IJType::Tensor], vec![IJType::Scalar], 1);
+        let node1 = _create_function_node(vec![IJType::Tensor], IJType::Tensor, 0);
+        let node2 = _create_function_node(vec![IJType::Tensor], IJType::Scalar, 1);
         let result = chain.extend(node1);
         assert!(result.is_ok());
         let new_chain = result.unwrap().unwrap();
@@ -430,19 +411,10 @@ mod tests {
         let node1 = operands[0].clone();
         assert_eq!(
             node1.output_type,
-            IJType::Function(FunctionSignature::new(
-                vec![IJType::Scalar],
-                vec![IJType::Scalar],
-            ))
+            IJType::Function(FunctionSignature::new(vec![IJType::Scalar], IJType::Scalar,))
         );
         let node2 = operands[1].clone();
-        assert_eq!(
-            node2.output_type,
-            IJType::Function(FunctionSignature::new(
-                vec![IJType::Scalar, IJType::Scalar],
-                vec![IJType::Scalar],
-            ))
-        );
+        assert_eq!(node2.output_type, IJType::scalar_function(2));
         let node3 = operands[2].clone();
         assert_eq!(node3.output_type, IJType::Scalar);
         let node4 = operands[3].clone();
@@ -457,19 +429,13 @@ mod tests {
         let operands = composition_node.operands.clone();
         assert_eq!(operands.len(), 4);
         let node1 = operands[0].clone();
-        assert_eq!(
-            node1.output_type,
-            IJType::Function(FunctionSignature::new(
-                vec![IJType::Tensor],
-                vec![IJType::Tensor],
-            ))
-        );
+        assert_eq!(node1.output_type, IJType::tensor_function(1));
         let node2 = operands[1].clone();
         assert_eq!(
             node2.output_type,
             IJType::Function(FunctionSignature::new(
                 vec![IJType::Scalar, IJType::Tensor],
-                vec![IJType::Tensor],
+                IJType::Tensor,
             ))
         );
         let node3 = operands[2].clone();
@@ -485,21 +451,9 @@ mod tests {
         let operands = composition_node.operands.clone();
         assert_eq!(operands.len(), 4);
         let node1 = operands[0].clone();
-        assert_eq!(
-            node1.output_type,
-            IJType::Function(FunctionSignature::new(
-                vec![IJType::Tensor],
-                vec![IJType::Tensor],
-            ))
-        );
+        assert_eq!(node1.output_type, IJType::tensor_function(1));
         let node2 = operands[1].clone();
-        assert_eq!(
-            node2.output_type,
-            IJType::Function(FunctionSignature::new(
-                vec![IJType::Tensor, IJType::Tensor],
-                vec![IJType::Tensor],
-            ))
-        );
+        assert_eq!(node2.output_type, IJType::tensor_function(2));
         let node3 = operands[2].clone();
         assert_eq!(node3.output_type, IJType::Tensor);
         let node4 = operands[3].clone();
@@ -518,7 +472,7 @@ mod tests {
             node1.output_type,
             IJType::Function(FunctionSignature::new(
                 vec![IJType::Tensor, IJType::Scalar],
-                vec![IJType::Tensor],
+                IJType::Tensor,
             ))
         );
         let node2 = operands[1].clone();
@@ -537,21 +491,9 @@ mod tests {
         let operands = composition_node.operands.clone();
         assert_eq!(operands.len(), 4);
         let node1 = operands[0].clone();
-        assert_eq!(
-            node1.output_type,
-            IJType::Function(FunctionSignature::new(
-                vec![IJType::Scalar],
-                vec![IJType::Scalar],
-            ))
-        );
+        assert_eq!(node1.output_type, IJType::scalar_function(1));
         let node2 = operands[1].clone();
-        assert_eq!(
-            node2.output_type,
-            IJType::Function(FunctionSignature::new(
-                vec![IJType::Scalar, IJType::Scalar],
-                vec![IJType::Scalar],
-            ))
-        );
+        assert_eq!(node2.output_type, IJType::scalar_function(2));
         let node3 = operands[2].clone();
         assert_eq!(node3.output_type, IJType::Scalar);
         let node4 = operands[3].clone();

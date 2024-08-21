@@ -31,12 +31,12 @@ impl ParseNodeFunctional for IdentityNode {
         _op: Token,
         slice: TokenSlice,
         context: &mut ASTContext,
-        needed_outputs: Option<&[Vec<IJType>]>,
+        needed_outputs: Option<&[IJType]>,
     ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
         let slice = slice.move_start(1)?;
         let output_types = match needed_outputs {
             Some(outputs) => outputs,
-            None => &[vec![IJType::Scalar], vec![IJType::Tensor]],
+            None => &[IJType::Scalar, IJType::Tensor],
         };
 
         let nodes = output_types
@@ -45,10 +45,10 @@ impl ParseNodeFunctional for IdentityNode {
                 Rc::new(Node::new(
                     Operation::Identity,
                     vec![],
-                    IJType::Function(FunctionSignature {
-                        input: output_type.clone(),
-                        output: output_type.clone(),
-                    }),
+                    IJType::Function(FunctionSignature::new(
+                        vec![output_type.clone()],
+                        output_type.clone(),
+                    )),
                     vec![],
                     context.get_increment_id(),
                 ))
@@ -82,23 +82,11 @@ mod tests {
         let (node, _) = parse_str_no_context("~I: Fn(S->S)")?;
         assert_eq!(node.op, Operation::Identity);
         assert_eq!(node.input_types.len(), 0);
-        assert_eq!(
-            node.output_type,
-            IJType::Function(FunctionSignature {
-                input: vec![IJType::Scalar],
-                output: vec![IJType::Scalar],
-            })
-        );
+        assert_eq!(node.output_type, IJType::scalar_function(1));
         let (node, _) = parse_str_no_context("~I: Fn(T->T)")?;
         assert_eq!(node.op, Operation::Identity);
         assert_eq!(node.input_types.len(), 0);
-        assert_eq!(
-            node.output_type,
-            IJType::Function(FunctionSignature {
-                input: vec![IJType::Tensor],
-                output: vec![IJType::Tensor],
-            })
-        );
+        assert_eq!(node.output_type, IJType::tensor_function(1));
         let (node, _) = parse_str_no_context("@(~-:Fn(T->T), I) [1]")?;
         assert_eq!(node.op, Operation::FunctionComposition(2));
         assert_eq!(node.output_type, IJType::Tensor);

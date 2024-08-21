@@ -69,7 +69,7 @@ impl ParseNodeFunctional for LambdaVariable {
         op: Token,
         slice: TokenSlice,
         context: &mut ASTContext,
-        needed_outputs: Option<&[Vec<IJType>]>,
+        needed_outputs: Option<&[IJType]>,
     ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
         let name = match op {
             Token::LambdaVariable(v) => v.name,
@@ -82,7 +82,7 @@ impl ParseNodeFunctional for LambdaVariable {
         };
 
         if let Some(outputs) = needed_outputs {
-            if outputs.iter().any(|output| output != &signature.output) {
+            if outputs.iter().any(|output| *output != *signature.output) {
                 return Err(SyntaxError::RequiredOutputsDoNotMatchFunctionOutputs(
                     needed_outputs
                         .unwrap()
@@ -90,12 +90,7 @@ impl ParseNodeFunctional for LambdaVariable {
                         .map(|output| format!("{:?}", output))
                         .collect::<Vec<String>>()
                         .join(", "),
-                    signature
-                        .output
-                        .iter()
-                        .map(|output| output.to_string())
-                        .collect::<Vec<String>>()
-                        .join(", "),
+                    signature.output.to_string(),
                 )
                 .into());
             }

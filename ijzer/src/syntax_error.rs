@@ -33,6 +33,9 @@ pub enum SyntaxError {
     #[error("Function without inputs")]
     FunctionWithoutInputs,
 
+    #[error("Functions must have a single output, but found unparsed tokens: '{0}'")]
+    FunctionWithUnparsedTokens(String),
+
     #[error("Variable is not allowed to have input arguments")]
     VariableWithInput,
 

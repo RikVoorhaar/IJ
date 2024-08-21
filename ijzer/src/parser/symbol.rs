@@ -1,10 +1,10 @@
 use super::{check_ok_needed_outputs, gather_operands, ParseNode, ParseNodeFunctional};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};
-use crate::types::IJType;
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
 use crate::tokens::{SymbolToken, Token};
+use crate::types::IJType;
 use anyhow::Result;
 use std::rc::Rc;
 pub struct Symbol;
@@ -34,14 +34,10 @@ impl ParseNode for Symbol {
                 IJType::Function(signature) => {
                     let (operands, rest) =
                         gather_operands(vec![signature.input.clone()], slice, context)?;
-                    let output_type = match signature.output.len() {
-                        1 => signature.clone().output.into_iter().next().unwrap(),
-                        _ => IJType::Group(signature.clone().output),
-                    };
                     let node = Node::new(
                         Operation::Function(name.clone()),
-                        signature.clone().input,
-                        output_type,
+                        signature.input.clone(),
+                        *signature.output.clone(),
                         operands,
                         context.get_increment_id(),
                     );
@@ -70,7 +66,7 @@ impl ParseNodeFunctional for Symbol {
         op: Token,
         slice: TokenSlice,
         context: &mut ASTContext,
-        needed_outputs: Option<&[Vec<IJType>]>,
+        needed_outputs: Option<&[IJType]>,
     ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
         let name = match op {
             Token::Symbol(SymbolToken { name }) => name,
