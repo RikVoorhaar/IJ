@@ -193,6 +193,9 @@ pub enum Token {
 
     #[token(".")]
     Apply,
+
+    #[token("?")]
+    GeneralizedContraction,
 }
 
 impl Display for Token {
@@ -227,6 +230,7 @@ impl Display for Token {
             Self::TypeConversion => write!(f, "<-"),
             Self::AsFunction => write!(f, "~"),
             Self::Apply => write!(f, "."),
+            Self::GeneralizedContraction => write!(f, "?"),
         }
     }
 }

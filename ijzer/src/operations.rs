@@ -23,6 +23,7 @@ pub enum Operation {
     LambdaVariable(String),
     Apply,
     AsFunction,
+    GeneralizedContraction,
 }
 
 impl Debug for Operation {
@@ -47,6 +48,7 @@ impl Debug for Operation {
             Self::LambdaVariable(s) => write!(f, "LambdaVariable(name: {})", s),
             Self::Apply => write!(f, "Apply"),
             Self::AsFunction => write!(f, "AsFunction"),
+            Self::GeneralizedContraction => write!(f, "GeneralizedContraction"),
         }
     }
 }

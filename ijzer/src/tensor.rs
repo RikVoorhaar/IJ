@@ -211,7 +211,7 @@ impl<T: Clone + Num> Tensor<T> {
         }
         Ok(output)
     }
-    pub fn dot(
+    pub fn generalized_contraction(
         &self,
         other: &Tensor<T>,
         f: impl Fn(&Tensor<T>) -> T,
@@ -603,7 +603,7 @@ mod tests {
         let tensor1 = Tensor::from_vec(vec![1.0, 0.0, 0.0, 1.0], Some(vec![2, 2]));
         let tensor2 = Tensor::from_vec(vec![2.0, 0.0, 0.0, 3.0], Some(vec![2, 2]));
         let result = tensor1
-            .dot(
+            .generalized_contraction(
                 &tensor2,
                 |x| x.reduce(|a, b| a + b).extract_scalar().unwrap(),
                 |a, b| a * b,
@@ -617,7 +617,7 @@ mod tests {
         let tensor1 = Tensor::from_vec(vec![1.0, 2.0, 3.0, 4.0], Some(vec![2, 2]));
         let tensor2 = Tensor::from_vec(vec![5.0, 6.0, 7.0, 8.0], Some(vec![2, 2]));
         let result = tensor1
-            .dot(
+            .generalized_contraction(
                 &tensor2,
                 |x| x.reduce(|a, b| a + b).extract_scalar().unwrap(),
                 |a, b| a * b,
