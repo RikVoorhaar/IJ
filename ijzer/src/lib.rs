@@ -10,6 +10,7 @@ pub mod tensor;
 pub mod tokens;
 pub mod types;
 
+
 pub fn compile(input: &str, number_type: &str) -> Result<TokenStream> {
     let number_type = compiler::number_type_from_string(number_type)?;
     let mut ast_context = ast_node::ASTContext::new();

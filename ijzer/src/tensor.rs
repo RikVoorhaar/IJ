@@ -168,8 +168,8 @@ impl<T: Clone + Num> Tensor<T> {
 
         Some(result)
     }
-    pub fn reduce(&self, mut f: impl FnMut(&T, &T) -> T) -> Tensor<T> {
-        let result = self.data.iter().cloned().reduce(|x, y| f(&x, &y)).unwrap();
+    pub fn reduce(&self, f: impl Fn(T, T) -> T) -> Tensor<T> {
+        let result = self.data.iter().cloned().reduce(|x, y| f(x, y)).unwrap();
         Tensor::scalar(result)
     }
     pub fn sub_tensor(&self, indices: Vec<Option<usize>>) -> Result<Tensor<T>, &'static str> {

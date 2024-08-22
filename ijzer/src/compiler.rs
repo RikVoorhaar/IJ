@@ -917,8 +917,6 @@ mod tests {
         println!("{}", input);
         println!("Compiled stream (string):");
         println!("'{}'", compiled_stream);
-        // println!("Compiled stream (TokenStream):");
-        // println!("{:?}", compiled_stream);
 
         let expected_stream_result = syn::parse_str(expected);
         assert!(expected_stream_result.is_ok());
@@ -927,8 +925,6 @@ mod tests {
         println!("------------------------");
         println!("Expected stream (string):");
         println!("'{}'", expected_stream);
-        // println!("Expected stream (TokenStream):");
-        // println!("{:?}", expected_stream);
         println!("------------------------");
 
         assert_eq!(
@@ -1084,7 +1080,7 @@ mod tests {
     }
 
     #[test]
-    fn test_type_conersion() {
+    fn test_type_conversion() {
         let input = "var x: S; <-T x";
         let expected = "x";
         compiler_compare(input, expected, "i64");
@@ -1099,6 +1095,10 @@ mod tests {
 
         let input = "var f: Fn(S,S->S); /<-Fn(N,N->N) f [1]";
         let expected = "ijzer::tensor::Tensor::<i64>::from_vec(vec![1],None).reduce((|_2_1:ijzer::tensor::Tensor::<i64>,_2_2:ijzer::tensor::Tensor::<i64>|((f)(ijzer::tensor::Tensor::<i64>::scalar(_2_1),ijzer::tensor::Tensor::<i64>::scalar(_2_2)).extract_scalar())))";
+        compiler_compare(input, expected, "i64");
+
+        let input = "var x: N; <-S x";
+        let expected = "ijzer::tensor::Tensor::<i64>::scalar(x)";
         compiler_compare(input, expected, "i64");
     }
 
