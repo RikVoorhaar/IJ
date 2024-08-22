@@ -772,7 +772,7 @@ impl TypeConversion {
             (IJType::Tensor, IJType::Tensor) => quote! {#child_stream},
             (IJType::Scalar, IJType::Scalar) => quote! {#child_stream},
             (IJType::Scalar, IJType::Tensor) => quote! {#child_stream},
-            (IJType::Scalar, IJType::Number) => quote! {#child_stream.extract_scalar()},
+            (IJType::Scalar, IJType::Number) => quote! {#child_stream.extract_scalar().unwrap()},
             (IJType::Number, IJType::Number) => quote! {#child_stream},
             (IJType::Number, IJType::Scalar) => {
                 let tensor_t = compiler.annotation_from_type(&IJType::Tensor);
@@ -801,7 +801,7 @@ impl TypeConversion {
                         compiler,
                         id,
                     )?);
-                    let arg_type = compiler.annotation_from_type(from);
+                    let arg_type = compiler.annotation_from_type(&to);
                     args.push(quote!(#ident: #arg_type));
                 }
                 let input_stream = quote! {(#child_stream)(#(#input_conversions),*)};
@@ -876,7 +876,7 @@ impl CompileNode for GeneralizedContraction {
         let tensor_t = compiler.annotation_from_type(&IJType::Tensor);
         let f_stream = child_streams[0].clone();
         let f_stream_extract = quote! {
-            (|z: #tensor_t| (#f_stream)(z)).extract_scalar().unwrap()
+            (|z: &#tensor_t| (#f_stream)(z.clone()).extract_scalar().unwrap())
         };
         let g_stream = child_streams[1].clone();
         match node.operands.len() {
@@ -917,8 +917,6 @@ mod tests {
         println!("{}", input);
         println!("Compiled stream (string):");
         println!("'{}'", compiled_stream);
-        // println!("Compiled stream (TokenStream):");
-        // println!("{:?}", compiled_stream);
 
         let expected_stream_result = syn::parse_str(expected);
         assert!(expected_stream_result.is_ok());
@@ -927,8 +925,6 @@ mod tests {
         println!("------------------------");
         println!("Expected stream (string):");
         println!("'{}'", expected_stream);
-        // println!("Expected stream (TokenStream):");
-        // println!("{:?}", expected_stream);
         println!("------------------------");
 
         assert_eq!(
@@ -1084,7 +1080,7 @@ mod tests {
     }
 
     #[test]
-    fn test_type_conersion() {
+    fn test_type_conversion() {
         let input = "var x: S; <-T x";
         let expected = "x";
         compiler_compare(input, expected, "i64");
@@ -1098,7 +1094,11 @@ mod tests {
         compiler_compare(input, expected, "i64");
 
         let input = "var f: Fn(S,S->S); /<-Fn(N,N->N) f [1]";
-        let expected = "ijzer::tensor::Tensor::<i64>::from_vec(vec![1],None).reduce((|_2_1:ijzer::tensor::Tensor::<i64>,_2_2:ijzer::tensor::Tensor::<i64>|((f)(ijzer::tensor::Tensor::<i64>::scalar(_2_1),ijzer::tensor::Tensor::<i64>::scalar(_2_2)).extract_scalar())))";
+        let expected = "ijzer :: tensor :: Tensor :: < i64 > :: from_vec (vec ! [1] , None) . reduce ((| _2_1 : i64 , _2_2 : i64 | ((f) (ijzer :: tensor :: Tensor :: < i64 > :: scalar (_2_1) , ijzer :: tensor :: Tensor :: < i64 > :: scalar (_2_2)) . extract_scalar () . unwrap ())))";
+        compiler_compare(input, expected, "i64");
+
+        let input = "var x: N; <-S x";
+        let expected = "ijzer::tensor::Tensor::<i64>::scalar(x)";
         compiler_compare(input, expected, "i64");
     }
 
@@ -1161,7 +1161,7 @@ mod tests {
     #[test]
     fn test_generalized_contraction() -> Result<()> {
         let input = "?/+* [1] [2]";
-        let expected = "ijzer :: tensor :: Tensor :: < i64 > :: from_vec (vec ! [1] , None) . generalized_contraction (& ijzer :: tensor :: Tensor :: < i64 > :: from_vec (vec ! [2] , None) , (| z : ijzer :: tensor :: Tensor :: < i64 > | (| _1 : ijzer :: tensor :: Tensor :: < i64 > | _1 . reduce (| a : i64 , b : i64 | a + b)) (z)) . extract_scalar () . unwrap () , | a : i64 , b : i64 | a * b) . unwrap ()";
+        let expected = "ijzer::tensor::Tensor::<i64>::from_vec(vec![1],None).generalized_contraction(&ijzer::tensor::Tensor::<i64>::from_vec(vec![2],None),(|z:&ijzer::tensor::Tensor::<i64>|(|_1:ijzer::tensor::Tensor::<i64>|_1.reduce(|a:i64,b:i64|a+b))(z.clone()).extract_scalar().unwrap()),|a:i64,b:i64|a*b).unwrap()";
         compiler_compare(input, expected, "i64");
 
         Ok(())
@@ -1170,7 +1170,7 @@ mod tests {
     #[test]
     fn test_generalized_contraction_functional() -> Result<()> {
         let input = "~?/+*";
-        let expected = "| x : ijzer :: tensor :: Tensor :: < i64 > , y : ijzer :: tensor :: Tensor :: < i64 > | x . generalized_contraction (& y , (| z : ijzer :: tensor :: Tensor :: < i64 > | (| _1 : ijzer :: tensor :: Tensor :: < i64 > | _1 . reduce (| a : i64 , b : i64 | a + b)) (z)) . extract_scalar () . unwrap () , | a : i64 , b : i64 | a * b) . unwrap ()";
+        let expected = "| x : ijzer :: tensor :: Tensor :: < i64 > , y : ijzer :: tensor :: Tensor :: < i64 > | x . generalized_contraction (& y , (| z : & ijzer :: tensor :: Tensor :: < i64 > | (| _1 : ijzer :: tensor :: Tensor :: < i64 > | _1 . reduce (| a : i64 , b : i64 | a + b)) (z . clone ()) . extract_scalar () . unwrap ()) , | a : i64 , b : i64 | a * b) . unwrap ()";
         compiler_compare(input, expected, "i64");
 
         Ok(())

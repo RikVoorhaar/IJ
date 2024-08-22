@@ -53,6 +53,16 @@ impl ParseNode for Symbol {
                     ),
                     slice,
                 ),
+                IJType::Number => (
+                    Node::new(
+                        Operation::Symbol(name.clone()),
+                        vec![],
+                        IJType::Number,
+                        vec![],
+                        context.get_increment_id(),
+                    ),
+                    slice,
+                ),
                 _ => unreachable!(),
             };
             Ok((Rc::new(node), rest))

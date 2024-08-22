@@ -12,9 +12,7 @@ fn test_function(x: Tensor<f64>) -> Tensor<f64> {
     z($x) = * y $x
     u = [1.0,2.0,3.0]
     v = @(-,+) [1.0] [2.0]
-    // g: Fn(N,N -> N) = <-Fn(N,N->N) + ((I) I)
     g($x, $y) = + $x $y
-    // (z [1.0] [-2.0])
     v
     "#
 }
