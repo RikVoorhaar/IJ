@@ -226,3 +226,42 @@ fn test_type_conversion() {
     let y = _test_type_conversion_func(f);
     assert_eq!(y.to_vec(), expected.to_vec());
 }
+
+#[test]
+fn test_apply() {
+    type TensorFun = Box<dyn Fn(Tensor<i64>) -> Tensor<i64>>;
+    #[ijzer(i64)]
+    fn _test_apply(f: fn(Tensor<i64>) -> TensorFun) -> Tensor<i64> {
+        r#"
+        var f: Fn(S-> Fn(S->S))
+        .(f 2) 4
+        "#
+    }
+
+    /// Turns `x` into a function that multiplies by `x`
+    fn f(x: Tensor<i64>) -> TensorFun {
+        Box::new(move |y: Tensor<i64>| x.apply_binary_op(&y, |a, b| a * b).unwrap())
+    }
+
+    let expected = Tensor::scalar(8);
+    let y = _test_apply(f);
+    assert_eq!(y.to_vec(), expected.to_vec());
+}
+
+#[test]
+fn test_matrix_multiplication() {
+    #[ijzer(i64)]
+    fn _test_matrix_multiplication(x: Tensor<i64>, y: Tensor<i64>) -> Tensor<i64> {
+        r#"
+        var x: T
+        var y: T
+        ?/+* x y
+        "#
+    }
+
+    let x = Tensor::from_vec(vec![1, 2, 3, 4], Some(vec![2, 2]));
+    let y = Tensor::from_vec(vec![1, 2, 3, 4], Some(vec![2, 2]));
+    let expected = Tensor::from_vec(vec![7, 10, 15, 22], Some(vec![2, 2]));
+    let z = _test_matrix_multiplication(x.clone(), y.clone());
+    assert_eq!(z.to_vec(), expected.to_vec());
+}

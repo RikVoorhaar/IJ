@@ -876,7 +876,7 @@ impl CompileNode for GeneralizedContraction {
         let tensor_t = compiler.annotation_from_type(&IJType::Tensor);
         let f_stream = child_streams[0].clone();
         let f_stream_extract = quote! {
-            (|z: #tensor_t| (#f_stream)(z)).extract_scalar().unwrap()
+            (|z: &#tensor_t| (#f_stream)(z.clone()).extract_scalar().unwrap())
         };
         let g_stream = child_streams[1].clone();
         match node.operands.len() {

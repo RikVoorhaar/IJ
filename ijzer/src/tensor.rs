@@ -169,7 +169,7 @@ impl<T: Clone + Num> Tensor<T> {
         Some(result)
     }
     pub fn reduce(&self, f: impl Fn(T, T) -> T) -> Tensor<T> {
-        let result = self.data.iter().cloned().reduce(|x, y| f(x, y)).unwrap();
+        let result = self.data.iter().cloned().reduce(f).unwrap();
         Tensor::scalar(result)
     }
     pub fn sub_tensor(&self, indices: Vec<Option<usize>>) -> Result<Tensor<T>, &'static str> {
