@@ -1161,7 +1161,7 @@ mod tests {
     #[test]
     fn test_generalized_contraction() -> Result<()> {
         let input = "?/+* [1] [2]";
-        let expected = "ijzer :: tensor :: Tensor :: < i64 > :: from_vec (vec ! [1] , None) . generalized_contraction (& ijzer :: tensor :: Tensor :: < i64 > :: from_vec (vec ! [2] , None) , (| z : ijzer :: tensor :: Tensor :: < i64 > | (| _1 : ijzer :: tensor :: Tensor :: < i64 > | _1 . reduce (| a : i64 , b : i64 | a + b)) (z)) . extract_scalar () . unwrap () , | a : i64 , b : i64 | a * b) . unwrap ()";
+        let expected = "ijzer::tensor::Tensor::<i64>::from_vec(vec![1],None).generalized_contraction(&ijzer::tensor::Tensor::<i64>::from_vec(vec![2],None),(|z:&ijzer::tensor::Tensor::<i64>|(|_1:ijzer::tensor::Tensor::<i64>|_1.reduce(|a:i64,b:i64|a+b))(z.clone()).extract_scalar().unwrap()),|a:i64,b:i64|a*b).unwrap()";
         compiler_compare(input, expected, "i64");
 
         Ok(())
@@ -1170,7 +1170,7 @@ mod tests {
     #[test]
     fn test_generalized_contraction_functional() -> Result<()> {
         let input = "~?/+*";
-        let expected = "| x : ijzer :: tensor :: Tensor :: < i64 > , y : ijzer :: tensor :: Tensor :: < i64 > | x . generalized_contraction (& y , (| z : ijzer :: tensor :: Tensor :: < i64 > | (| _1 : ijzer :: tensor :: Tensor :: < i64 > | _1 . reduce (| a : i64 , b : i64 | a + b)) (z)) . extract_scalar () . unwrap () , | a : i64 , b : i64 | a * b) . unwrap ()";
+        let expected = "| x : ijzer :: tensor :: Tensor :: < i64 > , y : ijzer :: tensor :: Tensor :: < i64 > | x . generalized_contraction (& y , (| z : & ijzer :: tensor :: Tensor :: < i64 > | (| _1 : ijzer :: tensor :: Tensor :: < i64 > | _1 . reduce (| a : i64 , b : i64 | a + b)) (z . clone ()) . extract_scalar () . unwrap ()) , | a : i64 , b : i64 | a * b) . unwrap ()";
         compiler_compare(input, expected, "i64");
 
         Ok(())
