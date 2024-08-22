@@ -213,5 +213,16 @@ fn test_type_conversion() {
     let y = _test_type_conversion(x);
     assert_eq!(y.to_vec(), expected.to_vec());
 
-    
+    #[ijzer(i64)]
+    fn _test_type_conversion_func(f: fn(Tensor<i64>, Tensor<i64>) -> Tensor<i64>) -> Tensor<i64> {
+        r#"
+        var f: Fn(S,S->S)
+        /<-Fn(N,N->N) f [1,2,3,4,5]
+        "#
+    }
+
+    let f = |a: Tensor<i64>, b: Tensor<i64>| a.apply_binary_op(&b, |x, y| x * y).unwrap();
+    let expected = Tensor::from_vec(vec![120], Some(vec![1]));
+    let y = _test_type_conversion_func(f);
+    assert_eq!(y.to_vec(), expected.to_vec());
 }

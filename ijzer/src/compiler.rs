@@ -772,7 +772,7 @@ impl TypeConversion {
             (IJType::Tensor, IJType::Tensor) => quote! {#child_stream},
             (IJType::Scalar, IJType::Scalar) => quote! {#child_stream},
             (IJType::Scalar, IJType::Tensor) => quote! {#child_stream},
-            (IJType::Scalar, IJType::Number) => quote! {#child_stream.extract_scalar()},
+            (IJType::Scalar, IJType::Number) => quote! {#child_stream.extract_scalar().unwrap()},
             (IJType::Number, IJType::Number) => quote! {#child_stream},
             (IJType::Number, IJType::Scalar) => {
                 let tensor_t = compiler.annotation_from_type(&IJType::Tensor);
@@ -801,7 +801,7 @@ impl TypeConversion {
                         compiler,
                         id,
                     )?);
-                    let arg_type = compiler.annotation_from_type(from);
+                    let arg_type = compiler.annotation_from_type(&to);
                     args.push(quote!(#ident: #arg_type));
                 }
                 let input_stream = quote! {(#child_stream)(#(#input_conversions),*)};
@@ -1094,7 +1094,7 @@ mod tests {
         compiler_compare(input, expected, "i64");
 
         let input = "var f: Fn(S,S->S); /<-Fn(N,N->N) f [1]";
-        let expected = "ijzer::tensor::Tensor::<i64>::from_vec(vec![1],None).reduce((|_2_1:ijzer::tensor::Tensor::<i64>,_2_2:ijzer::tensor::Tensor::<i64>|((f)(ijzer::tensor::Tensor::<i64>::scalar(_2_1),ijzer::tensor::Tensor::<i64>::scalar(_2_2)).extract_scalar())))";
+        let expected = "ijzer :: tensor :: Tensor :: < i64 > :: from_vec (vec ! [1] , None) . reduce ((| _2_1 : i64 , _2_2 : i64 | ((f) (ijzer :: tensor :: Tensor :: < i64 > :: scalar (_2_1) , ijzer :: tensor :: Tensor :: < i64 > :: scalar (_2_2)) . extract_scalar () . unwrap ())))";
         compiler_compare(input, expected, "i64");
 
         let input = "var x: N; <-S x";
