@@ -343,7 +343,7 @@ mod tests {
         Rc::new(Node::new(
             Operation::Symbol("test_symbol".to_string()),
             vec![],
-            IJType::Tensor,
+            IJType::Tensor(None),
             vec![],
             id,
         ))
@@ -358,7 +358,7 @@ mod tests {
     #[test]
     fn test_function_chain_extend1() {
         let chain = FunctionChain::empty();
-        let node = _create_function_node(vec![IJType::Tensor], IJType::Tensor, 0);
+        let node = _create_function_node(vec![IJType::Tensor(None)], IJType::Tensor(None), 0);
         let result = chain.extend(node);
         assert!(result.is_ok());
         let new_chain = result.unwrap().unwrap();
@@ -368,8 +368,8 @@ mod tests {
     #[test]
     fn test_function_chain_extend2() {
         let chain = FunctionChain::empty();
-        let node1 = _create_function_node(vec![IJType::Tensor], IJType::Tensor, 0);
-        let node2 = _create_function_node(vec![IJType::Tensor], IJType::Tensor, 1);
+        let node1 = _create_function_node(vec![IJType::Tensor(None)], IJType::Tensor(None), 0);
+        let node2 = _create_function_node(vec![IJType::Tensor(None)], IJType::Tensor(None), 1);
         let result = chain.extend(node1);
         assert!(result.is_ok());
         let new_chain = result.unwrap().unwrap();
@@ -382,8 +382,8 @@ mod tests {
     #[test]
     fn test_function_chain_extend_incompatible() {
         let chain = FunctionChain::empty();
-        let node1 = _create_function_node(vec![IJType::Tensor], IJType::Tensor, 0);
-        let node2 = _create_function_node(vec![IJType::Tensor], IJType::Scalar, 1);
+        let node1 = _create_function_node(vec![IJType::Tensor(None)], IJType::Tensor(None), 0);
+        let node2 = _create_function_node(vec![IJType::Tensor(None)], IJType::Scalar(None), 1);
         let result = chain.extend(node1);
         assert!(result.is_ok());
         let new_chain = result.unwrap().unwrap();
@@ -411,14 +411,17 @@ mod tests {
         let node1 = operands[0].clone();
         assert_eq!(
             node1.output_type,
-            IJType::Function(FunctionSignature::new(vec![IJType::Scalar], IJType::Scalar,))
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Scalar(None)],
+                IJType::Scalar(None),
+            ))
         );
         let node2 = operands[1].clone();
         assert_eq!(node2.output_type, IJType::scalar_function(2));
         let node3 = operands[2].clone();
-        assert_eq!(node3.output_type, IJType::Scalar);
+        assert_eq!(node3.output_type, IJType::Scalar(None));
         let node4 = operands[3].clone();
-        assert_eq!(node4.output_type, IJType::Scalar);
+        assert_eq!(node4.output_type, IJType::Scalar(None));
     }
 
     #[test]
@@ -434,14 +437,14 @@ mod tests {
         assert_eq!(
             node2.output_type,
             IJType::Function(FunctionSignature::new(
-                vec![IJType::Scalar, IJType::Tensor],
-                IJType::Tensor,
+                vec![IJType::Scalar(None), IJType::Tensor(None)],
+                IJType::Tensor(None),
             ))
         );
         let node3 = operands[2].clone();
-        assert_eq!(node3.output_type, IJType::Scalar);
+        assert_eq!(node3.output_type, IJType::Scalar(None));
         let node4 = operands[3].clone();
-        assert_eq!(node4.output_type, IJType::Tensor);
+        assert_eq!(node4.output_type, IJType::Tensor(None));
     }
     #[test]
     fn test_function_composition_parser_minus_plus_tensor_tensor() {
@@ -455,9 +458,9 @@ mod tests {
         let node2 = operands[1].clone();
         assert_eq!(node2.output_type, IJType::tensor_function(2));
         let node3 = operands[2].clone();
-        assert_eq!(node3.output_type, IJType::Tensor);
+        assert_eq!(node3.output_type, IJType::Tensor(None));
         let node4 = operands[3].clone();
-        assert_eq!(node4.output_type, IJType::Tensor);
+        assert_eq!(node4.output_type, IJType::Tensor(None));
     }
 
     #[test]
@@ -471,14 +474,14 @@ mod tests {
         assert_eq!(
             node1.output_type,
             IJType::Function(FunctionSignature::new(
-                vec![IJType::Tensor, IJType::Scalar],
-                IJType::Tensor,
+                vec![IJType::Tensor(None), IJType::Scalar(None)],
+                IJType::Tensor(None),
             ))
         );
         let node2 = operands[1].clone();
-        assert_eq!(node2.output_type, IJType::Tensor);
+        assert_eq!(node2.output_type, IJType::Tensor(None));
         let node3 = operands[2].clone();
-        assert_eq!(node3.output_type, IJType::Scalar);
+        assert_eq!(node3.output_type, IJType::Scalar(None));
     }
 
     #[test]
@@ -495,9 +498,9 @@ mod tests {
         let node2 = operands[1].clone();
         assert_eq!(node2.output_type, IJType::scalar_function(2));
         let node3 = operands[2].clone();
-        assert_eq!(node3.output_type, IJType::Scalar);
+        assert_eq!(node3.output_type, IJType::Scalar(None));
         let node4 = operands[3].clone();
-        assert_eq!(node4.output_type, IJType::Scalar);
+        assert_eq!(node4.output_type, IJType::Scalar(None));
     }
 
     #[test]

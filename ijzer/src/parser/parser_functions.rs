@@ -130,7 +130,7 @@ mod tests {
         let (node, context) = result.unwrap();
         assert_eq!(node.op, Operation::Nothing);
         let expected_var = Variable {
-            typ: IJType::Tensor,
+            typ: IJType::Tensor(None),
             name: "a".to_string(),
         };
         let actual_var = context.symbols.get("a").unwrap();
@@ -144,7 +144,7 @@ mod tests {
         let (node, context) = result.unwrap();
         assert_eq!(node.op, Operation::Nothing);
         let expected_var = Variable {
-            typ: IJType::Scalar,
+            typ: IJType::Scalar(None),
             name: "b".to_string(),
         };
         let actual_var = context.symbols.get("b").unwrap();
@@ -172,7 +172,7 @@ mod tests {
         let (node, context) = result.unwrap();
         assert_eq!(node.op, Operation::Nothing);
         let expected_var = Variable {
-            typ: IJType::Function(FunctionSignature::new(vec![IJType::Scalar], IJType::Tensor)),
+            typ: IJType::Function(FunctionSignature::new(vec![IJType::Scalar(None)], IJType::Tensor(None))),
             name: "scale".to_string(),
         };
         let actual_var = context.symbols.get("scale").unwrap();

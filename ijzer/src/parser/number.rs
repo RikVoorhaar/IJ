@@ -23,7 +23,7 @@ impl ParseNode for NumberNode {
             Rc::new(Node::new(
                 node_op,
                 vec![],
-                IJType::Scalar,
+                IJType::Scalar(None),
                 vec![],
                 context.get_increment_id(),
             )),

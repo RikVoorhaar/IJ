@@ -20,13 +20,13 @@ impl ParseNode for Reduction {
     ) -> Result<(Rc<Node>, TokenSlice)> {
         let (function, rest) =
             next_node_specific_function(slice, context, FunctionSignature::number_function(2))?;
-        let (operands, rest) = gather_operands(vec![vec![IJType::Tensor]], rest, context)?;
+        let (operands, rest) = gather_operands(vec![vec![IJType::Tensor(None)]], rest, context)?;
         let operand = operands.into_iter().next().unwrap();
         Ok((
             Rc::new(Node::new(
                 Operation::Reduce,
-                vec![function.output_type.clone(), IJType::Tensor],
-                IJType::Scalar,
+                vec![function.output_type.clone(), IJType::Tensor(None)],
+                IJType::Scalar(None),
                 vec![function, operand],
                 context.get_increment_id(),
             )),
@@ -41,7 +41,7 @@ impl ParseNodeFunctional for Reduction {
         context: &mut ASTContext,
         needed_outputs: Option<&[IJType]>,
     ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
-        let actual_outputs = IJType::Scalar;
+        let actual_outputs = IJType::Scalar(None);
         if !check_ok_needed_outputs(needed_outputs, &actual_outputs) {
             return Err(SyntaxError::FunctionSignatureMismatch(
                 format!("{:?}", needed_outputs),
@@ -57,7 +57,7 @@ impl ParseNodeFunctional for Reduction {
         let node = Rc::new(Node::new(
             Operation::Reduce,
             vec![IJType::number_function(2)],
-            IJType::Function(FunctionSignature::new(vec![IJType::Tensor], IJType::Scalar)),
+            IJType::Function(FunctionSignature::new(vec![IJType::Tensor(None)], IJType::Scalar(None))),
             vec![function],
             context.get_increment_id(),
         ));
@@ -79,9 +79,9 @@ mod tests {
 
         assert_eq!(
             node.input_types,
-            vec![IJType::number_function(2), IJType::Tensor]
+            vec![IJType::number_function(2), IJType::Tensor(None)]
         );
-        assert_eq!(node.output_type, IJType::Scalar);
+        assert_eq!(node.output_type, IJType::Scalar(None));
     }
 
     #[test]
@@ -95,9 +95,9 @@ mod tests {
         assert_eq!(node.op, Operation::Reduce);
         assert_eq!(
             node.input_types,
-            vec![IJType::number_function(2), IJType::Tensor]
+            vec![IJType::number_function(2), IJType::Tensor(None)]
         );
-        assert_eq!(node.output_type, IJType::Scalar);
+        assert_eq!(node.output_type, IJType::Scalar(None));
     }
 
     #[test]
@@ -107,7 +107,7 @@ mod tests {
             Token::Reduction,
             slice,
             &mut context,
-            Some(&[IJType::Scalar]),
+            Some(&[IJType::Scalar(None)]),
         )?;
         println!("{:?}", result);
         Ok(())

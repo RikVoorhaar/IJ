@@ -3,12 +3,14 @@ use crate::tokens::{find_matching_parenthesis_on_tokens, lexer, Token};
 use anyhow::Result;
 use std::fmt::Debug;
 
+type NumberType = Option<String>;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum IJType {
     Void,
-    Scalar,
-    Tensor,
-    Number,
+    Scalar(NumberType),
+    Tensor(NumberType),
+    Number(NumberType),
     Function(FunctionSignature),
     Group(Vec<IJType>),
 }
@@ -49,20 +51,20 @@ impl FunctionSignature {
     }
     pub fn tensor_function(inputs: usize) -> Self {
         Self {
-            input: vec![IJType::Tensor; inputs],
-            output: Box::new(IJType::Tensor),
+            input: vec![IJType::Tensor(None); inputs],
+            output: Box::new(IJType::Tensor(None)),
         }
     }
     pub fn scalar_function(inputs: usize) -> Self {
         Self {
-            input: vec![IJType::Scalar; inputs],
-            output: Box::new(IJType::Scalar),
+            input: vec![IJType::Scalar(None); inputs],
+            output: Box::new(IJType::Scalar(None)),
         }
     }
     pub fn number_function(inputs: usize) -> Self {
         Self {
-            input: vec![IJType::Number; inputs],
-            output: Box::new(IJType::Number),
+            input: vec![IJType::Number(None); inputs],
+            output: Box::new(IJType::Number(None)),
         }
     }
     pub fn from_tokens(tokens: &[Token]) -> Result<Self> {
@@ -100,35 +102,45 @@ impl FunctionSignature {
 impl IJType {
     pub fn tensor_function(inputs: usize) -> IJType {
         IJType::Function(FunctionSignature::new(
-            vec![IJType::Tensor; inputs],
-            IJType::Tensor,
+            vec![IJType::Tensor(None); inputs],
+            IJType::Tensor(None),
         ))
     }
     pub fn scalar_function(inputs: usize) -> IJType {
         IJType::Function(FunctionSignature::new(
-            vec![IJType::Scalar; inputs],
-            IJType::Scalar,
+            vec![IJType::Scalar(None); inputs],
+            IJType::Scalar(None),
         ))
     }
     pub fn number_function(inputs: usize) -> IJType {
         IJType::Function(FunctionSignature::new(
-            vec![IJType::Number; inputs],
-            IJType::Number,
+            vec![IJType::Number(None); inputs],
+            IJType::Number(None),
         ))
     }
     pub fn tensor_to_scalar_function(inputs: usize) -> IJType {
         IJType::Function(FunctionSignature::new(
-            vec![IJType::Tensor; inputs],
-            IJType::Scalar,
+            vec![IJType::Tensor(None); inputs],
+            IJType::Scalar(None),
         ))
     }
 
     /// Parses tokens and returns the type and the number of tokens consumed.
     pub fn parse_tokens(tokens: &[Token]) -> Result<(Self, usize)> {
         match tokens {
-            [Token::Scalar, ..] => Ok((IJType::Scalar, 1)),
-            [Token::Tensor, ..] => Ok((IJType::Tensor, 1)),
-            [Token::NumberType, ..] => Ok((IJType::Number, 1)),
+            [Token::Scalar, Token::NumberType(n), ..] => {
+                Ok((IJType::Scalar(Some(n.to_string())), 2))
+            }
+            [Token::Scalar, ..] => Ok((IJType::Scalar(None), 1)),
+            [Token::Tensor, Token::NumberType(n), ..] => {
+                Ok((IJType::Tensor(Some(n.to_string())), 2))
+            }
+            [Token::Tensor, ..] => Ok((IJType::Tensor(None), 1)),
+            [Token::NumberToken, Token::NumberType(n), ..] => {
+                Ok((IJType::Number(Some(n.to_string())), 2))
+            }
+            [Token::NumberToken, ..] => Ok((IJType::Number(None), 1)),
+
             [Token::FunctionType, Token::LParen, rest @ ..] => {
                 let maybe_index =
                     find_matching_parenthesis_on_tokens(rest, &Token::LParen, &Token::RParen);
@@ -169,11 +181,14 @@ impl IJType {
 impl std::fmt::Display for IJType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            IJType::Scalar => write!(f, "S"),
-            IJType::Tensor => write!(f, "T"),
+            IJType::Scalar(None) => write!(f, "S"),
+            IJType::Scalar(Some(n)) => write!(f, "<{}>", n),
+            IJType::Tensor(None) => write!(f, "T"),
+            IJType::Tensor(Some(n)) => write!(f, "<{}>", n),
             IJType::Function(sig) => write!(f, "Fn({})", sig),
             IJType::Void => write!(f, "Void"),
-            IJType::Number => write!(f, "N"),
+            IJType::Number(None) => write!(f, "N"),
+            IJType::Number(Some(n)) => write!(f, "<{}>", n),
             IJType::Group(types) => write!(
                 f,
                 "Group({})",
@@ -203,14 +218,30 @@ mod tests {
     fn test_ijtype_from_string_scalar() {
         let result = IJType::from_string("S");
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), IJType::Scalar);
+        assert_eq!(result.unwrap(), IJType::Scalar(None));
+
+        let result = IJType::from_string("S<usize>");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), IJType::Scalar(Some("usize".to_string())));
+
+        let result = IJType::from_string("S<_>");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), IJType::Scalar(Some("_".to_string())));
     }
 
     #[test]
     fn test_ijtype_from_string_tensor() {
         let result = IJType::from_string("T");
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), IJType::Tensor);
+        assert_eq!(result.unwrap(), IJType::Tensor(None));
+
+        let result = IJType::from_string("T<usize>");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), IJType::Tensor(Some("usize".to_string())));
+
+        let result = IJType::from_string("T<_>");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), IJType::Tensor(Some("_".to_string())));
     }
 
     #[test]
@@ -224,8 +255,8 @@ mod tests {
 
         assert!(result.is_ok());
         let expected = IJType::Function(FunctionSignature::new(
-            vec![IJType::Tensor, IJType::Tensor],
-            IJType::Scalar,
+            vec![IJType::Tensor(None), IJType::Tensor(None)],
+            IJType::Scalar(None),
         ));
         assert_eq!(result.unwrap(), expected);
     }
@@ -240,7 +271,7 @@ mod tests {
     fn test_function_signature_from_string_tensor_to_scalar() {
         let result = FunctionSignature::from_string("T->S");
         assert!(result.is_ok());
-        let expected = FunctionSignature::new(vec![IJType::Tensor], IJType::Scalar);
+        let expected = FunctionSignature::new(vec![IJType::Tensor(None)], IJType::Scalar(None));
         assert_eq!(result.unwrap(), expected);
     }
 
@@ -248,7 +279,10 @@ mod tests {
     fn test_function_signature_from_string_tensors_to_tensor() {
         let result = FunctionSignature::from_string("T,T->T");
         assert!(result.is_ok());
-        let expected = FunctionSignature::new(vec![IJType::Tensor, IJType::Tensor], IJType::Tensor);
+        let expected = FunctionSignature::new(
+            vec![IJType::Tensor(None), IJType::Tensor(None)],
+            IJType::Tensor(None),
+        );
         assert_eq!(result.unwrap(), expected);
     }
 
@@ -266,12 +300,12 @@ mod tests {
         let expected = IJType::Function(FunctionSignature::new(
             vec![
                 IJType::Function(FunctionSignature::new(
-                    vec![IJType::Tensor, IJType::Tensor],
-                    IJType::Scalar,
+                    vec![IJType::Tensor(None), IJType::Tensor(None)],
+                    IJType::Scalar(None),
                 )),
-                IJType::Tensor,
+                IJType::Tensor(None),
             ],
-            IJType::Scalar,
+            IJType::Scalar(None),
         ));
         assert_eq!(result.unwrap(), expected);
     }
@@ -283,15 +317,15 @@ mod tests {
         assert_eq!(
             t,
             IJType::Function(FunctionSignature::new(
-                vec![IJType::Tensor, IJType::Tensor],
-                IJType::Scalar,
+                vec![IJType::Tensor(None), IJType::Tensor(None)],
+                IJType::Scalar(None),
             ))
         );
         assert_eq!(tokens[i..].len(), 1);
 
         let tokens = lexer("T a").unwrap();
         let (t, i) = IJType::parse_tokens(&tokens).unwrap();
-        assert_eq!(t, IJType::Tensor);
+        assert_eq!(t, IJType::Tensor(None));
         assert_eq!(tokens[i..].len(), 1);
 
         let tokens = lexer("Fn(T,T->Fn(T->T)) S").unwrap();
@@ -299,8 +333,11 @@ mod tests {
         assert_eq!(
             t,
             IJType::Function(FunctionSignature::new(
-                vec![IJType::Tensor, IJType::Tensor],
-                IJType::Function(FunctionSignature::new(vec![IJType::Tensor], IJType::Tensor,)),
+                vec![IJType::Tensor(None), IJType::Tensor(None)],
+                IJType::Function(FunctionSignature::new(
+                    vec![IJType::Tensor(None)],
+                    IJType::Tensor(None),
+                )),
             ))
         );
         assert_eq!(tokens[i..].len(), 1);

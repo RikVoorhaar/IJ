@@ -21,11 +21,11 @@ impl ParseNode for Symbol {
                 .ok_or(SyntaxError::UnknownSymbol(name.clone()))?;
 
             let (node, rest) = match variable.typ.clone() {
-                IJType::Tensor => (
+                IJType::Tensor(None) => (
                     Node::new(
                         Operation::Symbol(name.clone()),
                         vec![],
-                        IJType::Tensor,
+                        IJType::Tensor(None),
                         vec![],
                         context.get_increment_id(),
                     ),
@@ -43,21 +43,21 @@ impl ParseNode for Symbol {
                     );
                     (node, rest)
                 }
-                IJType::Scalar => (
+                IJType::Scalar(None) => (
                     Node::new(
                         Operation::Symbol(name.clone()),
                         vec![],
-                        IJType::Scalar,
+                        IJType::Scalar(None),
                         vec![],
                         context.get_increment_id(),
                     ),
                     slice,
                 ),
-                IJType::Number => (
+                IJType::Number(None) => (
                     Node::new(
                         Operation::Symbol(name.clone()),
                         vec![],
-                        IJType::Number,
+                        IJType::Number(None),
                         vec![],
                         context.get_increment_id(),
                     ),

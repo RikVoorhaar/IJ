@@ -158,8 +158,12 @@ impl CompilerContext {
     pub fn annotation_from_type(&self, var_type: &IJType) -> TokenStream {
         let number_type = self._number_type.clone();
         match var_type {
-            IJType::Number => quote!(#number_type),
-            IJType::Tensor | IJType::Scalar => quote!(ijzer::tensor::Tensor::<#number_type>),
+            IJType::Number(None) => quote!(#number_type),
+            IJType::Number(Some(n)) => quote!(#n),
+            IJType::Tensor(None) => quote!(ijzer::tensor::Tensor::<#number_type>),
+            IJType::Tensor(Some(n)) => quote!(ijzer::tensor::Tensor::<#n>),
+            IJType::Scalar(None) => quote!(ijzer::tensor::Tensor::<#number_type>),
+            IJType::Scalar(Some(n)) => quote!(ijzer::tensor::Tensor::<#n>),
             IJType::Function(signature) => {
                 let input_types = signature
                     .input
@@ -197,7 +201,7 @@ impl CompileNode for Number {
             let parsed_val = syn::parse_str::<proc_macro2::TokenStream>(&val).map_err(|_| {
                 syn::Error::new_spanned(&val, "Failed to parse value into a Rust TokenStream")
             })?;
-            let t = compiler.annotation_from_type(&IJType::Scalar);
+            let t = compiler.annotation_from_type(&IJType::Scalar(None));
             let res = quote! {
                 #t::scalar(#parsed_val)
             };
@@ -221,7 +225,7 @@ impl CompileNode for Array {
             let parsed_val = syn::parse_str::<proc_macro2::TokenStream>(&val).map_err(|_| {
                 syn::Error::new_spanned(&val, "Failed to parse value into a Rust TokenStream")
             })?;
-            let t = compiler.annotation_from_type(&IJType::Scalar);
+            let t = compiler.annotation_from_type(&IJType::Scalar(None));
             let res = quote! {
                 #t::from_vec(vec![#parsed_val], None)
             };
@@ -374,11 +378,11 @@ impl CompileNode for Add {
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
-        let tensor_t = compiler.annotation_from_type(&IJType::Tensor);
-        let number_t = compiler.annotation_from_type(&IJType::Number);
+        let tensor_t = compiler.annotation_from_type(&IJType::Tensor(None));
+        let number_t = compiler.annotation_from_type(&IJType::Number(None));
 
         let res = match node.output_type.clone() {
-            IJType::Tensor | IJType::Scalar => {
+            IJType::Tensor(None) | IJType::Scalar(None) => {
                 if children.len() != 2 {
                     panic!("Expected 2 children for add, found {:?}", children.len());
                 }
@@ -393,10 +397,10 @@ impl CompileNode for Add {
             IJType::Function(f) => {
                 let output_type = *f.output;
                 match output_type {
-                    IJType::Number => {
+                    IJType::Number(None) => {
                         quote! { |a: #number_t, b: #number_t| a + b }
                     }
-                    IJType::Scalar | IJType::Tensor => {
+                    IJType::Scalar(None) | IJType::Tensor(None) => {
                         quote! {
                             |x1: #tensor_t, x2: #tensor_t|
                             x1.apply_binary_op(&x2, |a: #number_t, b: #number_t| a + b).unwrap()
@@ -424,11 +428,11 @@ impl CompileNode for Subtract {
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::Subtract = &node.op {
-            let number_t = compiler.annotation_from_type(&IJType::Number);
-            let tensor_t = compiler.annotation_from_type(&IJType::Tensor);
+            let number_t = compiler.annotation_from_type(&IJType::Number(None));
+            let tensor_t = compiler.annotation_from_type(&IJType::Tensor(None));
             let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
             let res = match node.output_type.clone() {
-                IJType::Tensor | IJType::Scalar => {
+                IJType::Tensor(None) | IJType::Scalar(None) => {
                     let childstream1 = child_streams.get(&children[0]).unwrap();
                     let childstream2 = child_streams.get(&children[1]).unwrap();
 
@@ -439,10 +443,10 @@ impl CompileNode for Subtract {
                 IJType::Function(f) => {
                     let output_type = *f.output;
                     match output_type {
-                        IJType::Number => {
+                        IJType::Number(None) => {
                             quote! { |a: #number_t, b: #number_t| a - b }
                         }
-                        IJType::Scalar | IJType::Tensor => {
+                        IJType::Scalar(None) | IJType::Tensor(None) => {
                             quote! {
                                 |x1: #tensor_t, x2: #tensor_t|
                                 x1.apply_binary_op(&x2, |a: #number_t, b: #number_t| a - b).unwrap()
@@ -473,11 +477,11 @@ impl CompileNode for Negate {
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::Negate = &node.op {
-            let number_t = compiler.annotation_from_type(&IJType::Number);
-            let tensor_t = compiler.annotation_from_type(&IJType::Tensor);
+            let number_t = compiler.annotation_from_type(&IJType::Number(None));
+            let tensor_t = compiler.annotation_from_type(&IJType::Tensor(None));
             let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
             let res = match node.output_type.clone() {
-                IJType::Tensor | IJType::Scalar => {
+                IJType::Tensor(None) | IJType::Scalar(None) => {
                     let childstream = child_streams.get(&children[0]).unwrap();
                     quote! {
                         #childstream.map(|a: #number_t| -a)
@@ -486,10 +490,10 @@ impl CompileNode for Negate {
                 IJType::Function(f) => {
                     let output_type = *f.output;
                     match output_type {
-                        IJType::Number => {
+                        IJType::Number(None) => {
                             quote! { |a: #number_t| -a }
                         }
-                        IJType::Scalar | IJType::Tensor => {
+                        IJType::Scalar(None) | IJType::Tensor(None) => {
                             quote! {
                                 |x: #tensor_t| x.map(|a: #number_t| -a)
                             }
@@ -519,11 +523,11 @@ impl CompileNode for Multiply {
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::Multiply = &node.op {
-            let number_t = compiler.annotation_from_type(&IJType::Number);
-            let tensor_t = compiler.annotation_from_type(&IJType::Tensor);
+            let number_t = compiler.annotation_from_type(&IJType::Number(None));
+            let tensor_t = compiler.annotation_from_type(&IJType::Tensor(None));
             let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
             let res = match node.output_type.clone() {
-                IJType::Tensor | IJType::Scalar => {
+                IJType::Tensor(None) | IJType::Scalar(None) => {
                     let childstream1 = child_streams.get(&children[0]).unwrap();
                     let childstream2 = child_streams.get(&children[1]).unwrap();
 
@@ -534,10 +538,10 @@ impl CompileNode for Multiply {
                 IJType::Function(f) => {
                     let output_type = *f.output;
                     match output_type {
-                        IJType::Number => {
+                        IJType::Number(None) => {
                             quote! { |a: #number_t, b: #number_t| a * b }
                         }
-                        IJType::Scalar | IJType::Tensor => {
+                        IJType::Scalar(None) | IJType::Tensor(None) => {
                             quote! {
                                 |x1: #tensor_t, x2: #tensor_t|
                                 x1.apply_binary_op(&x2, |a: #number_t, b: #number_t| a * b).unwrap()
@@ -602,7 +606,7 @@ impl CompileNode for Reduce {
             panic!("Expected reduce node, found {:?}", node.op);
         }
         let operands = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
-        let tensor_t = compiler.annotation_from_type(&IJType::Tensor);
+        let tensor_t = compiler.annotation_from_type(&IJType::Tensor(None));
         match operands.len() {
             1 => {
                 let functional_operand = &operands[0];
@@ -769,17 +773,17 @@ impl TypeConversion {
         id: usize,
     ) -> Result<TokenStream> {
         let res = match (from, to) {
-            (IJType::Tensor, IJType::Tensor) => quote! {#child_stream},
-            (IJType::Scalar, IJType::Scalar) => quote! {#child_stream},
-            (IJType::Scalar, IJType::Tensor) => quote! {#child_stream},
-            (IJType::Scalar, IJType::Number) => quote! {#child_stream.extract_scalar().unwrap()},
-            (IJType::Number, IJType::Number) => quote! {#child_stream},
-            (IJType::Number, IJType::Scalar) => {
-                let tensor_t = compiler.annotation_from_type(&IJType::Tensor);
+            (IJType::Tensor(_), IJType::Tensor(_)) => quote! {#child_stream},
+            (IJType::Scalar(_), IJType::Scalar(_)) => quote! {#child_stream},
+            (IJType::Scalar(_), IJType::Tensor(_)) => quote! {#child_stream},
+            (IJType::Scalar(_), IJType::Number(_)) => quote! {#child_stream.extract_scalar().unwrap()},
+            (IJType::Number(_), IJType::Number(_)) => quote! {#child_stream},
+            (IJType::Number(_), IJType::Scalar(_)) => {
+                let tensor_t = compiler.annotation_from_type(&IJType::Tensor(None));
                 quote! {#tensor_t::scalar(#child_stream)}
             }
-            (IJType::Number, IJType::Tensor) => {
-                let tensor_t = compiler.annotation_from_type(&IJType::Tensor);
+            (IJType::Number(_), IJType::Tensor(_)) => {
+                let tensor_t = compiler.annotation_from_type(&IJType::Tensor(None));
                 quote! {#tensor_t::scalar(#child_stream)}
             }
             (IJType::Function(ref signature_from), IJType::Function(ref signature_to)) => {
@@ -873,7 +877,7 @@ impl CompileNode for GeneralizedContraction {
             .iter()
             .map(|n| child_streams[&n.id].clone())
             .collect::<Vec<_>>();
-        let tensor_t = compiler.annotation_from_type(&IJType::Tensor);
+        let tensor_t = compiler.annotation_from_type(&IJType::Tensor(None));
         let f_stream = child_streams[0].clone();
         let f_stream_extract = quote! {
             (|z: &#tensor_t| (#f_stream)(z.clone()).extract_scalar().unwrap())

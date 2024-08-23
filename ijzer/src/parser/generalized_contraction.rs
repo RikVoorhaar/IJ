@@ -14,7 +14,7 @@ use std::rc::Rc;
 pub struct GeneralizedContraction;
 impl GeneralizedContraction {
     fn first_signature() -> FunctionSignature {
-        FunctionSignature::new(vec![IJType::Tensor], IJType::Scalar)
+        FunctionSignature::new(vec![IJType::Tensor(None)], IJType::Scalar(None))
     }
     fn second_signature() -> FunctionSignature {
         FunctionSignature::number_function(2)
@@ -36,16 +36,16 @@ impl ParseNode for GeneralizedContraction {
     ) -> Result<(Rc<Node>, TokenSlice)> {
         let (f_node, g_node, rest) = Self::get_functional_part(slice, context)?;
         let (operands, rest) =
-            gather_operands(vec![vec![IJType::Tensor, IJType::Tensor]], rest, context)?;
+            gather_operands(vec![vec![IJType::Tensor(None), IJType::Tensor(None)]], rest, context)?;
         let node = Node::new(
             Operation::GeneralizedContraction,
             vec![
                 IJType::Function(Self::first_signature()),
                 IJType::Function(Self::second_signature()),
-                IJType::Tensor,
-                IJType::Tensor,
+                IJType::Tensor(None),
+                IJType::Tensor(None),
             ],
-            IJType::Tensor,
+            IJType::Tensor(None),
             vec![f_node, g_node, operands[0].clone(), operands[1].clone()],
             context.get_increment_id(),
         );
@@ -60,10 +60,10 @@ impl ParseNodeFunctional for GeneralizedContraction {
         needed_outputs: Option<&[IJType]>,
     ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
         let slice = slice.move_start(1)?;
-        if !check_ok_needed_outputs(needed_outputs, &IJType::Tensor) {
+        if !check_ok_needed_outputs(needed_outputs, &IJType::Tensor(None)) {
             return Err(SyntaxError::RequiredOutputsDoNotMatchFunctionOutputs(
                 format!("{:?}", needed_outputs),
-                IJType::Tensor.to_string(),
+                IJType::Tensor(None).to_string(),
             )
             .into());
         }

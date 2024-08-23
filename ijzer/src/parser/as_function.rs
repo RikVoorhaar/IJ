@@ -131,8 +131,8 @@ mod tests {
         assert_eq!(
             node.output_type,
             IJType::Function(FunctionSignature::new(
-                vec![IJType::Tensor],
-                IJType::Scalar
+                vec![IJType::Tensor(None)],
+                IJType::Scalar(None)
             ))
         );
         Ok(())

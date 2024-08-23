@@ -27,7 +27,7 @@ impl ParseNode for LSqBracket {
             Rc::new(Node::new(
                 Operation::Array(contents),
                 vec![],
-                IJType::Tensor,
+                IJType::Tensor(None),
                 vec![],
                 context.get_increment_id(),
             )),

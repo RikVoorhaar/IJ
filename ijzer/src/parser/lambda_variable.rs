@@ -25,7 +25,7 @@ pub fn parse_lambda_assign_lhs(
         rest = rest.move_start(type_end)?;
         (parsed_type, rest)
     } else {
-        (IJType::Tensor, slice)
+        (IJType::Tensor(None), slice)
     };
 
     let node = Node::new(
