@@ -19,8 +19,8 @@ use binary_op::{next_node_simple_binary_op, Add, Multiply};
 mod parenthesis;
 use parenthesis::LParen;
 
-mod square_brackets;
-use square_brackets::LSqBracket;
+mod array;
+use array::LSqBracket;
 
 mod symbol;
 use symbol::Symbol;

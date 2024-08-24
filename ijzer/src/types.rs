@@ -182,13 +182,13 @@ impl std::fmt::Display for IJType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             IJType::Scalar(None) => write!(f, "S"),
-            IJType::Scalar(Some(n)) => write!(f, "<{}>", n),
+            IJType::Scalar(Some(n)) => write!(f, "{}", n),
             IJType::Tensor(None) => write!(f, "T"),
-            IJType::Tensor(Some(n)) => write!(f, "<{}>", n),
+            IJType::Tensor(Some(n)) => write!(f, "{}", n),
             IJType::Function(sig) => write!(f, "Fn({})", sig),
             IJType::Void => write!(f, "Void"),
             IJType::Number(None) => write!(f, "N"),
-            IJType::Number(Some(n)) => write!(f, "<{}>", n),
+            IJType::Number(Some(n)) => write!(f, "{}", n),
             IJType::Group(types) => write!(
                 f,
                 "Group({})",
