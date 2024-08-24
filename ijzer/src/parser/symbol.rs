@@ -27,8 +27,8 @@ impl ParseNode for Symbol {
                         vec![],
                         IJType::Tensor(None),
                         vec![],
-                        context.get_increment_id(),
-                    ),
+                        context,
+                    )?,
                     slice,
                 ),
                 IJType::Function(signature) => {
@@ -39,8 +39,8 @@ impl ParseNode for Symbol {
                         signature.input.clone(),
                         *signature.output.clone(),
                         operands,
-                        context.get_increment_id(),
-                    );
+                        context,
+                    )?;
                     (node, rest)
                 }
                 IJType::Scalar(None) => (
@@ -49,8 +49,8 @@ impl ParseNode for Symbol {
                         vec![],
                         IJType::Scalar(None),
                         vec![],
-                        context.get_increment_id(),
-                    ),
+                        context,
+                    )?,
                     slice,
                 ),
                 IJType::Number(None) => (
@@ -59,8 +59,8 @@ impl ParseNode for Symbol {
                         vec![],
                         IJType::Number(None),
                         vec![],
-                        context.get_increment_id(),
-                    ),
+                        context,
+                    )?,
                     slice,
                 ),
                 _ => unreachable!(),
@@ -103,8 +103,8 @@ impl ParseNodeFunctional for Symbol {
                     vec![],
                     variable.typ.clone(),
                     vec![],
-                    context.get_increment_id(),
-                ))],
+                    context,
+                )?)],
                 slice.move_start(1)?,
             ))
         } else {

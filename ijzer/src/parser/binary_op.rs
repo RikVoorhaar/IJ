@@ -52,8 +52,8 @@ pub fn next_node_simple_binary_op(
             input_types,
             output_type,
             operands,
-            context.get_increment_id(),
-        )),
+            context,
+        )?),
         rest,
     ))
 }
@@ -74,8 +74,8 @@ fn _next_node_functional_binary(
             vec![],
             IJType::Function(FunctionSignature::new(input_type, output_type)),
             vec![],
-            context.get_increment_id(),
-        )));
+            context,
+        )?));
     }
     if check_ok_needed_outputs(needed_outputs, &IJType::Number(None)) {
         let output_type = IJType::Number(None);
@@ -85,8 +85,8 @@ fn _next_node_functional_binary(
             vec![],
             IJType::Function(FunctionSignature::new(input_type, output_type)),
             vec![],
-            context.get_increment_id(),
-        )));
+            context,
+        )?));
     }
     if check_ok_needed_outputs(needed_outputs, &IJType::Tensor(None)) {
         let output_type = IJType::Tensor(None);
@@ -101,8 +101,8 @@ fn _next_node_functional_binary(
                 vec![],
                 IJType::Function(FunctionSignature::new(input_type, output_type.clone())),
                 vec![],
-                context.get_increment_id(),
-            )));
+                context,
+            )?));
         }
     }
     if nodes.is_empty() {

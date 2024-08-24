@@ -27,8 +27,8 @@ impl ParseNode for NumberNode {
                         vec![],
                         IJType::Scalar(Some(n.clone())),
                         vec![],
-                        context.get_increment_id(),
-                    )),
+                        context,
+                    )?),
                     slice,
                 ))
             }
@@ -38,8 +38,8 @@ impl ParseNode for NumberNode {
                     vec![],
                     IJType::Scalar(None),
                     vec![],
-                    context.get_increment_id(),
-                )),
+                    context,
+                )?),
                 slice,
             )),
         }

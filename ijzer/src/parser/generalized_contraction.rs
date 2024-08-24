@@ -47,8 +47,8 @@ impl ParseNode for GeneralizedContraction {
             ],
             IJType::Tensor(None),
             vec![f_node, g_node, operands[0].clone(), operands[1].clone()],
-            context.get_increment_id(),
-        );
+            context,
+        )?;
         Ok((Rc::new(node), rest))
     }
 }
@@ -76,8 +76,8 @@ impl ParseNodeFunctional for GeneralizedContraction {
             ],
             IJType::tensor_function(2),
             vec![f_node, g_node],
-            context.get_increment_id(),
-        );
+            context,
+        )?;
         Ok((vec![Rc::new(node)], rest))
     }
 }

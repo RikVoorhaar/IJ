@@ -33,8 +33,8 @@ pub fn parse_lambda_assign_lhs(
         vec![node_type.clone()],
         node_type,
         vec![],
-        context.get_increment_id(),
-    );
+        context,
+    )?;
     Ok((Rc::new(node), rest))
 }
 
@@ -58,8 +58,8 @@ impl ParseNode for LambdaVariable {
             vec![],
             var_type,
             vec![],
-            context.get_increment_id(),
-        );
+            context,
+        )?;
         Ok((Rc::new(node), slice))
     }
 }
@@ -101,8 +101,8 @@ impl ParseNodeFunctional for LambdaVariable {
             vec![],
             IJType::Function(signature),
             vec![],
-            context.get_increment_id(),
-        );
+            context,
+        )?;
         Ok((vec![Rc::new(node)], slice.move_start(1)?))
     }
 }

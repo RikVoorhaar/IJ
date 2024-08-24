@@ -89,8 +89,8 @@ fn type_conversion_functional_part(
                 vec![function_node.output_type.clone()],
                 desired_type,
                 vec![function_node],
-                context.get_increment_id(),
-            );
+                context,
+            )?;
             Ok((Rc::new(conversion_node), rest))
         }
         None => Err(SyntaxError::TypeConversionNotPossible(
@@ -130,8 +130,8 @@ impl ParseNode for TypeConversion {
                     vec![current_type],
                     desired_type,
                     vec![operand],
-                    context.get_increment_id(),
-                );
+                    context,
+                )?;
                 Ok((Rc::new(conversion_node), rest))
             }
             IJType::Function(ref signature) => {
@@ -151,8 +151,8 @@ impl ParseNode for TypeConversion {
                             .into_iter()
                             .chain(operands)
                             .collect(),
-                        context.get_increment_id(),
-                    )),
+                        context,
+                    )?),
                     rest,
                 ))
             }

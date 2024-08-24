@@ -42,7 +42,7 @@ impl ParseNodeFunctional for IdentityNode {
         let nodes = output_types
             .iter()
             .map(|output_type| {
-                Rc::new(Node::new(
+                Ok(Rc::new(Node::new(
                     Operation::Identity,
                     vec![],
                     IJType::Function(FunctionSignature::new(
@@ -50,10 +50,10 @@ impl ParseNodeFunctional for IdentityNode {
                         output_type.clone(),
                     )),
                     vec![],
-                    context.get_increment_id(),
-                ))
+                    context,
+                )?))
             })
-            .collect();
+            .collect::<Result<Vec<Rc<Node>>>>()?;
         Ok((nodes, slice))
     }
 }

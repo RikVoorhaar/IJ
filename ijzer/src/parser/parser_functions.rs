@@ -97,8 +97,8 @@ fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
                 vec![],
                 typ,
                 vec![],
-                context.get_increment_id(),
-            )))
+                context,
+            )?))
         }
         _ => Err(SyntaxError::InvalidVarStatement(
             context.token_slice_to_string(context.full_slice()),

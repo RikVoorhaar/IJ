@@ -263,8 +263,8 @@ impl ParseNode for FunctionComposition {
                 full_input_type,
                 output_type,
                 all_nodes,
-                context.get_increment_id(),
-            )),
+                context,
+            )?),
             rest,
         ))
     }
@@ -276,7 +276,7 @@ impl ParseNodeFunctional for FunctionComposition {
         slice: TokenSlice,
         context: &mut ASTContext,
         needed_outputs: Option<&[IJType]>,
-    ) -> Result<(Vec<Rc<Node>>, TokenSlice), Error> {
+    ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
         let slice = slice.move_start(1)?;
         let (chains, remainder) = Self::get_chains_from_slice(slice, context)?;
 
@@ -305,16 +305,16 @@ impl ParseNodeFunctional for FunctionComposition {
                         chain.get_node_types(),
                         chain_type,
                         chain.functions.clone(),
-                        context.get_increment_id(),
-                    )))
+                        context,
+                    )?))
                 } else {
                     Err(SyntaxError::TypeError(
                         "Function".to_string(),
                         format!("{:?}", chain_type),
-                    ))
+                    ).into())
                 }
             })
-            .collect::<Result<Vec<Rc<Node>>, SyntaxError>>()?;
+            .collect::<Result<Vec<Rc<Node>>>>()?;
 
         Ok((nodes, remainder))
     }
@@ -328,25 +328,25 @@ mod tests {
     use crate::parser::{parse_str, parse_str_no_context};
     use crate::types::FunctionSignature;
 
-    fn _create_function_node(input_types: Vec<IJType>, output_type: IJType, id: usize) -> Rc<Node> {
+    fn _create_function_node(input_types: Vec<IJType>, output_type: IJType, context: &mut ASTContext) -> Result<Rc<Node>> {
         let function_signature = FunctionSignature::new(input_types, output_type);
-        Rc::new(Node::new(
+        Ok(Rc::new(Node::new(
             Operation::Function("test_functoin".to_string()),
             vec![],
             IJType::Function(function_signature),
             vec![],
-            id,
-        ))
+            context,
+        )?))
     }
 
-    fn _create_non_function_node(id: usize) -> Rc<Node> {
-        Rc::new(Node::new(
+    fn _create_non_function_node(context: &mut ASTContext) -> Result<Rc<Node>> {
+        Ok(Rc::new(Node::new(
             Operation::Symbol("test_symbol".to_string()),
             vec![],
             IJType::Tensor(None),
             vec![],
-            id,
-        ))
+            context,
+        )?))
     }
 
     #[test]
@@ -356,20 +356,24 @@ mod tests {
     }
 
     #[test]
-    fn test_function_chain_extend1() {
+    fn test_function_chain_extend1() -> Result<()> {
+        let mut context = ASTContext::new();
         let chain = FunctionChain::empty();
-        let node = _create_function_node(vec![IJType::Tensor(None)], IJType::Tensor(None), 0);
+        let node = _create_function_node(vec![IJType::Tensor(None)], IJType::Tensor(None), &mut context)?;
         let result = chain.extend(node);
         assert!(result.is_ok());
         let new_chain = result.unwrap().unwrap();
         assert_eq!(new_chain.len(), 1);
+
+        Ok(())
     }
 
     #[test]
-    fn test_function_chain_extend2() {
+    fn test_function_chain_extend2() -> Result<()> {
+        let mut context = ASTContext::new();
         let chain = FunctionChain::empty();
-        let node1 = _create_function_node(vec![IJType::Tensor(None)], IJType::Tensor(None), 0);
-        let node2 = _create_function_node(vec![IJType::Tensor(None)], IJType::Tensor(None), 1);
+        let node1 = _create_function_node(vec![IJType::Tensor(None)], IJType::Tensor(None), &mut context)?;
+        let node2 = _create_function_node(vec![IJType::Tensor(None)], IJType::Tensor(None), &mut context)?;
         let result = chain.extend(node1);
         assert!(result.is_ok());
         let new_chain = result.unwrap().unwrap();
@@ -377,13 +381,16 @@ mod tests {
         assert!(result.is_ok());
         let new_chain = result.unwrap().unwrap();
         assert_eq!(new_chain.len(), 2);
+
+        Ok(())
     }
 
     #[test]
-    fn test_function_chain_extend_incompatible() {
+    fn test_function_chain_extend_incompatible() -> Result<()> {
+        let mut context = ASTContext::new();
         let chain = FunctionChain::empty();
-        let node1 = _create_function_node(vec![IJType::Tensor(None)], IJType::Tensor(None), 0);
-        let node2 = _create_function_node(vec![IJType::Tensor(None)], IJType::Scalar(None), 1);
+        let node1 = _create_function_node(vec![IJType::Tensor(None)], IJType::Tensor(None), &mut context)?;
+        let node2 = _create_function_node(vec![IJType::Tensor(None)], IJType::Scalar(None), &mut context)?;
         let result = chain.extend(node1);
         assert!(result.is_ok());
         let new_chain = result.unwrap().unwrap();
@@ -391,14 +398,19 @@ mod tests {
         assert!(result.is_ok());
         let new_chain = result.unwrap();
         assert!(new_chain.is_none());
+
+        Ok(())
     }
 
     #[test]
-    fn test_function_chain_extend_not_function() {
+    fn test_function_chain_extend_not_function() -> Result<()> {
+        let mut context = ASTContext::new();
         let chain = FunctionChain::empty();
-        let node1 = _create_non_function_node(0);
+        let node1 = _create_non_function_node(&mut context)?;
         let result = chain.extend(node1);
         assert!(result.is_err());
+
+        Ok(())
     }
 
     #[test]

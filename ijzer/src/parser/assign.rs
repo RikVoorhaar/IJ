@@ -159,8 +159,8 @@ pub fn parse_assign(context: &mut ASTContext) -> Result<Rc<Node>> {
         vec![],
         symbol_type.clone(),
         vec![],
-        context.get_increment_id(),
-    ));
+        context,
+    )?);
     context.insert_variable(Variable {
         name: symbol_name,
         typ: symbol_type.clone(),
@@ -173,8 +173,8 @@ pub fn parse_assign(context: &mut ASTContext) -> Result<Rc<Node>> {
         vec![symbol_type, rhs_node.output_type.clone()],
         IJType::Void,
         operands,
-        context.get_increment_id(),
-    )))
+        context,
+    )?))
 }
 
 #[cfg(test)]

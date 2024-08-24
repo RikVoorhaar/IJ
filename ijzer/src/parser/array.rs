@@ -31,8 +31,8 @@ impl ParseNode for LSqBracket {
                         vec![],
                         IJType::Tensor(Some(n.clone())),
                         vec![],
-                        context.get_increment_id(),
-                    )),
+                        context,
+                    )?),
                     rest,
                 ))
             }
@@ -42,8 +42,8 @@ impl ParseNode for LSqBracket {
                     vec![],
                     IJType::Tensor(None),
                     vec![],
-                    context.get_increment_id(),
-                )),
+                    context,
+                )?),
                 rest,
             )),
         }

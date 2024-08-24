@@ -176,6 +176,15 @@ impl IJType {
             _ => None,
         }
     }
+
+    pub fn extract_number_type(&self) -> Option<NumberType> {
+        match self {
+            IJType::Scalar(n) => Some(n.clone()),
+            IJType::Tensor(n) => Some(n.clone()),
+            IJType::Number(n) => Some(n.clone()),
+            _ => None,
+        }
+    }
 }
 
 impl std::fmt::Display for IJType {

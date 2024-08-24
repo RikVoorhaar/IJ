@@ -38,8 +38,8 @@ impl ParseNode for Apply {
                 node_input_types,
                 output_type.clone(),
                 operands,
-                context.id_counter,
-            )),
+                context,
+            )?),
             rest,
         ))
     }

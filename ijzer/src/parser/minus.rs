@@ -52,8 +52,8 @@ impl ParseNode for MinusOp {
                     vec![],
                     output_type,
                     vec![],
-                    context.get_increment_id(),
-                );
+                    context,
+                )?;
                 return Ok((Rc::new(node), rest));
             }
         }
@@ -64,8 +64,8 @@ impl ParseNode for MinusOp {
                     input_types,
                     output_type,
                     operands,
-                    context.get_increment_id(),
-                )),
+                    context,
+                )?),
                 rest,
             )),
             2 => Ok((
@@ -74,8 +74,8 @@ impl ParseNode for MinusOp {
                     input_types,
                     output_type,
                     operands,
-                    context.get_increment_id(),
-                )),
+                    context,
+                )?),
                 rest,
             )),
             _ => unreachable!(),
@@ -98,15 +98,15 @@ impl ParseNodeFunctional for MinusOp {
                 vec![],
                 IJType::scalar_function(2),
                 vec![],
-                context.get_increment_id(),
-            )));
+                context,
+            )?));
             nodes.push(Rc::new(Node::new(
                 Operation::Negate,
                 vec![],
                 IJType::scalar_function(1),
                 vec![],
-                context.get_increment_id(),
-            )));
+                context,
+            )?));
         }
         if check_ok_needed_outputs(needed_outputs, &IJType::Number(None)) {
             nodes.push(Rc::new(Node::new(
@@ -114,15 +114,15 @@ impl ParseNodeFunctional for MinusOp {
                 vec![],
                 IJType::number_function(2),
                 vec![],
-                context.get_increment_id(),
-            )));
+                context,
+            )?));
             nodes.push(Rc::new(Node::new(
                 Operation::Negate,
                 vec![],
                 IJType::number_function(1),
                 vec![],
-                context.get_increment_id(),
-            )));
+                context,
+            )?));
         }
         if check_ok_needed_outputs(needed_outputs, &IJType::Tensor(None)) {
             let output_type = IJType::Tensor(None);
@@ -143,8 +143,8 @@ impl ParseNodeFunctional for MinusOp {
                     vec![],
                     IJType::Function(FunctionSignature::new(input_type, output_type.clone())),
                     vec![],
-                    context.get_increment_id(),
-                )));
+                    context,
+                )?));
             }
         }
         if nodes.is_empty() {

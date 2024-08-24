@@ -28,8 +28,8 @@ impl ParseNode for Reduction {
                 vec![function.output_type.clone(), IJType::Tensor(None)],
                 IJType::Scalar(None),
                 vec![function, operand],
-                context.get_increment_id(),
-            )),
+                context,
+            )?),
             rest,
         ))
     }
@@ -59,8 +59,8 @@ impl ParseNodeFunctional for Reduction {
             vec![IJType::number_function(2)],
             IJType::Function(FunctionSignature::new(vec![IJType::Tensor(None)], IJType::Scalar(None))),
             vec![function],
-            context.get_increment_id(),
-        ));
+            context,
+        )?);
         Ok((vec![node], rest))
     }
 }
