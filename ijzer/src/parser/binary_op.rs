@@ -1,10 +1,10 @@
 use super::{check_ok_needed_outputs, gather_operands, ParseNodeFunctional};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};
-use crate::types::{FunctionSignature, IJType};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
+use crate::types::{FunctionSignature, IJType};
 use anyhow::{anyhow, Context, Result};
 use std::rc::Rc;
 
@@ -28,10 +28,10 @@ pub fn next_node_simple_binary_op(
         .map(|n| n.output_type.clone())
         .collect::<Vec<IJType>>();
     let output_type = match input_types.as_slice() {
-        [IJType::Tensor(None), IJType::Tensor(None)] => IJType::Tensor(None),
-        [IJType::Scalar(None), IJType::Tensor(None)] => IJType::Tensor(None),
-        [IJType::Tensor(None), IJType::Scalar(None)] => IJType::Tensor(None),
-        [IJType::Scalar(None), IJType::Scalar(None)] => IJType::Scalar(None),
+        [IJType::Tensor(_), IJType::Tensor(_)] => IJType::Tensor(None),
+        [IJType::Scalar(_), IJType::Tensor(_)] => IJType::Tensor(None),
+        [IJType::Tensor(_), IJType::Scalar(_)] => IJType::Tensor(None),
+        [IJType::Scalar(_), IJType::Scalar(_)] => IJType::Scalar(None),
         _ => {
             return Err(context.add_context_to_syntax_error(
                 SyntaxError::TypeError(
@@ -47,13 +47,7 @@ pub fn next_node_simple_binary_op(
         }
     };
     Ok((
-        Rc::new(Node::new(
-            op,
-            input_types,
-            output_type,
-            operands,
-            context,
-        )?),
+        Rc::new(Node::new(op, input_types, output_type, operands, context)?),
         rest,
     ))
 }
@@ -148,7 +142,10 @@ mod tests {
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
         assert_eq!(node.op, Operation::Add);
-        assert_eq!(node.input_types, vec![IJType::Tensor(None), IJType::Tensor(None)]);
+        assert_eq!(
+            node.input_types,
+            vec![IJType::Tensor(None), IJType::Tensor(None)]
+        );
         assert_eq!(node.output_type, IJType::Tensor(None));
     }
 
@@ -158,7 +155,10 @@ mod tests {
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
         assert_eq!(node.op, Operation::Add);
-        assert_eq!(node.input_types, vec![IJType::Tensor(None), IJType::Scalar(None)]);
+        assert_eq!(
+            node.input_types,
+            vec![IJType::Tensor(None), IJType::Scalar(None)]
+        );
         assert_eq!(node.output_type, IJType::Tensor(None));
     }
 
@@ -168,7 +168,10 @@ mod tests {
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
         assert_eq!(node.op, Operation::Add);
-        assert_eq!(node.input_types, vec![IJType::Scalar(None), IJType::Scalar(None)]);
+        assert_eq!(
+            node.input_types,
+            vec![IJType::Scalar(None), IJType::Scalar(None)]
+        );
         assert_eq!(node.output_type, IJType::Scalar(None));
     }
 
@@ -178,7 +181,10 @@ mod tests {
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
         assert_eq!(node.op, Operation::Multiply);
-        assert_eq!(node.input_types, vec![IJType::Tensor(None), IJType::Tensor(None)]);
+        assert_eq!(
+            node.input_types,
+            vec![IJType::Tensor(None), IJType::Tensor(None)]
+        );
         assert_eq!(node.output_type, IJType::Tensor(None));
     }
 
@@ -188,7 +194,10 @@ mod tests {
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
         assert_eq!(node.op, Operation::Multiply);
-        assert_eq!(node.input_types, vec![IJType::Tensor(None), IJType::Scalar(None)]);
+        assert_eq!(
+            node.input_types,
+            vec![IJType::Tensor(None), IJType::Scalar(None)]
+        );
         assert_eq!(node.output_type, IJType::Tensor(None));
     }
 
@@ -198,7 +207,27 @@ mod tests {
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
         assert_eq!(node.op, Operation::Multiply);
-        assert_eq!(node.input_types, vec![IJType::Scalar(None), IJType::Scalar(None)]);
+        assert_eq!(
+            node.input_types,
+            vec![IJType::Scalar(None), IJType::Scalar(None)]
+        );
         assert_eq!(node.output_type, IJType::Scalar(None));
+    }
+
+    #[test]
+    fn test_with_type_inference() -> Result<()> {
+        let (node, _) = parse_str_no_context("+ 1 2<i64>")?;
+        assert_eq!(node.output_type, IJType::Scalar(Some("i64".to_string())));
+
+        let (node, _) = parse_str_no_context("+ 1 2<_>")?;
+        assert_eq!(node.output_type, IJType::Scalar(Some("_".to_string())));
+
+        let (node, _) = parse_str_no_context("+ 1<_> 2<_>")?;
+        assert_eq!(node.output_type, IJType::Scalar(Some("_".to_string())));
+
+        let result = parse_str_no_context("+ 1<usize> 2<i64>");
+        assert!(result.is_err());
+
+        Ok(())
     }
 }

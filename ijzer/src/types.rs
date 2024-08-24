@@ -185,19 +185,34 @@ impl IJType {
             _ => None,
         }
     }
+
+    pub fn type_match(&self, other: &Self) -> bool {
+        if self == other {
+            return true;
+        }
+        matches!(
+            (self, other),
+            (IJType::Scalar(None), IJType::Scalar(_))
+                | (IJType::Scalar(_), IJType::Scalar(None))
+                | (IJType::Tensor(None), IJType::Tensor(_))
+                | (IJType::Tensor(_), IJType::Tensor(None))
+                | (IJType::Number(None), IJType::Number(_))
+                | (IJType::Number(_), IJType::Number(None))
+        )
+    }
 }
 
 impl std::fmt::Display for IJType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             IJType::Scalar(None) => write!(f, "S"),
-            IJType::Scalar(Some(n)) => write!(f, "{}", n),
+            IJType::Scalar(Some(n)) => write!(f, "S<{}>", n),
             IJType::Tensor(None) => write!(f, "T"),
-            IJType::Tensor(Some(n)) => write!(f, "{}", n),
+            IJType::Tensor(Some(n)) => write!(f, "T<{}>", n),
             IJType::Function(sig) => write!(f, "Fn({})", sig),
             IJType::Void => write!(f, "Void"),
             IJType::Number(None) => write!(f, "N"),
-            IJType::Number(Some(n)) => write!(f, "{}", n),
+            IJType::Number(Some(n)) => write!(f, "N<{}>", n),
             IJType::Group(types) => write!(
                 f,
                 "Group({})",

@@ -44,7 +44,7 @@ pub fn gather_operands(
             .iter()
             .map(|n| n.output_type.clone())
             .collect::<Vec<IJType>>();
-        if types.iter().any(|t| t == &operands_types) {
+        if types.iter().any(|t| t.iter().zip(operands_types.iter()).all(|(a, b)| a.type_match(b))) {
             longest_match_length = operands.len();
         }
     }
