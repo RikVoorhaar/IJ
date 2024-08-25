@@ -177,6 +177,8 @@ impl IJType {
         }
     }
 
+    /// Extracts the number type from the type. If the type is not a scalar, tensor, or number, it returns None.
+    /// Note that this thus returns an Option<Option<String>>.
     pub fn extract_number_type(&self) -> Option<NumberType> {
         match self {
             IJType::Scalar(n) => Some(n.clone()),
@@ -199,6 +201,34 @@ impl IJType {
                 | (IJType::Number(None), IJType::Number(_))
                 | (IJType::Number(_), IJType::Number(None))
         )
+    }
+
+    pub fn type_downcast_number_type(&self, other: &Self) -> Result<Self> {
+        if !self.type_match(other) {
+            return Err(SyntaxError::TypeConversionNotPossible(
+                format!("{:?}", self),
+                format!("{:?}", other),
+            )
+            .into());
+        }
+        match (self, other) {
+            (IJType::Scalar(None), IJType::Scalar(Some(n))) => Ok(IJType::Scalar(Some(n.clone()))),
+            (IJType::Scalar(Some(n)), IJType::Scalar(None)) => Ok(IJType::Scalar(Some(n.clone()))),
+            (IJType::Tensor(None), IJType::Tensor(Some(n))) => Ok(IJType::Tensor(Some(n.clone()))),
+            (IJType::Tensor(Some(n)), IJType::Tensor(None)) => Ok(IJType::Tensor(Some(n.clone()))),
+            (IJType::Number(None), IJType::Number(Some(n))) => Ok(IJType::Number(Some(n.clone()))),
+            (IJType::Number(Some(n)), IJType::Number(None)) => Ok(IJType::Number(Some(n.clone()))),
+            _ => Ok(self.clone()),
+        }
+    }
+
+    pub fn maybe_apply_number_type(&self, other: &Option<String>) -> Self {
+        match self {
+            IJType::Scalar(None) => IJType::Scalar(other.clone()),
+            IJType::Tensor(None) => IJType::Tensor(other.clone()),
+            IJType::Number(None) => IJType::Number(other.clone()),
+            _ => self.clone(),
+        }
     }
 }
 

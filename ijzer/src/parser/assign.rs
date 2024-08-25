@@ -329,6 +329,17 @@ mod tests {
     }
 
     #[test]
+    fn test_assign_simple_scalar_with_number_type() -> Result<()> {
+        let tokens = lexer("g: S<i64> = 1<i64>")?;
+        let mut context = ASTContext::from_tokens(tokens.clone());
+        let node = parse_assign(&mut context)?;
+        assert_eq!(node.op, Operation::Assign);
+        assert_eq!(node.operands[0].output_type, IJType::Scalar(Some("i64".to_string())));
+        assert_eq!(node.operands[1].output_type, IJType::Scalar(Some("i64".to_string())));
+        Ok(())
+    }
+
+    #[test]
     fn test_assign_simple_function() -> Result<()> {
         let tokens = lexer("g($x) = $x")?;
         let mut context = ASTContext::from_tokens(tokens.clone());
@@ -361,6 +372,23 @@ mod tests {
         );
         assert_eq!(node.operands[1].output_type, IJType::Scalar(None));
         assert_eq!(node.operands[2].output_type, IJType::Scalar(None));
+        Ok(())
+    }
+    #[test]
+    fn test_assign_simple_function_scalar_with_number_type() -> Result<()> {
+        let tokens = lexer("g($x: S<i64>) = $x")?;
+        let mut context = ASTContext::from_tokens(tokens.clone());
+        let node = parse_assign(&mut context)?;
+        println!("{:?}", node);
+        assert_eq!(node.op, Operation::Assign);
+        assert_eq!(node.operands.len(), 3);
+        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(
+            node.operands[0].output_type,
+            IJType::Function(FunctionSignature::new(vec![IJType::Scalar(Some("i64".to_string()))], IJType::Scalar(Some("i64".to_string()))))
+        );
+        assert_eq!(node.operands[1].output_type, IJType::Scalar(Some("i64".to_string())));
+        assert_eq!(node.operands[2].output_type, IJType::Scalar(Some("i64".to_string())));
         Ok(())
     }
 

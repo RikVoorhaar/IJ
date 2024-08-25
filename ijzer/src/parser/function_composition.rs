@@ -44,12 +44,35 @@ impl FunctionChain {
     fn empty() -> Self {
         Self { functions: vec![] }
     }
+    fn get_number_type(&self) -> Result<Option<String>> {
+        if self.len() == 0 {
+            return Ok(None);
+        }
+        let mut number_type =
+            _get_output_type_from_function(self.functions.last().unwrap().clone())?
+                .extract_number_type()
+                .unwrap_or(None);
 
-    fn get_output_type(&self) -> Result<IJType, SyntaxError> {
+        for function in self.functions.iter().rev().skip(1) {
+            let number_input_type = _get_input_types_from_function(function.clone())?[0]
+                .maybe_apply_number_type(&number_type)
+                .extract_number_type()
+                .unwrap_or(None);
+            number_type = _get_output_type_from_function(function.clone())?
+                .maybe_apply_number_type(&number_input_type)
+                .extract_number_type()
+                .unwrap_or(None);
+        }
+        Ok(number_type)
+    }
+
+    fn get_output_type(&self) -> Result<IJType> {
         let first_function = self.functions.first().ok_or_else(|| {
             SyntaxError::FunctionChainInconsistency("Function chain is empty".to_string())
         })?;
-        _get_output_type_from_function(first_function.clone())
+        let output_type = _get_output_type_from_function(first_function.clone())?;
+        let number_type = self.get_number_type()?;
+        Ok(output_type.maybe_apply_number_type(&number_type))
     }
 
     fn get_input_types(&self) -> Result<Vec<IJType>, SyntaxError> {
@@ -66,7 +89,7 @@ impl FunctionChain {
             .collect()
     }
 
-    fn get_chain_type(&self) -> Result<IJType, SyntaxError> {
+    fn get_chain_type(&self) -> Result<IJType> {
         let input_types = self.get_input_types()?;
         let output_types = self.get_output_type()?;
         Ok(IJType::Function(FunctionSignature::new(
@@ -95,7 +118,7 @@ impl FunctionChain {
             }
             let prev_input_type = prev_input_types[0].clone();
             let next_output_type = _get_output_type_from_function(next_function.clone())?;
-            if prev_input_type != next_output_type {
+            if !prev_input_type.type_match(&next_output_type) {
                 return Err(SyntaxError::FunctionChainInconsistency(format!(
                     "Function chain is not consistent: {:?} -> {:?}",
                     prev_input_type, next_output_type
@@ -124,9 +147,10 @@ impl FunctionChain {
         let last_input_type = last_input_types[0].clone();
 
         let node_output_type = _get_output_type_from_function(node.clone())?;
-        if last_input_type != node_output_type {
+        if !last_input_type.type_match(&node_output_type) {
             return Ok(None);
         }
+
         let mut new_functions = self.functions.clone();
         new_functions.push(node);
         Ok(Some(Self::new(new_functions)?))
@@ -134,7 +158,11 @@ impl FunctionChain {
 
     fn match_input_type(&self, input_types: Vec<IJType>) -> Result<bool, SyntaxError> {
         let chain_input_types = self.get_input_types()?;
-        Ok(chain_input_types == input_types)
+        Ok(chain_input_types.len() == input_types.len()
+            && chain_input_types
+                .iter()
+                .zip(input_types.iter())
+                .all(|(a, b)| a.type_match(b)))
     }
 }
 
@@ -308,10 +336,10 @@ impl ParseNodeFunctional for FunctionComposition {
                         context,
                     )?))
                 } else {
-                    Err(SyntaxError::TypeError(
-                        "Function".to_string(),
-                        format!("{:?}", chain_type),
-                    ).into())
+                    Err(
+                        SyntaxError::TypeError("Function".to_string(), format!("{:?}", chain_type))
+                            .into(),
+                    )
                 }
             })
             .collect::<Result<Vec<Rc<Node>>>>()?;
@@ -328,10 +356,14 @@ mod tests {
     use crate::parser::{parse_str, parse_str_no_context};
     use crate::types::FunctionSignature;
 
-    fn _create_function_node(input_types: Vec<IJType>, output_type: IJType, context: &mut ASTContext) -> Result<Rc<Node>> {
+    fn _create_function_node(
+        input_types: Vec<IJType>,
+        output_type: IJType,
+        context: &mut ASTContext,
+    ) -> Result<Rc<Node>> {
         let function_signature = FunctionSignature::new(input_types, output_type);
         Ok(Rc::new(Node::new(
-            Operation::Function("test_functoin".to_string()),
+            Operation::Function("test_function".to_string()),
             vec![],
             IJType::Function(function_signature),
             vec![],
@@ -359,7 +391,11 @@ mod tests {
     fn test_function_chain_extend1() -> Result<()> {
         let mut context = ASTContext::new();
         let chain = FunctionChain::empty();
-        let node = _create_function_node(vec![IJType::Tensor(None)], IJType::Tensor(None), &mut context)?;
+        let node = _create_function_node(
+            vec![IJType::Tensor(None)],
+            IJType::Tensor(None),
+            &mut context,
+        )?;
         let result = chain.extend(node);
         assert!(result.is_ok());
         let new_chain = result.unwrap().unwrap();
@@ -372,8 +408,16 @@ mod tests {
     fn test_function_chain_extend2() -> Result<()> {
         let mut context = ASTContext::new();
         let chain = FunctionChain::empty();
-        let node1 = _create_function_node(vec![IJType::Tensor(None)], IJType::Tensor(None), &mut context)?;
-        let node2 = _create_function_node(vec![IJType::Tensor(None)], IJType::Tensor(None), &mut context)?;
+        let node1 = _create_function_node(
+            vec![IJType::Tensor(None)],
+            IJType::Tensor(None),
+            &mut context,
+        )?;
+        let node2 = _create_function_node(
+            vec![IJType::Tensor(None)],
+            IJType::Tensor(None),
+            &mut context,
+        )?;
         let result = chain.extend(node1);
         assert!(result.is_ok());
         let new_chain = result.unwrap().unwrap();
@@ -389,8 +433,16 @@ mod tests {
     fn test_function_chain_extend_incompatible() -> Result<()> {
         let mut context = ASTContext::new();
         let chain = FunctionChain::empty();
-        let node1 = _create_function_node(vec![IJType::Tensor(None)], IJType::Tensor(None), &mut context)?;
-        let node2 = _create_function_node(vec![IJType::Tensor(None)], IJType::Scalar(None), &mut context)?;
+        let node1 = _create_function_node(
+            vec![IJType::Tensor(None)],
+            IJType::Tensor(None),
+            &mut context,
+        )?;
+        let node2 = _create_function_node(
+            vec![IJType::Tensor(None)],
+            IJType::Scalar(None),
+            &mut context,
+        )?;
         let result = chain.extend(node1);
         assert!(result.is_ok());
         let new_chain = result.unwrap().unwrap();
@@ -538,6 +590,21 @@ mod tests {
         assert_eq!(child1.op, Operation::FunctionComposition(2));
         let child2 = node.operands[1].clone();
         assert_eq!(child2.op, Operation::Add);
+        Ok(())
+    }
+
+    #[test]
+    fn test_function_composition_number_type() -> Result<()> {
+        let mut context = ASTContext::new();
+        parse_str("var f: Fn(S<a>,S<b>->S<c>)", &mut context)?;
+        parse_str("var g: Fn(S<c>->S<d>)", &mut context)?;
+        let node = parse_str("@(g,f) 1 2", &mut context)?;
+        assert_eq!(node.output_type, IJType::Scalar(Some("d".to_string())));
+
+        parse_str("var f: Fn(S<a>,S<b>->S<c>)", &mut context)?;
+        parse_str("var g: Fn(S->S)", &mut context)?;
+        let node = parse_str("@(g,f) 1 2", &mut context)?;
+        assert_eq!(node.output_type, IJType::Scalar(Some("c".to_string())));
         Ok(())
     }
 }
