@@ -203,6 +203,28 @@ impl IJType {
         )
     }
 
+    /// Checks if the function type matches the other function type.
+    /// For example an `Fn(S<a>->S<a>) matches a Fn(S->S).
+    pub fn type_match_function(&self, other: &Self) -> Result<bool> {
+        if self == other {
+            return Ok(true);
+        }
+        let signature1 = self
+            .extract_signature()
+            .ok_or(SyntaxError::ExpectedFunction(format!("{:?}", self)))?;
+
+        let signature2 = other
+            .extract_signature()
+            .ok_or(SyntaxError::ExpectedFunction(format!("{:?}", other)))?;
+
+        Ok(signature1.output.type_match(&signature2.output)
+            && signature1
+                .input
+                .iter()
+                .zip(signature2.input.iter())
+                .all(|(a, b)| a.type_match(b)))
+    }
+
     pub fn type_downcast_number_type(&self, other: &Self) -> Result<Self> {
         if !self.type_match(other) {
             return Err(SyntaxError::TypeConversionNotPossible(

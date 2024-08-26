@@ -35,13 +35,16 @@ impl ParseNode for GeneralizedContraction {
         context: &mut ASTContext,
     ) -> Result<(Rc<Node>, TokenSlice)> {
         let (f_node, g_node, rest) = Self::get_functional_part(slice, context)?;
-        let (operands, rest) =
-            gather_operands(vec![vec![IJType::Tensor(None), IJType::Tensor(None)]], rest, context)?;
+        let (operands, rest) = gather_operands(
+            vec![vec![IJType::Tensor(None), IJType::Tensor(None)]],
+            rest,
+            context,
+        )?;
         let node = Node::new(
             Operation::GeneralizedContraction,
             vec![
-                IJType::Function(Self::first_signature()),
-                IJType::Function(Self::second_signature()),
+                f_node.output_type.clone(),
+                g_node.output_type.clone(),
                 operands[0].output_type.clone(),
                 operands[1].output_type.clone(),
             ],
@@ -68,13 +71,48 @@ impl ParseNodeFunctional for GeneralizedContraction {
             .into());
         }
         let (f_node, g_node, rest) = Self::get_functional_part(slice, context)?;
+        let f_number_type_output = f_node
+            .output_type
+            .extract_signature()
+            .unwrap()
+            .output
+            .extract_number_type()
+            .unwrap_or_default();
+        let f_number_type_input = f_node.output_type.extract_signature().unwrap().input[0]
+            .extract_number_type()
+            .unwrap_or_default();
+        let g_number_type = g_node
+            .output_type
+            .extract_signature()
+            .unwrap()
+            .output
+            .extract_number_type()
+            .unwrap_or_default();
+        match (f_number_type_input, g_number_type.clone()) {
+            (Some(n), Some(m)) => {
+                if n != m {
+                    return Err(SyntaxError::NumberTypeMismatch(n, m).into());
+                }
+            }
+            _ => {}
+        }
+        let (number_type_input, number_type_output) = match (f_number_type_output, g_number_type) {
+            (Some(n1), Some(n2)) => (Some(n1.clone()), Some(n2.clone())),
+            (Some(n1), None) => (Some(n1.clone()), Some(n1.clone())),
+            (None, Some(n2)) => (Some(n2.clone()), Some(n2.clone())),
+            _ => (None, None),
+        };
+
         let node = Node::new(
             Operation::GeneralizedContraction,
-            vec![
-                IJType::Function(Self::first_signature()),
-                IJType::Function(Self::second_signature()),
-            ],
-            IJType::tensor_function(2),
+            vec![f_node.output_type.clone(), g_node.output_type.clone()],
+            IJType::Function(FunctionSignature::new(
+                vec![
+                    IJType::Tensor(number_type_input.clone()),
+                    IJType::Tensor(number_type_input),
+                ],
+                IJType::Tensor(number_type_output),
+            )),
             vec![f_node, g_node],
             context,
         )?;
@@ -85,7 +123,7 @@ impl ParseNodeFunctional for GeneralizedContraction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::parse_str_no_context;
+    use crate::parser::{parse_str, parse_str_no_context};
 
     #[test]
     fn test_generalized_contraction() -> Result<()> {
@@ -126,6 +164,43 @@ mod tests {
 
         let result = parse_str_no_context("?/+* [1]<a> [2]<b>");
         assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_generalized_contraction_functions() -> Result<()> {
+        let mut context = ASTContext::new();
+        parse_str("var f: Fn(T->S)", &mut context)?;
+        parse_str("var g: Fn(N,N->N)", &mut context)?;
+        let node = parse_str("~? f g", &mut context)?;
+        assert_eq!(node.op, Operation::GeneralizedContraction);
+        assert_eq!(
+            node.output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor(None), IJType::Tensor(None)],
+                IJType::Tensor(None)
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_generalized_contraction_functions_number_type() -> Result<()> {
+        let mut context = ASTContext::new();
+        parse_str("var f: Fn(T->S)", &mut context)?;
+        parse_str("var g: Fn(N<f64>,N<f64>->N<f64>)", &mut context)?;
+        let node = parse_str("~? f g", &mut context)?;
+        assert_eq!(node.op, Operation::GeneralizedContraction);
+        assert_eq!(
+            node.output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![
+                    IJType::Tensor(Some("f64".to_string())),
+                    IJType::Tensor(Some("f64".to_string()))
+                ],
+                IJType::Tensor(Some("f64".to_string()))
+            ))
+        );
         Ok(())
     }
 }

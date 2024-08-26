@@ -166,14 +166,12 @@ fn next_node_functional(
             context,
             needed_outputs,
         )?,
-        Token::GeneralizedContraction => {
-            GeneralizedContraction::next_node_functional_impl(
-                Token::GeneralizedContraction,
-                slice,
-                context,
-                needed_outputs,
-            )?
-        }
+        Token::GeneralizedContraction => GeneralizedContraction::next_node_functional_impl(
+            Token::GeneralizedContraction,
+            slice,
+            context,
+            needed_outputs,
+        )?,
         _ => {
             return Err(SyntaxError::SliceCannotBeParsedAsFunction(
                 context.token_slice_to_string(slice),
@@ -196,7 +194,7 @@ pub fn next_node_specific_function(
         next_node_functional(slice, context, Some(&[*signature.output]))?;
     let function = function_options
         .into_iter()
-        .find(|n| n.output_type == function_type);
+        .find(|n| n.output_type.type_match_function(&function_type).unwrap_or(false));
 
     if function.is_none() {
         return Err(SyntaxError::TypeError(
@@ -281,7 +279,10 @@ mod tests {
         let expected_signature = FunctionSignature::tensor_function(1);
         assert_eq!(
             node.input_types,
-            vec![IJType::Function(expected_signature.clone()), IJType::Tensor(None)]
+            vec![
+                IJType::Function(expected_signature.clone()),
+                IJType::Tensor(None)
+            ]
         );
         assert_eq!(node.output_type, IJType::Void);
         let first_operand = &node.operands[0];

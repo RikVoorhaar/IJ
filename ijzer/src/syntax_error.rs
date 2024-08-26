@@ -143,4 +143,7 @@ pub enum SyntaxError {
 
     #[error("Cannot infer output number type from operands. Got both {0} and {1}")]
     CannotInferOutputNumberType(String, String),
+
+    #[error("Number type mismatch {0} and {1}")]
+    NumberTypeMismatch(String, String),
 }
