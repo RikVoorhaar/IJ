@@ -31,10 +31,22 @@ impl ParseNode for MinusOp {
             .iter()
             .map(|n| n.output_type.clone())
             .collect::<Vec<IJType>>();
-        let output_type = if input_types.iter().all(|t| t == &IJType::Scalar(None)) {
+        let output_type = if input_types
+            .iter()
+            .all(|t| t.type_match(&IJType::Scalar(None)))
+        {
             IJType::Scalar(None)
-        } else {
+        } else if input_types
+            .iter()
+            .any(|t| t.type_match(&IJType::Tensor(None)))
+        {
             IJType::Tensor(None)
+        } else {
+            return Err(SyntaxError::TypeError(
+                "S,S or S,T, or T,S or T,T".to_string(),
+                format!("{:?}", input_types),
+            )
+            .into());
         };
         if operands.len() == 1 {
             if let Operation::Number(x) = operands[0].op.clone() {
@@ -107,8 +119,7 @@ impl ParseNodeFunctional for MinusOp {
                 vec![],
                 context,
             )?));
-        }
-        if check_ok_needed_outputs(needed_outputs, &IJType::Number(None)) {
+        } else if check_ok_needed_outputs(needed_outputs, &IJType::Number(None)) {
             nodes.push(Rc::new(Node::new(
                 Operation::Subtract,
                 vec![],
@@ -123,8 +134,7 @@ impl ParseNodeFunctional for MinusOp {
                 vec![],
                 context,
             )?));
-        }
-        if check_ok_needed_outputs(needed_outputs, &IJType::Tensor(None)) {
+        } else if check_ok_needed_outputs(needed_outputs, &IJType::Tensor(None)) {
             let output_type = IJType::Tensor(None);
             let input_types = vec![
                 vec![IJType::Tensor(None), IJType::Tensor(None)],
@@ -146,8 +156,7 @@ impl ParseNodeFunctional for MinusOp {
                     context,
                 )?));
             }
-        }
-        if nodes.is_empty() {
+        } else {
             return Err(SyntaxError::FunctionSignatureMismatch(
                 format!("{:?}", needed_outputs),
                 "Fn(T,T->T) or Fn(S,S->S) or Fn(T,S->T) or Fn(S,T->S) or Fn(N,N->N) or Fn(N->N) or Fn(S->S) or Fn(T->T)".to_string(),
@@ -163,7 +172,6 @@ mod tests {
     use super::*;
     use crate::parser::parse_str_no_context;
     use crate::tokens::Number;
-    use anyhow::Error;
     use std::str::FromStr;
 
     #[test]
@@ -211,7 +219,10 @@ mod tests {
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
         assert_eq!(node.op, Operation::Subtract);
-        assert_eq!(node.input_types, vec![IJType::Tensor(None), IJType::Tensor(None)]);
+        assert_eq!(
+            node.input_types,
+            vec![IJType::Tensor(None), IJType::Tensor(None)]
+        );
         assert_eq!(node.output_type, IJType::Tensor(None));
     }
 
@@ -221,7 +232,10 @@ mod tests {
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
         assert_eq!(node.op, Operation::Subtract);
-        assert_eq!(node.input_types, vec![IJType::Tensor(None), IJType::Scalar(None)]);
+        assert_eq!(
+            node.input_types,
+            vec![IJType::Tensor(None), IJType::Scalar(None)]
+        );
         assert_eq!(node.output_type, IJType::Tensor(None));
     }
 
@@ -231,15 +245,53 @@ mod tests {
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
         assert_eq!(node.op, Operation::Subtract);
-        assert_eq!(node.input_types, vec![IJType::Scalar(None), IJType::Scalar(None)]);
+        assert_eq!(
+            node.input_types,
+            vec![IJType::Scalar(None), IJType::Scalar(None)]
+        );
         assert_eq!(node.output_type, IJType::Scalar(None));
     }
 
     #[test]
-    fn test_negate_single_group() -> Result<(), Error> {
+    fn test_negate_single_group() -> Result<()> {
         let (node, _) = parse_str_no_context("-(1)")?;
         assert_eq!(node.op, Operation::Number(Number::from_str("-1")?));
         assert_eq!(node.operands.len(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn test_subtract_with_number_types() -> Result<()> {
+        let (node, _) = parse_str_no_context("- 1<a> 2")?;
+        assert_eq!(node.op, Operation::Subtract);
+        assert_eq!(
+            node.input_types,
+            vec![IJType::Scalar(Some("a".to_string())), IJType::Scalar(None)]
+        );
+        assert_eq!(node.output_type, IJType::Scalar(Some("a".to_string())));
+
+        let (node, _) = parse_str_no_context("- 1 2<a>")?;
+        assert_eq!(node.op, Operation::Subtract);
+        assert_eq!(
+            node.input_types,
+            vec![IJType::Scalar(None), IJType::Scalar(Some("a".to_string()))]
+        );
+        assert_eq!(node.output_type, IJType::Scalar(Some("a".to_string())));
+
+        let (node, _) = parse_str_no_context("- 1<a> 2<a>")?;
+        assert_eq!(node.op, Operation::Subtract);
+        assert_eq!(
+            node.input_types,
+            vec![
+                IJType::Scalar(Some("a".to_string())),
+                IJType::Scalar(Some("a".to_string()))
+            ]
+        );
+        assert_eq!(node.output_type, IJType::Scalar(Some("a".to_string())));
+
+        let result = parse_str_no_context("- 1<a> 2<b>");
+        assert!(result.is_err());
+
         Ok(())
     }
 }

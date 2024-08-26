@@ -42,8 +42,8 @@ impl ParseNode for GeneralizedContraction {
             vec![
                 IJType::Function(Self::first_signature()),
                 IJType::Function(Self::second_signature()),
-                IJType::Tensor(None),
-                IJType::Tensor(None),
+                operands[0].output_type.clone(),
+                operands[1].output_type.clone(),
             ],
             IJType::Tensor(None),
             vec![f_node, g_node, operands[0].clone(), operands[1].clone()],
@@ -107,6 +107,25 @@ mod tests {
         let node = node.operands[0].clone();
         assert_eq!(node.op, Operation::GeneralizedContraction);
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_generalized_contraction_number_type() -> Result<()> {
+        let (node, _) = parse_str_no_context("?/+* [1]<a> [2]")?;
+        assert_eq!(node.op, Operation::GeneralizedContraction);
+        assert_eq!(node.output_type, IJType::Tensor(Some("a".to_string())));
+
+        let (node, _) = parse_str_no_context("?/+* [1] [2]<a>")?;
+        assert_eq!(node.op, Operation::GeneralizedContraction);
+        assert_eq!(node.output_type, IJType::Tensor(Some("a".to_string())));
+
+        let (node, _) = parse_str_no_context("?/+* [1]<a> [2]<a>")?;
+        assert_eq!(node.op, Operation::GeneralizedContraction);
+        assert_eq!(node.output_type, IJType::Tensor(Some("a".to_string())));
+
+        let result = parse_str_no_context("?/+* [1]<a> [2]<b>");
+        assert!(result.is_err());
         Ok(())
     }
 }

@@ -121,7 +121,7 @@ impl FunctionChain {
         Ok(input_types
             .iter()
             .zip(number_types.iter())
-            .map(|(input_type, number_type)| input_type.maybe_apply_number_type(&number_type))
+            .map(|(input_type, number_type)| input_type.maybe_apply_number_type(number_type))
             .collect())
     }
 

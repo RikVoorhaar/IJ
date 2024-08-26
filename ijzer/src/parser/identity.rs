@@ -93,4 +93,18 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_identity_number_type() -> Result<()> {
+        let (node, _) = parse_str_no_context("I 1<a>")?;
+        assert_eq!(node.output_type, IJType::Scalar(Some("a".to_string())));
+
+        let (node, _) = parse_str_no_context("I [1]<a>")?;
+        assert_eq!(node.output_type, IJType::Tensor(Some("a".to_string())));
+
+        let (node, _) = parse_str_no_context("I I I I I 1<a>")?;
+        assert_eq!(node.output_type, IJType::Scalar(Some("a".to_string())));
+
+        Ok(())
+    }
 }
