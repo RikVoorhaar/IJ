@@ -44,7 +44,7 @@ impl FunctionChain {
     fn empty() -> Self {
         Self { functions: vec![] }
     }
-    fn get_number_type(&self) -> Result<Option<String>> {
+    fn get_output_number_type(&self) -> Result<Option<String>> {
         if self.len() == 0 {
             return Ok(None);
         }
@@ -65,21 +65,64 @@ impl FunctionChain {
         }
         Ok(number_type)
     }
+    fn get_input_number_type(&self) -> Result<Vec<Option<String>>> {
+        if self.len() == 0 {
+            return Ok(vec![]);
+        }
+        let mut number_types =
+            _get_input_types_from_function(self.functions.first().unwrap().clone())?
+                .iter()
+                .map(|input_type| input_type.extract_number_type().unwrap_or(None))
+                .collect::<Vec<Option<String>>>();
+
+        for function in self.functions.iter().skip(1) {
+            let number_output_type = _get_output_type_from_function(function.clone())?
+                .maybe_apply_number_type(&number_types[0])
+                .extract_number_type();
+            number_types = match number_output_type {
+                Some(None) => _get_input_types_from_function(function.clone())?
+                    .iter()
+                    .map(|input_type| {
+                        input_type
+                            .maybe_apply_number_type(&number_types[0])
+                            .extract_number_type()
+                            .unwrap_or(None)
+                    })
+                    .collect::<Vec<Option<String>>>(),
+                _ => _get_input_types_from_function(function.clone())?
+                    .iter()
+                    .map(|input_type| {
+                        input_type
+                            .maybe_apply_number_type(&number_types[0])
+                            .extract_number_type()
+                            .unwrap_or(None)
+                    })
+                    .collect::<Vec<Option<String>>>(),
+            }
+        }
+        Ok(number_types)
+    }
 
     fn get_output_type(&self) -> Result<IJType> {
         let first_function = self.functions.first().ok_or_else(|| {
             SyntaxError::FunctionChainInconsistency("Function chain is empty".to_string())
         })?;
         let output_type = _get_output_type_from_function(first_function.clone())?;
-        let number_type = self.get_number_type()?;
+        let number_type = self.get_output_number_type()?;
         Ok(output_type.maybe_apply_number_type(&number_type))
     }
 
-    fn get_input_types(&self) -> Result<Vec<IJType>, SyntaxError> {
+    fn get_input_types(&self) -> Result<Vec<IJType>> {
         let last_function = self.functions.last().ok_or_else(|| {
             SyntaxError::FunctionChainInconsistency("Function chain is empty".to_string())
         })?;
-        _get_input_types_from_function(last_function.clone())
+        let input_types = _get_input_types_from_function(last_function.clone())?;
+        let number_types = self.get_input_number_type()?;
+        Ok(input_types
+            .iter()
+            .zip(number_types.iter())
+            .map(|(input_type, number_type)| input_type.maybe_apply_number_type(&number_type))
+            .collect())
     }
 
     fn get_node_types(&self) -> Vec<IJType> {
@@ -132,9 +175,9 @@ impl FunctionChain {
         self.functions.len()
     }
 
-    fn extend(&self, node: Rc<Node>) -> Result<Option<Self>, SyntaxError> {
+    fn extend(&self, node: Rc<Node>) -> Result<Option<Self>> {
         if !_is_function(node.clone()) {
-            return Err(SyntaxError::NotPureFunction(format!("{:?}", node)));
+            return Err(SyntaxError::NotPureFunction(format!("{:?}", node)).into());
         }
         if self.len() == 0 {
             return Ok(Some(Self::new(vec![node])?));
@@ -156,7 +199,7 @@ impl FunctionChain {
         Ok(Some(Self::new(new_functions)?))
     }
 
-    fn match_input_type(&self, input_types: Vec<IJType>) -> Result<bool, SyntaxError> {
+    fn match_input_type(&self, input_types: Vec<IJType>) -> Result<bool> {
         let chain_input_types = self.get_input_types()?;
         Ok(chain_input_types.len() == input_types.len()
             && chain_input_types
@@ -238,7 +281,7 @@ impl ParseNode for FunctionComposition {
         let types = chains
             .iter()
             .map(|chain| chain.get_input_types())
-            .collect::<Result<Vec<Vec<IJType>>, SyntaxError>>()?;
+            .collect::<Result<Vec<Vec<IJType>>>>()?;
         if types.is_empty() {
             return Err(context.add_context_to_syntax_error(
                 SyntaxError::FunctionChainInconsistency(
@@ -605,6 +648,59 @@ mod tests {
         parse_str("var g: Fn(S->S)", &mut context)?;
         let node = parse_str("@(g,f) 1 2", &mut context)?;
         assert_eq!(node.output_type, IJType::Scalar(Some("c".to_string())));
+
+        parse_str("var f: Fn(S<a>->S<a>)", &mut context)?;
+        parse_str("var g: Fn(S->S<a>)", &mut context)?;
+        let node = parse_str("@(g,f) 1", &mut context)?;
+        assert_eq!(node.output_type, IJType::Scalar(Some("a".to_string())));
+        let node = parse_str("@(f,g) 1", &mut context)?;
+        assert_eq!(node.output_type, IJType::Scalar(Some("a".to_string())));
+
+        parse_str("var f: Fn(S<a>->S<b>)", &mut context)?;
+        parse_str("var g: Fn(S->S<a>)", &mut context)?;
+        let node = parse_str("@(f,g) 1", &mut context)?;
+        assert_eq!(node.output_type, IJType::Scalar(Some("b".to_string())));
+
+        parse_str("var f: Fn(S<a>->S<b>)", &mut context)?;
+        parse_str("var g: Fn(S->S)", &mut context)?;
+        let node = parse_str("@(f,g) 1<a>", &mut context)?;
+        assert_eq!(node.output_type, IJType::Scalar(Some("b".to_string())));
+        let result = parse_str("@(f,g) 1<c>", &mut context);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_function_composition_function_type() -> Result<()> {
+        let mut context = ASTContext::new();
+        parse_str("var g: Fn(Fn(S<b>->S<c>)->S<d>)", &mut context)?;
+        parse_str("var f: Fn(S<a> -> Fn(S<b>->S<c>))", &mut context)?;
+        let node = parse_str("@(g,f) 1<a>", &mut context)?;
+        assert_eq!(node.output_type, IJType::Scalar(Some("d".to_string())));
+
+        let mut context = ASTContext::new();
+        parse_str("var g: Fn(Fn(S->S)->S<d>)", &mut context)?;
+        parse_str("var f: Fn(S<a> -> Fn(S<b>->S<c>))", &mut context)?;
+        let result = parse_str("@(g,f) 1<a>", &mut context);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_function_composition_inconsistent() -> Result<()> {
+        let mut context = ASTContext::new();
+        parse_str("var g: Fn(S<a> -> S<b>)", &mut context)?;
+        parse_str("var f: Fn(S<b> -> S<c>)", &mut context)?;
+        let result = parse_str("@(g,f) 1<b>", &mut context);
+        assert!(result.is_err());
+
+        let mut context = ASTContext::new();
+        parse_str("var g: Fn(S<b> -> S<a>)", &mut context)?;
+        parse_str("var f: Fn(S -> S)", &mut context)?;
+        let result = parse_str("@(g,f) 1<a>", &mut context);
+        assert!(result.is_err());
+
         Ok(())
     }
 }
