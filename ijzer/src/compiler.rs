@@ -18,27 +18,31 @@ pub fn number_type_from_string(number_type: &str) -> Result<TokenStream, syn::Er
     })?;
     Ok(parsed_val)
 }
-pub fn annotation_from_type(var_type: &IJType) -> TokenStream {
-    match var_type {
-        IJType::Number(None) => quote!(_),
-        IJType::Number(Some(n)) => quote!(#n),
-        IJType::Tensor(None) => quote!(ijzer::tensor::Tensor::<_>),
-        IJType::Tensor(Some(n)) => quote!(ijzer::tensor::Tensor::<#n>),
-        IJType::Scalar(None) => quote!(ijzer::tensor::Tensor::<_>),
-        IJType::Scalar(Some(n)) => quote!(ijzer::tensor::Tensor::<#n>),
+pub fn annotation_from_type(var_type: &IJType) -> Result<TokenStream> {
+    let number_type_annot = number_type_from_string(
+        &var_type
+            .extract_number_type()
+            .unwrap_or_default()
+            .unwrap_or("_".to_string()),
+    )?;
+    let res = match var_type {
+        IJType::Number(_) => quote!(#number_type_annot),
+        IJType::Tensor(_) => quote!(ijzer::tensor::Tensor::<#number_type_annot>),
+        IJType::Scalar(_) => quote!(ijzer::tensor::Tensor::<#number_type_annot>),
         IJType::Function(signature) => {
             let input_types = signature
                 .input
                 .iter()
                 .map(annotation_from_type)
-                .collect::<Vec<_>>();
-            let output_type = annotation_from_type(&signature.output);
+                .collect::<Result<Vec<_>>>()?;
+            let output_type = annotation_from_type(&signature.output)?;
             quote! {
                 fn(#(#input_types),*) -> #output_type
             }
         }
         _ => panic!("Unsupported type: {:?}", var_type),
-    }
+    };
+    Ok(res)
 }
 
 pub fn compile_line_from_node(
@@ -198,7 +202,7 @@ impl CompileNode for Number {
                 syn::Error::new_spanned(&val, "Failed to parse value into a Rust TokenStream")
             })?;
             let number_type = node.output_type.extract_number_type().unwrap_or_default();
-            let t = annotation_from_type(&IJType::Scalar(number_type));
+            let t = annotation_from_type(&IJType::Scalar(number_type))?;
             let res = quote! {
                 #t::scalar(#parsed_val)
             };
@@ -223,7 +227,7 @@ impl CompileNode for Array {
                 syn::Error::new_spanned(&val, "Failed to parse value into a Rust TokenStream")
             })?;
             let number_type = node.output_type.extract_number_type().unwrap_or_default();
-            let t = annotation_from_type(&IJType::Scalar(number_type));
+            let t = annotation_from_type(&IJType::Scalar(number_type))?;
             let res = quote! {
                 #t::from_vec(vec![#parsed_val], None)
             };
@@ -351,10 +355,10 @@ impl CompileNode for Assign {
             .skip(2)
             .map(|n| {
                 let s = child_streams[&n.id].clone();
-                let t = annotation_from_type(&n.output_type);
-                quote!(#s: #t)
+                let t = annotation_from_type(&n.output_type)?;
+                Ok(quote!(#s: #t))
             })
-            .collect::<Vec<_>>();
+            .collect::<Result<Vec<_>>>()?;
 
         if args_streams.is_empty() {
             Ok(quote!(
@@ -379,7 +383,7 @@ impl CompileNode for Add {
 
         let res = match node.output_type.clone() {
             IJType::Tensor(number_type) | IJType::Scalar(number_type) => {
-                let number_annot = annotation_from_type(&IJType::Number(number_type));
+                let number_annot = annotation_from_type(&IJType::Number(number_type))?;
                 if children.len() != 2 {
                     panic!("Expected 2 children for add, found {:?}", children.len());
                 }
@@ -394,8 +398,8 @@ impl CompileNode for Add {
             IJType::Function(f) => {
                 let output_type = *f.output;
                 let number_type = output_type.extract_number_type().unwrap_or_default();
-                let number_annot = annotation_from_type(&IJType::Number(number_type.clone()));
-                let tensor_annot = annotation_from_type(&IJType::Tensor(number_type));
+                let number_annot = annotation_from_type(&IJType::Number(number_type.clone()))?;
+                let tensor_annot = annotation_from_type(&IJType::Tensor(number_type))?;
                 match output_type {
                     IJType::Number(_) => {
                         quote! { |a: #number_annot, b: #number_annot| a + b }
@@ -432,7 +436,7 @@ impl CompileNode for Subtract {
             let res = match node.output_type.clone() {
                 IJType::Tensor(_) | IJType::Scalar(_) => {
                     let number_type = node.output_type.extract_number_type().unwrap_or_default();
-                    let number_annot = annotation_from_type(&IJType::Number(number_type.clone()));
+                    let number_annot = annotation_from_type(&IJType::Number(number_type.clone()))?;
                     let childstream1 = child_streams.get(&children[0]).unwrap();
                     let childstream2 = child_streams.get(&children[1]).unwrap();
 
@@ -443,8 +447,8 @@ impl CompileNode for Subtract {
                 IJType::Function(f) => {
                     let output_type = *f.output;
                     let number_type = output_type.extract_number_type().unwrap_or_default();
-                    let number_annot = annotation_from_type(&IJType::Number(number_type.clone()));
-                    let tensor_annot = annotation_from_type(&IJType::Tensor(number_type));
+                    let number_annot = annotation_from_type(&IJType::Number(number_type.clone()))?;
+                    let tensor_annot = annotation_from_type(&IJType::Tensor(number_type))?;
                     match output_type {
                         IJType::Number(_) => {
                             quote! { |a: #number_annot, b: #number_annot| a - b }
@@ -483,7 +487,7 @@ impl CompileNode for Negate {
             let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
             let res = match node.output_type.clone() {
                 IJType::Tensor(number_type) | IJType::Scalar(number_type) => {
-                    let number_annot = annotation_from_type(&IJType::Number(number_type));
+                    let number_annot = annotation_from_type(&IJType::Number(number_type))?;
                     let childstream = child_streams.get(&children[0]).unwrap();
                     quote! {
                         #childstream.map(|a: #number_annot| -a)
@@ -492,8 +496,8 @@ impl CompileNode for Negate {
                 IJType::Function(f) => {
                     let output_type = *f.output;
                     let number_type = output_type.extract_number_type().unwrap_or_default();
-                    let number_annot = annotation_from_type(&IJType::Number(number_type.clone()));
-                    let tensor_annot = annotation_from_type(&IJType::Tensor(number_type));
+                    let number_annot = annotation_from_type(&IJType::Number(number_type.clone()))?;
+                    let tensor_annot = annotation_from_type(&IJType::Tensor(number_type))?;
                     match output_type {
                         IJType::Number(_) => {
                             quote! { |a: #number_annot| -a }
@@ -531,7 +535,7 @@ impl CompileNode for Multiply {
             let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
             let res = match node.output_type.clone() {
                 IJType::Tensor(number_type) | IJType::Scalar(number_type) => {
-                    let number_annot = annotation_from_type(&IJType::Number(number_type));
+                    let number_annot = annotation_from_type(&IJType::Number(number_type))?;
                     let childstream1 = child_streams.get(&children[0]).unwrap();
                     let childstream2 = child_streams.get(&children[1]).unwrap();
 
@@ -542,8 +546,8 @@ impl CompileNode for Multiply {
                 IJType::Function(f) => {
                     let output_type = *f.output;
                     let number_type = output_type.extract_number_type().unwrap_or_default();
-                    let number_annot = annotation_from_type(&IJType::Number(number_type.clone()));
-                    let tensor_annot = annotation_from_type(&IJType::Tensor(number_type));
+                    let number_annot = annotation_from_type(&IJType::Number(number_type.clone()))?;
+                    let tensor_annot = annotation_from_type(&IJType::Tensor(number_type))?;
                     match output_type {
                         IJType::Number(_) => {
                             quote! { |a: #number_annot, b: #number_annot| a * b }
@@ -623,7 +627,7 @@ impl CompileNode for Reduce {
                     .output
                     .extract_number_type()
                     .unwrap_or_default();
-                let tensor_t = annotation_from_type(&IJType::Tensor(number_type));
+                let tensor_t = annotation_from_type(&IJType::Tensor(number_type))?;
                 let functional_operand_stream = child_streams.get(functional_operand).unwrap();
                 let ident = compiler.get_varname(node.id);
                 Ok(quote! {
@@ -693,7 +697,7 @@ impl CompileNode for FunctionComposition {
             .enumerate()
         {
             let ident = Ident::new(&format!("_{}_{}", node.id, i + 1), Span::call_site());
-            let type_annotation = annotation_from_type(arg_type);
+            let type_annotation = annotation_from_type(arg_type)?;
             args_with_type.push(quote! { #ident: #type_annotation });
             args.push(quote! { #ident });
         }
@@ -794,11 +798,11 @@ impl TypeConversion {
             }
             (IJType::Number(_), IJType::Number(_)) => quote! {#child_stream},
             (IJType::Number(_), IJType::Scalar(number_type)) => {
-                let tensor_t = annotation_from_type(&IJType::Tensor(number_type.clone()));
+                let tensor_t = annotation_from_type(&IJType::Tensor(number_type.clone()))?;
                 quote! {#tensor_t::scalar(#child_stream)}
             }
             (IJType::Number(_), IJType::Tensor(number_type)) => {
-                let tensor_t = annotation_from_type(&IJType::Tensor(number_type.clone()));
+                let tensor_t = annotation_from_type(&IJType::Tensor(number_type.clone()))?;
                 quote! {#tensor_t::scalar(#child_stream)}
             }
             (IJType::Function(ref signature_from), IJType::Function(ref signature_to)) => {
@@ -814,7 +818,7 @@ impl TypeConversion {
                     .zip(idents.clone())
                 {
                     input_conversions.push(Self::convert_type(&to, from, quote!(#ident), id)?);
-                    let arg_type = annotation_from_type(&to);
+                    let arg_type = annotation_from_type(&to)?;
                     args.push(quote!(#ident: #arg_type));
                 }
                 let input_stream = quote! {(#child_stream)(#(#input_conversions),*)};
@@ -886,14 +890,16 @@ impl CompileNode for GeneralizedContraction {
             .collect::<Vec<_>>();
         let f_stream = child_streams[0].clone();
         let f_node = &node.operands[0];
-        let f_arg_annot = annotation_from_type(&f_node.input_types[0]);
+        let f_arg_annot = annotation_from_type(&f_node.input_types[0])?;
         let f_stream_extract = quote! {
             (|z: &#f_arg_annot| (#f_stream)(z.clone()).extract_scalar().unwrap())
         };
         let g_stream = child_streams[1].clone();
         let g_node = &node.operands[1];
-        let input_number_type = g_node.input_types[0].extract_number_type().unwrap_or_default();
-        let tensor_t = annotation_from_type(&IJType::Tensor(input_number_type));
+        let input_number_type = g_node.input_types[0]
+            .extract_number_type()
+            .unwrap_or_default();
+        let tensor_t = annotation_from_type(&IJType::Tensor(input_number_type))?;
         match node.operands.len() {
             2 => Ok(quote! {
                 |x: #tensor_t, y: #tensor_t| x.generalized_contraction(&y, #f_stream_extract, #g_stream).unwrap()
