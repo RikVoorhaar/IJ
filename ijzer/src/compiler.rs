@@ -1045,6 +1045,7 @@ mod tests {
             "ijzer::tensor::Tensor::<_>::from_vec(vec![1], None).map(|a: _| -a)",
         );
         compiler_compare("var x: S; -x", "x.map(|a: _| -a)");
+        compiler_compare("var x: S<f64>; -x", "x.map(|a: f64| -a)");
     }
 
     #[test]
@@ -1056,6 +1057,11 @@ mod tests {
         compiler_compare(
             "/+ [1,2]",
             "ijzer::tensor::Tensor::<_>::from_vec(vec![1,2], None).reduce(|a: _, b: _| a + b)",
+        );
+
+        compiler_compare(
+            "/+ [1,2]<f64>",
+            "ijzer::tensor::Tensor::<f64>::from_vec(vec![1,2], None).reduce(|a: _, b: _| a + b)",
         );
     }
 
@@ -1118,11 +1124,19 @@ mod tests {
         let input = "var x: N; <-S x";
         let expected = "ijzer::tensor::Tensor::<_>::scalar(x)";
         compiler_compare(input, expected);
+
+        let input = "var x: N<f64>; <-S<f64> x";
+        let expected = "ijzer::tensor::Tensor::<f64>::scalar(x)";
+        compiler_compare(input, expected);
     }
 
     #[test]
     fn test_as_function() {
         let input = "var f: Fn(T->T); ~f";
+        let expected = "f";
+        compiler_compare(input, expected);
+
+        let input = "var f: Fn(T<f64>->T<f64>); ~f";
         let expected = "f";
         compiler_compare(input, expected);
 
@@ -1155,6 +1169,10 @@ mod tests {
     fn test_apply() -> Result<()> {
         let input = "var f: Fn(S,S->S); .~f 1 2";
         let expected = "f (ijzer :: tensor :: Tensor :: < _ > :: scalar (1) , ijzer :: tensor :: Tensor :: < _ > :: scalar (2))";
+        compiler_compare(input, expected);
+
+        let input = "var f: Fn(S<f64>,S<f64>->S<f64>); .~f 1<f64> 2<f64>";
+        let expected = "f (ijzer :: tensor :: Tensor :: < f64 > :: scalar (1) , ijzer :: tensor :: Tensor :: < f64 > :: scalar (2))";
         compiler_compare(input, expected);
 
         let input = "var f: Fn(S->Fn(S->S)); .(f 1) 2";
