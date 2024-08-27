@@ -96,21 +96,53 @@ impl TokenSlice {
     }
 }
 
+fn infer_output_number_type(operands: &Vec<Rc<Node>>, output_type: IJType) -> Result<IJType> {
+    match output_type.extract_number_type() {
+        Some(None) => {
+            let mut number_type = None;
+            for operand in operands {
+                match operand.output_type.extract_number_type() {
+                    Some(Some(n)) => {
+                        if number_type.is_none() {
+                            number_type = Some(n.clone());
+                        } else if number_type != Some(n.clone()) {
+                            return Err(SyntaxError::CannotInferOutputNumberType(
+                                format!("{:?}", number_type),
+                                format!("{:?}", n),
+                            )
+                            .into());
+                        }
+                    }
+                    _ => continue,
+                }
+            }
+            match output_type {
+                IJType::Tensor(None) => Ok(IJType::Tensor(number_type)),
+                IJType::Scalar(None) => Ok(IJType::Scalar(number_type)),
+                IJType::Number(None) => Ok(IJType::Number(number_type)),
+                _ => unreachable!(),
+            }
+        }
+        _ => Ok(output_type),
+    }
+}
 impl Node {
     pub fn new(
         op: Operation,
         input_types: Vec<IJType>,
         output_type: IJType,
         operands: Vec<Rc<Node>>,
-        id: usize,
-    ) -> Self {
-        Node {
+        context: &mut ASTContext,
+    ) -> Result<Self> {
+        let output_type = infer_output_number_type(&operands, output_type)
+            .map_err(|e| context.add_context_to_syntax_error(e, context.full_slice()))?;
+        Ok(Node {
             op,
             output_type,
             input_types,
             operands,
-            id,
-        }
+            id: context.get_increment_id(),
+        })
     }
 }
 

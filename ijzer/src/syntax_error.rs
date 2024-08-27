@@ -140,4 +140,10 @@ pub enum SyntaxError {
 
     #[error("None of the required outputs {0} match the function outputs {1}")]
     RequiredOutputsDoNotMatchFunctionOutputs(String, String),
+
+    #[error("Cannot infer output number type from operands. Got both {0} and {1}")]
+    CannotInferOutputNumberType(String, String),
+
+    #[error("Number type mismatch {0} and {1}")]
+    NumberTypeMismatch(String, String),
 }

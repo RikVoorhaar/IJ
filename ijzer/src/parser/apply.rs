@@ -38,8 +38,8 @@ impl ParseNode for Apply {
                 node_input_types,
                 output_type.clone(),
                 operands,
-                context.id_counter,
-            )),
+                context,
+            )?),
             rest,
         ))
     }
@@ -67,6 +67,26 @@ mod tests {
 
         let node = parse_str(".~f 1 2", &mut context)?;
         assert_eq!(node.op, Operation::Apply);
+        assert_eq!(node.operands.len(), 3);
+        Ok(())
+    }
+
+    #[test]
+    fn test_apply_with_type() -> Result<()> {
+        let mut context = ASTContext::new();
+        parse_str("var f: Fn(S,S->S)", &mut context)?;
+
+        let node = parse_str(".~f 1<i64> 2", &mut context)?;
+        assert_eq!(node.op, Operation::Apply);
+        assert_eq!(node.output_type, IJType::Scalar(Some("i64".to_string())));
+        assert_eq!(node.operands.len(), 3);
+
+        let mut context = ASTContext::new();
+        parse_str("var f: Fn(S<a>,S<b>->S<c>)", &mut context)?;
+
+        let node = parse_str(".~f 1<a> 2<b>", &mut context)?;
+        assert_eq!(node.op, Operation::Apply);
+        assert_eq!(node.output_type, IJType::Scalar(Some("c".to_string())));
         assert_eq!(node.operands.len(), 3);
         Ok(())
     }

@@ -44,7 +44,7 @@ pub fn gather_operands(
             .iter()
             .map(|n| n.output_type.clone())
             .collect::<Vec<IJType>>();
-        if types.iter().any(|t| t == &operands_types) {
+        if types.iter().any(|t| t.iter().zip(operands_types.iter()).all(|(a, b)| a.type_match(b))) {
             longest_match_length = operands.len();
         }
     }
@@ -109,7 +109,7 @@ pub fn find_matching_parenthesis(
 
 pub fn check_ok_needed_outputs(needed_outputs: Option<&[IJType]>, actual_output: &IJType) -> bool {
     match needed_outputs {
-        Some(outputs) => outputs.iter().any(|output| actual_output == output),
+        Some(outputs) => outputs.iter().any(|output| actual_output.type_match(output)),
         None => true,
     }
 }

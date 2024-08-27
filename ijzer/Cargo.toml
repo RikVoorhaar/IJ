@@ -3,17 +3,6 @@ name = "ijzer"
 version = "0.1.0"
 edition = "2021"
 
-[[example]]
-name = "parser_example"
-
-[[example]]
-name = "compiler_example"
-
-[[example]]
-name = "tokenstream_example"
-
-[[example]]
-name = "tensor_example"
 
 [dependencies]
 anyhow = "1.0.79"

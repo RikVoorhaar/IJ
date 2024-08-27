@@ -11,8 +11,7 @@ pub mod tokens;
 pub mod types;
 
 
-pub fn compile(input: &str, number_type: &str) -> Result<TokenStream> {
-    let number_type = compiler::number_type_from_string(number_type)?;
+pub fn compile(input: &str) -> Result<TokenStream> {
     let mut ast_context = ast_node::ASTContext::new();
     let tokens = tokens::lexer(input)?;
     let parsed_lines = parser::parse_lines(tokens, &mut ast_context)?;
@@ -20,7 +19,7 @@ pub fn compile(input: &str, number_type: &str) -> Result<TokenStream> {
     parsed_lines
         .into_iter()
         .map(|(root, has_semicolon)| {
-            compiler::compile_line_from_node(root, has_semicolon, number_type.clone())
+            compiler::compile_line_from_node(root, has_semicolon)
         })
         .collect::<Result<TokenStream>>()
 }

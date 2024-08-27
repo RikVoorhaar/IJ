@@ -43,8 +43,8 @@ impl ParseNode for LParen {
                         operands_types.clone(),
                         IJType::Group(operands_types),
                         operands,
-                        context.get_increment_id(),
-                    )),
+                        context,
+                    )?),
                     remainder,
                 ))
             }

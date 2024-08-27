@@ -19,8 +19,8 @@ use binary_op::{next_node_simple_binary_op, Add, Multiply};
 mod parenthesis;
 use parenthesis::LParen;
 
-mod square_brackets;
-use square_brackets::LSqBracket;
+mod array;
+use array::LSqBracket;
 
 mod symbol;
 use symbol::Symbol;
@@ -166,14 +166,12 @@ fn next_node_functional(
             context,
             needed_outputs,
         )?,
-        Token::GeneralizedContraction => {
-            GeneralizedContraction::next_node_functional_impl(
-                Token::GeneralizedContraction,
-                slice,
-                context,
-                needed_outputs,
-            )?
-        }
+        Token::GeneralizedContraction => GeneralizedContraction::next_node_functional_impl(
+            Token::GeneralizedContraction,
+            slice,
+            context,
+            needed_outputs,
+        )?,
         _ => {
             return Err(SyntaxError::SliceCannotBeParsedAsFunction(
                 context.token_slice_to_string(slice),
@@ -196,7 +194,7 @@ pub fn next_node_specific_function(
         next_node_functional(slice, context, Some(&[*signature.output]))?;
     let function = function_options
         .into_iter()
-        .find(|n| n.output_type == function_type);
+        .find(|n| n.output_type.type_match_function(&function_type).unwrap_or(false));
 
     if function.is_none() {
         return Err(SyntaxError::TypeError(
@@ -221,17 +219,17 @@ mod tests {
         assert!(result.is_ok());
         let (node, context) = result.unwrap();
         assert_eq!(node.op, Operation::Assign);
-        assert_eq!(node.input_types, vec![IJType::Tensor; 2]);
+        assert_eq!(node.input_types, vec![IJType::Tensor(None); 2]);
         assert_eq!(node.output_type, IJType::Void);
         let first_operand = &node.operands[0];
         assert_eq!(first_operand.op, Operation::Symbol("x".to_string()));
-        assert_eq!(first_operand.output_type, IJType::Tensor);
+        assert_eq!(first_operand.output_type, IJType::Tensor(None));
         let second_operand = &node.operands[1];
-        assert_eq!(second_operand.output_type, IJType::Tensor);
+        assert_eq!(second_operand.output_type, IJType::Tensor(None));
         assert_eq!(second_operand.op, Operation::Array("1".to_string()));
 
         let expected_var = Variable {
-            typ: IJType::Tensor,
+            typ: IJType::Tensor(None),
             name: "x".to_string(),
         };
         let actual_var = context.symbols.get("x").unwrap();
@@ -244,13 +242,13 @@ mod tests {
         assert!(result.is_ok());
         let (node, context) = result.unwrap();
         assert_eq!(node.op, Operation::Assign);
-        assert_eq!(node.input_types, vec![IJType::Scalar; 2]);
+        assert_eq!(node.input_types, vec![IJType::Scalar(None); 2]);
         assert_eq!(node.output_type, IJType::Void);
         let first_operand = &node.operands[0];
         assert_eq!(first_operand.op, Operation::Symbol("x".to_string()));
-        assert_eq!(first_operand.output_type, IJType::Scalar);
+        assert_eq!(first_operand.output_type, IJType::Scalar(None));
         let second_operand = &node.operands[1];
-        assert_eq!(second_operand.output_type, IJType::Scalar);
+        assert_eq!(second_operand.output_type, IJType::Scalar(None));
         assert_eq!(
             second_operand.op,
             Operation::Number(tokens::Number {
@@ -259,7 +257,7 @@ mod tests {
         );
 
         let expected_var = Variable {
-            typ: IJType::Scalar,
+            typ: IJType::Scalar(None),
             name: "x".to_string(),
         };
         let actual_var = context.symbols.get("x").unwrap();
@@ -281,7 +279,10 @@ mod tests {
         let expected_signature = FunctionSignature::tensor_function(1);
         assert_eq!(
             node.input_types,
-            vec![IJType::Function(expected_signature.clone()), IJType::Tensor]
+            vec![
+                IJType::Function(expected_signature.clone()),
+                IJType::Tensor(None)
+            ]
         );
         assert_eq!(node.output_type, IJType::Void);
         let first_operand = &node.operands[0];
@@ -293,10 +294,10 @@ mod tests {
         );
         let second_operand = &node.operands[1];
         assert_eq!(second_operand.op, Operation::Add);
-        assert_eq!(second_operand.output_type, IJType::Tensor);
+        assert_eq!(second_operand.output_type, IJType::Tensor(None));
 
         let expected_var = Variable {
-            typ: IJType::tensor_function(1),
+            typ: IJType::Function(expected_signature),
             name: "x".to_string(),
         };
         let actual_var = context.symbols.get("x").unwrap();
@@ -323,8 +324,8 @@ mod tests {
         assert!(result.is_ok());
         let node = result.unwrap();
         assert_eq!(node.op, Operation::Function("x".to_string()));
-        assert_eq!(node.input_types, vec![IJType::Scalar]);
-        assert_eq!(node.output_type, IJType::Tensor);
+        assert_eq!(node.input_types, vec![IJType::Scalar(None)]);
+        assert_eq!(node.output_type, IJType::Tensor(None));
     }
 
     #[test]
@@ -335,8 +336,8 @@ mod tests {
         assert!(result.is_ok());
         let node = result.unwrap();
         assert_eq!(node.op, Operation::Function("add2".to_string()));
-        assert_eq!(node.input_types, vec![IJType::Tensor]);
-        assert_eq!(node.output_type, IJType::Tensor);
+        assert_eq!(node.input_types, vec![IJType::Tensor(None)]);
+        assert_eq!(node.output_type, IJType::Tensor(None));
     }
 
     #[test]
@@ -345,8 +346,8 @@ mod tests {
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
         assert_eq!(node.op, Operation::Negate);
-        assert_eq!(node.input_types, vec![IJType::Scalar]);
-        assert_eq!(node.output_type, IJType::Scalar);
+        assert_eq!(node.input_types, vec![IJType::Scalar(None)]);
+        assert_eq!(node.output_type, IJType::Scalar(None));
     }
 
     #[test]

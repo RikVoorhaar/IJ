@@ -171,7 +171,7 @@ pub enum Token {
     Tensor,
 
     #[token("N", priority = 3)]
-    NumberType,
+    NumberToken,
 
     #[token(":")]
     TypeDeclaration,
@@ -196,6 +196,9 @@ pub enum Token {
 
     #[token("?")]
     GeneralizedContraction,
+
+    #[regex(r"<\w+>", |lex| lex.slice().trim_start_matches('<').trim_end_matches('>').parse().ok())]
+    NumberType(String),
 }
 
 impl Display for Token {
@@ -221,7 +224,7 @@ impl Display for Token {
             Self::FunctionType => write!(f, "Fn"),
             Self::Scalar => write!(f, "S"),
             Self::Tensor => write!(f, "T"),
-            Self::NumberType => write!(f, "N"),
+            Self::NumberToken => write!(f, "N"),
             Self::TypeDeclaration => write!(f, ":"),
             Self::Semicolon => write!(f, ";"),
             Self::LambdaVariable(v) => write!(f, "${}", v.name),
@@ -231,6 +234,7 @@ impl Display for Token {
             Self::AsFunction => write!(f, "~"),
             Self::Apply => write!(f, "."),
             Self::GeneralizedContraction => write!(f, "?"),
+            Self::NumberType(s) => write!(f, "<{}>", s),
         }
     }
 }

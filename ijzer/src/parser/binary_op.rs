@@ -1,10 +1,10 @@
 use super::{check_ok_needed_outputs, gather_operands, ParseNodeFunctional};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};
-use crate::types::{FunctionSignature, IJType};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
+use crate::types::{FunctionSignature, IJType};
 use anyhow::{anyhow, Context, Result};
 use std::rc::Rc;
 
@@ -16,10 +16,10 @@ pub fn next_node_simple_binary_op(
     context: &mut ASTContext,
 ) -> Result<(Rc<Node>, TokenSlice)> {
     let types = vec![
-        vec![IJType::Tensor, IJType::Tensor],
-        vec![IJType::Scalar, IJType::Tensor],
-        vec![IJType::Tensor, IJType::Scalar],
-        vec![IJType::Scalar, IJType::Scalar],
+        vec![IJType::Tensor(None), IJType::Tensor(None)],
+        vec![IJType::Scalar(None), IJType::Tensor(None)],
+        vec![IJType::Tensor(None), IJType::Scalar(None)],
+        vec![IJType::Scalar(None), IJType::Scalar(None)],
     ];
     let (operands, rest) = gather_operands(types, slice, context)
         .with_context(|| anyhow!("Error caused by {:?}", op))?;
@@ -28,10 +28,10 @@ pub fn next_node_simple_binary_op(
         .map(|n| n.output_type.clone())
         .collect::<Vec<IJType>>();
     let output_type = match input_types.as_slice() {
-        [IJType::Tensor, IJType::Tensor] => IJType::Tensor,
-        [IJType::Scalar, IJType::Tensor] => IJType::Tensor,
-        [IJType::Tensor, IJType::Scalar] => IJType::Tensor,
-        [IJType::Scalar, IJType::Scalar] => IJType::Scalar,
+        [IJType::Tensor(_), IJType::Tensor(_)] => IJType::Tensor(None),
+        [IJType::Scalar(_), IJType::Tensor(_)] => IJType::Tensor(None),
+        [IJType::Tensor(_), IJType::Scalar(_)] => IJType::Tensor(None),
+        [IJType::Scalar(_), IJType::Scalar(_)] => IJType::Scalar(None),
         _ => {
             return Err(context.add_context_to_syntax_error(
                 SyntaxError::TypeError(
@@ -47,13 +47,7 @@ pub fn next_node_simple_binary_op(
         }
     };
     Ok((
-        Rc::new(Node::new(
-            op,
-            input_types,
-            output_type,
-            operands,
-            context.get_increment_id(),
-        )),
+        Rc::new(Node::new(op, input_types, output_type, operands, context)?),
         rest,
     ))
 }
@@ -66,34 +60,34 @@ fn _next_node_functional_binary(
 ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
     let rest = slice.move_start(1)?;
     let mut nodes = vec![];
-    if check_ok_needed_outputs(needed_outputs, &IJType::Scalar) {
-        let output_type = IJType::Scalar;
-        let input_type = vec![IJType::Scalar, IJType::Scalar];
+    if check_ok_needed_outputs(needed_outputs, &IJType::Scalar(None)) {
+        let output_type = IJType::Scalar(None);
+        let input_type = vec![IJType::Scalar(None), IJType::Scalar(None)];
         nodes.push(Rc::new(Node::new(
             operation.clone(),
             vec![],
             IJType::Function(FunctionSignature::new(input_type, output_type)),
             vec![],
-            context.get_increment_id(),
-        )));
+            context,
+        )?));
     }
-    if check_ok_needed_outputs(needed_outputs, &IJType::Number) {
-        let output_type = IJType::Number;
-        let input_type = vec![IJType::Number, IJType::Number];
+    if check_ok_needed_outputs(needed_outputs, &IJType::Number(None)) {
+        let output_type = IJType::Number(None);
+        let input_type = vec![IJType::Number(None), IJType::Number(None)];
         nodes.push(Rc::new(Node::new(
             operation.clone(),
             vec![],
             IJType::Function(FunctionSignature::new(input_type, output_type)),
             vec![],
-            context.get_increment_id(),
-        )));
+            context,
+        )?));
     }
-    if check_ok_needed_outputs(needed_outputs, &IJType::Tensor) {
-        let output_type = IJType::Tensor;
+    if check_ok_needed_outputs(needed_outputs, &IJType::Tensor(None)) {
+        let output_type = IJType::Tensor(None);
         let input_types = vec![
-            vec![IJType::Tensor, IJType::Tensor],
-            vec![IJType::Scalar, IJType::Tensor],
-            vec![IJType::Tensor, IJType::Scalar],
+            vec![IJType::Tensor(None), IJType::Tensor(None)],
+            vec![IJType::Scalar(None), IJType::Tensor(None)],
+            vec![IJType::Tensor(None), IJType::Scalar(None)],
         ];
         for input_type in input_types {
             nodes.push(Rc::new(Node::new(
@@ -101,8 +95,8 @@ fn _next_node_functional_binary(
                 vec![],
                 IJType::Function(FunctionSignature::new(input_type, output_type.clone())),
                 vec![],
-                context.get_increment_id(),
-            )));
+                context,
+            )?));
         }
     }
     if nodes.is_empty() {
@@ -148,8 +142,11 @@ mod tests {
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
         assert_eq!(node.op, Operation::Add);
-        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Tensor]);
-        assert_eq!(node.output_type, IJType::Tensor);
+        assert_eq!(
+            node.input_types,
+            vec![IJType::Tensor(None), IJType::Tensor(None)]
+        );
+        assert_eq!(node.output_type, IJType::Tensor(None));
     }
 
     #[test]
@@ -158,8 +155,11 @@ mod tests {
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
         assert_eq!(node.op, Operation::Add);
-        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Scalar]);
-        assert_eq!(node.output_type, IJType::Tensor);
+        assert_eq!(
+            node.input_types,
+            vec![IJType::Tensor(None), IJType::Scalar(None)]
+        );
+        assert_eq!(node.output_type, IJType::Tensor(None));
     }
 
     #[test]
@@ -168,8 +168,11 @@ mod tests {
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
         assert_eq!(node.op, Operation::Add);
-        assert_eq!(node.input_types, vec![IJType::Scalar, IJType::Scalar]);
-        assert_eq!(node.output_type, IJType::Scalar);
+        assert_eq!(
+            node.input_types,
+            vec![IJType::Scalar(None), IJType::Scalar(None)]
+        );
+        assert_eq!(node.output_type, IJType::Scalar(None));
     }
 
     #[test]
@@ -178,8 +181,11 @@ mod tests {
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
         assert_eq!(node.op, Operation::Multiply);
-        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Tensor]);
-        assert_eq!(node.output_type, IJType::Tensor);
+        assert_eq!(
+            node.input_types,
+            vec![IJType::Tensor(None), IJType::Tensor(None)]
+        );
+        assert_eq!(node.output_type, IJType::Tensor(None));
     }
 
     #[test]
@@ -188,8 +194,11 @@ mod tests {
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
         assert_eq!(node.op, Operation::Multiply);
-        assert_eq!(node.input_types, vec![IJType::Tensor, IJType::Scalar]);
-        assert_eq!(node.output_type, IJType::Tensor);
+        assert_eq!(
+            node.input_types,
+            vec![IJType::Tensor(None), IJType::Scalar(None)]
+        );
+        assert_eq!(node.output_type, IJType::Tensor(None));
     }
 
     #[test]
@@ -198,7 +207,27 @@ mod tests {
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
         assert_eq!(node.op, Operation::Multiply);
-        assert_eq!(node.input_types, vec![IJType::Scalar, IJType::Scalar]);
-        assert_eq!(node.output_type, IJType::Scalar);
+        assert_eq!(
+            node.input_types,
+            vec![IJType::Scalar(None), IJType::Scalar(None)]
+        );
+        assert_eq!(node.output_type, IJType::Scalar(None));
+    }
+
+    #[test]
+    fn test_with_type_inference() -> Result<()> {
+        let (node, _) = parse_str_no_context("+ 1 2<i64>")?;
+        assert_eq!(node.output_type, IJType::Scalar(Some("i64".to_string())));
+
+        let (node, _) = parse_str_no_context("+ 1 2<_>")?;
+        assert_eq!(node.output_type, IJType::Scalar(Some("_".to_string())));
+
+        let (node, _) = parse_str_no_context("+ 1<_> 2<_>")?;
+        assert_eq!(node.output_type, IJType::Scalar(Some("_".to_string())));
+
+        let result = parse_str_no_context("+ 1<usize> 2<i64>");
+        assert!(result.is_err());
+
+        Ok(())
     }
 }

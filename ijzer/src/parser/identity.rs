@@ -15,7 +15,7 @@ impl ParseNode for IdentityNode {
         context: &mut ASTContext,
     ) -> Result<(Rc<Node>, TokenSlice)> {
         let (operands, rest) = gather_operands(
-            vec![vec![IJType::Scalar], vec![IJType::Tensor]],
+            vec![vec![IJType::Scalar(None)], vec![IJType::Tensor(None)]],
             tokens,
             context,
         )?;
@@ -36,13 +36,13 @@ impl ParseNodeFunctional for IdentityNode {
         let slice = slice.move_start(1)?;
         let output_types = match needed_outputs {
             Some(outputs) => outputs,
-            None => &[IJType::Scalar, IJType::Tensor],
+            None => &[IJType::Scalar(None), IJType::Tensor(None)],
         };
 
         let nodes = output_types
             .iter()
             .map(|output_type| {
-                Rc::new(Node::new(
+                Ok(Rc::new(Node::new(
                     Operation::Identity,
                     vec![],
                     IJType::Function(FunctionSignature::new(
@@ -50,10 +50,10 @@ impl ParseNodeFunctional for IdentityNode {
                         output_type.clone(),
                     )),
                     vec![],
-                    context.get_increment_id(),
-                ))
+                    context,
+                )?))
             })
-            .collect();
+            .collect::<Result<Vec<Rc<Node>>>>()?;
         Ok((nodes, slice))
     }
 }
@@ -89,7 +89,21 @@ mod tests {
         assert_eq!(node.output_type, IJType::tensor_function(1));
         let (node, _) = parse_str_no_context("@(~-:Fn(T->T), I) [1]")?;
         assert_eq!(node.op, Operation::FunctionComposition(2));
-        assert_eq!(node.output_type, IJType::Tensor);
+        assert_eq!(node.output_type, IJType::Tensor(None));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_identity_number_type() -> Result<()> {
+        let (node, _) = parse_str_no_context("I 1<a>")?;
+        assert_eq!(node.output_type, IJType::Scalar(Some("a".to_string())));
+
+        let (node, _) = parse_str_no_context("I [1]<a>")?;
+        assert_eq!(node.output_type, IJType::Tensor(Some("a".to_string())));
+
+        let (node, _) = parse_str_no_context("I I I I I 1<a>")?;
+        assert_eq!(node.output_type, IJType::Scalar(Some("a".to_string())));
 
         Ok(())
     }

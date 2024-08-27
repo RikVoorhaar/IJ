@@ -108,6 +108,26 @@ mod tests {
     }
 
     #[test]
+    fn test_as_function_with_type() -> Result<()> {
+        let mut context = ASTContext::new();
+        parse_str("var f: Fn(S<a>,S<b>->S<c>)", &mut context)?;
+
+        let node = parse_str("~f", &mut context)?;
+        assert_eq!(node.op, Operation::Function("f".to_string()));
+        assert_eq!(
+            node.output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![
+                    IJType::Scalar(Some("a".to_string())),
+                    IJType::Scalar(Some("b".to_string()))
+                ],
+                IJType::Scalar(Some("c".to_string()))
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
     fn test_as_function_declaration() -> Result<()> {
         let (node, _) = parse_str_no_context("~+:Fn(S,S->S)")?;
 
@@ -131,8 +151,8 @@ mod tests {
         assert_eq!(
             node.output_type,
             IJType::Function(FunctionSignature::new(
-                vec![IJType::Tensor],
-                IJType::Scalar
+                vec![IJType::Tensor(None)],
+                IJType::Scalar(None)
             ))
         );
         Ok(())

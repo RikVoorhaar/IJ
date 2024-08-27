@@ -4,7 +4,7 @@ use ijzer_macro::ijzer;
 
 #[test]
 fn test_identity() {
-    #[ijzer(f64)]
+    #[ijzer]
     fn _test_identity(x: Tensor<f64>) -> Tensor<f64> {
         r#"
         var x: T
@@ -19,7 +19,7 @@ fn test_identity() {
 
 #[test]
 fn test_assign() {
-    #[ijzer(f64)]
+    #[ijzer]
     fn _test_assign_tensor() -> Tensor<f64> {
         r#"
         x: T = [1.0]
@@ -31,7 +31,7 @@ fn test_assign() {
     let y = _test_assign_tensor();
     assert_eq!(y.to_vec(), x.to_vec());
 
-    #[ijzer(i64)]
+    #[ijzer]
     fn _test_assign_scalar() -> Tensor<i64> {
         r#"
         x: S = 1
@@ -46,7 +46,7 @@ fn test_assign() {
 
 #[test]
 fn test_simple_arithmetic() {
-    #[ijzer(i64)]
+    #[ijzer]
     fn _test_add(x: Tensor<i64>) -> Tensor<i64> {
         r#"
         var x: T
@@ -59,7 +59,7 @@ fn test_simple_arithmetic() {
     let y = _test_add(x.clone());
     assert_eq!(y.to_vec(), expected.to_vec());
 
-    #[ijzer(i64)]
+    #[ijzer]
     fn _test_sub(x: Tensor<i64>) -> Tensor<i64> {
         r#"
         var x: T
@@ -72,7 +72,7 @@ fn test_simple_arithmetic() {
     let y = _test_sub(x.clone());
     assert_eq!(y.to_vec(), expected.to_vec());
 
-    #[ijzer(i64)]
+    #[ijzer]
     fn _test_neg(x: Tensor<i64>) -> Tensor<i64> {
         r#"
         var x: T
@@ -85,7 +85,7 @@ fn test_simple_arithmetic() {
     let y = _test_neg(x.clone());
     assert_eq!(y.to_vec(), expected.to_vec());
 
-    #[ijzer(i64)]
+    #[ijzer]
     fn _test_mul(x: Tensor<i64>) -> Tensor<i64> {
         r#"
         var x: T
@@ -101,7 +101,7 @@ fn test_simple_arithmetic() {
 
 #[test]
 fn test_external_function() {
-    #[ijzer(i64)]
+    #[ijzer]
     fn f(x: Tensor<i64>) -> Tensor<i64> {
         r#"
         var x: T
@@ -109,7 +109,7 @@ fn test_external_function() {
         "#
     }
 
-    #[ijzer(i64)]
+    #[ijzer]
     fn _test_call_f() -> Tensor<i64> {
         r#"
         var f: Fn(T->T)
@@ -124,7 +124,7 @@ fn test_external_function() {
 
 #[test]
 fn test_return_function() {
-    #[ijzer(i64)]
+    #[ijzer]
     fn _return_function() -> fn(Tensor<i64>) -> Tensor<i64> {
         r#"
         square($x: T) -> T = * $x $x
@@ -141,7 +141,7 @@ fn test_return_function() {
 
 #[test]
 fn test_reduce() {
-    #[ijzer(f64)]
+    #[ijzer]
     fn _test_reduce(x: Tensor<f64>) -> Tensor<f64> {
         r#"
         var x: T
@@ -154,7 +154,7 @@ fn test_reduce() {
     let y = _test_reduce(x.clone());
     assert_eq!(y.to_vec(), expected.to_vec());
 
-    #[ijzer(f64)]
+    #[ijzer]
     fn _test_reduce_2(x: Tensor<f64>, f: fn(f64, f64) -> f64) -> Tensor<f64> {
         r#"
         var x: T
@@ -171,18 +171,18 @@ fn test_reduce() {
 
 #[test]
 fn test_function_composition() {
-    #[ijzer(i64)]
+    #[ijzer]
     fn _test_function_composition() -> Tensor<i64> {
         r#"
-        @(/+, -, +) [1,2] [3,4] 
+        @(/+,+) [1,2]<i64> [3,4]<i64>
         "#
     }
 
-    let expected = Tensor::from_vec(vec![-10], Some(vec![2]));
+    let expected = Tensor::from_vec(vec![10], Some(vec![2]));
     let y = _test_function_composition();
     assert_eq!(y.to_vec(), expected.to_vec());
 
-    #[ijzer(i64)]
+    #[ijzer]
     fn _test_external_function_composition(
         f: fn(Tensor<i64>, Tensor<i64>) -> Tensor<i64>,
     ) -> Tensor<i64> {
@@ -200,7 +200,7 @@ fn test_function_composition() {
 
 #[test]
 fn test_type_conversion() {
-    #[ijzer(i64)]
+    #[ijzer]
     fn _test_type_conversion(x: i64) -> Tensor<i64> {
         r#"
         var x: N
@@ -213,7 +213,7 @@ fn test_type_conversion() {
     let y = _test_type_conversion(x);
     assert_eq!(y.to_vec(), expected.to_vec());
 
-    #[ijzer(i64)]
+    #[ijzer]
     fn _test_type_conversion_func(f: fn(Tensor<i64>, Tensor<i64>) -> Tensor<i64>) -> Tensor<i64> {
         r#"
         var f: Fn(S,S->S)
@@ -230,7 +230,7 @@ fn test_type_conversion() {
 #[test]
 fn test_apply() {
     type TensorFun = Box<dyn Fn(Tensor<i64>) -> Tensor<i64>>;
-    #[ijzer(i64)]
+    #[ijzer]
     fn _test_apply(f: fn(Tensor<i64>) -> TensorFun) -> Tensor<i64> {
         r#"
         var f: Fn(S-> Fn(S->S))
@@ -250,7 +250,7 @@ fn test_apply() {
 
 #[test]
 fn test_matrix_multiplication() {
-    #[ijzer(i64)]
+    #[ijzer]
     fn _test_matrix_multiplication(x: Tensor<i64>, y: Tensor<i64>) -> Tensor<i64> {
         r#"
         var x: T
