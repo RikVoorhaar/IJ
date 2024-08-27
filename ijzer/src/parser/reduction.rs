@@ -26,6 +26,7 @@ impl ParseNode for Reduction {
         let (operands, rest) =
             gather_operands(vec![vec![IJType::Tensor(input_number_type)]], rest, context)?;
         let operand = operands.into_iter().next().unwrap();
+
         Ok((
             Rc::new(Node::new(
                 Operation::Reduce,
@@ -164,6 +165,14 @@ mod tests {
                 IJType::Scalar(Some("b".to_string()))
             ))
         );
+        Ok(())
+    }
+
+    #[test]
+    fn test_with_composition() -> Result<()> {
+        let (node, _) = parse_str_no_context("@(/+, -, +) [1,2] [3,4]")?;
+        assert_eq!(node.op, Operation::FunctionComposition(3));
+        assert_eq!(node.output_type, IJType::Scalar(None));
         Ok(())
     }
 }
