@@ -1,7 +1,4 @@
-use super::{
-    check_ok_needed_outputs, gather_operands, next_node_specific_function, ParseNode,
-    ParseNodeFunctional,
-};
+use super::{check_ok_needed_outputs, gather_operands, ParseNode, ParseNodeFunctional};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
@@ -48,13 +45,51 @@ impl ParseNode for TensorBuilder {
         ))
     }
 }
+impl ParseNodeFunctional for TensorBuilder {
+    fn next_node_functional_impl(
+        op: Token,
+        slice: TokenSlice,
+        context: &mut ASTContext,
+        needed_outputs: Option<&[IJType]>,
+    ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
+        let Token::TensorBuilder(builder_name) = op else {
+            unreachable!()
+        };
+        let mut rest = slice.move_start(1)?;
+        if !check_ok_needed_outputs(needed_outputs, &IJType::Tensor(None)) {
+            return Err(SyntaxError::RequiredOutputsDoNotMatchFunctionOutputs(
+                format!("{:?}", needed_outputs),
+                IJType::Tensor(None).to_string(),
+            )
+            .into());
+        }
+        let number_type = if rest.is_empty() {
+            None
+        } else if let Token::NumberType(number_type) = context.get_token_at_index(rest.start)? {
+            rest = rest.move_start(1)?;
+            Some(number_type.clone())
+        } else {
+            None
+        };
+        let node = Rc::new(Node::new(
+            Operation::TensorBuilder(builder_name),
+            vec![],
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor(Some("usize".to_string()))],
+                IJType::Tensor(number_type),
+            )),
+            vec![],
+            context,
+        )?);
+
+        Ok((vec![node], rest))
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast_node::ASTContext;
     use crate::parser::parse_str_no_context;
-    use crate::tokens::Token;
 
     #[test]
     fn test_tensor_builder() -> Result<()> {
@@ -73,6 +108,31 @@ mod tests {
         let (node, _) = parse_str_no_context("randu [3]<usize>")?;
         assert_eq!(node.op, Operation::TensorBuilder("randu".to_string()));
         assert_eq!(node.output_type, IJType::Tensor(None));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_tensor_builder_functional() -> Result<()> {
+        let (node, _) = parse_str_no_context("~randu<f64>")?;
+        assert_eq!(node.op, Operation::TensorBuilder("randu".to_string()));
+        assert_eq!(
+            node.output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor(Some("usize".to_string()))],
+                IJType::Tensor(Some("f64".to_string())),
+            ))
+        );
+
+        let (node, _) = parse_str_no_context("~randu")?;
+        assert_eq!(node.op, Operation::TensorBuilder("randu".to_string()));
+        assert_eq!(
+            node.output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor(Some("usize".to_string()))],
+                IJType::Tensor(None),
+            ))
+        );
 
         Ok(())
     }

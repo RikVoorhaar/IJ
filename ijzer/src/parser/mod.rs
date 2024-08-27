@@ -176,6 +176,12 @@ fn next_node_functional(
             context,
             needed_outputs,
         )?,
+        Token::TensorBuilder(name) => TensorBuilder::next_node_functional_impl(
+            Token::TensorBuilder(name.clone()),
+            slice,
+            context,
+            needed_outputs,
+        )?,
         _ => {
             return Err(SyntaxError::SliceCannotBeParsedAsFunction(
                 context.token_slice_to_string(slice),
