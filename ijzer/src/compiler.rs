@@ -169,7 +169,8 @@ impl CompilerContext {
             Operation::AsFunction => AsFunction::compile(node, self, child_streams)?,
             Operation::GeneralizedContraction => {
                 GeneralizedContraction::compile(node, self, child_streams)?
-            } // _ => NotImplemented::compile(node, self, child_streams)?,
+            }
+            _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
         Ok(stream)
