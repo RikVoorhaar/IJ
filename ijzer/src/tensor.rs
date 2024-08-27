@@ -3,10 +3,10 @@ use itertools::Itertools;
 use num_traits::{Float, Num};
 use rand::Rng;
 use std::fmt;
-use std::ops::{Index, IndexMut, Neg};
+use std::ops::{Index, IndexMut};
 
 #[derive(Clone)]
-pub struct Tensor<T: Clone + Num + Neg<Output = T>> {
+pub struct Tensor<T: Clone + Num> {
     data: Box<[T]>,
     shape: Vec<usize>,
     strides: Vec<usize>,
@@ -45,7 +45,7 @@ pub fn broadcast_shapes(shape1: &[usize], shape2: &[usize]) -> Option<Vec<usize>
     Some(result)
 }
 
-impl<T: Clone + Num + Neg<Output = T>> Tensor<T> {
+impl<T: Clone + Num> Tensor<T> {
     pub fn shape(&self) -> &[usize] {
         &self.shape
     }
@@ -316,7 +316,7 @@ impl<T: Clone + Float> Tensor<T> {
     }
 }
 
-impl<T: Clone + Num + Neg<Output = T>> Index<&[usize]> for Tensor<T> {
+impl<T: Clone + Num> Index<&[usize]> for Tensor<T> {
     type Output = T;
     fn index(&self, index: &[usize]) -> &Self::Output {
         let position: usize = index
@@ -328,7 +328,7 @@ impl<T: Clone + Num + Neg<Output = T>> Index<&[usize]> for Tensor<T> {
     }
 }
 
-impl<T: Clone + Num + Neg<Output = T>> IndexMut<&[usize]> for Tensor<T> {
+impl<T: Clone + Num> IndexMut<&[usize]> for Tensor<T> {
     fn index_mut(&mut self, index: &[usize]) -> &mut Self::Output {
         let position: usize = index
             .iter()
@@ -339,7 +339,7 @@ impl<T: Clone + Num + Neg<Output = T>> IndexMut<&[usize]> for Tensor<T> {
     }
 }
 
-impl<T: fmt::Display + Clone + Num + Neg<Output = T>> fmt::Display for Tensor<T> {
+impl<T: fmt::Display + Clone + Num> fmt::Display for Tensor<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let dims = self.shape.clone();
         if dims.is_empty() {
