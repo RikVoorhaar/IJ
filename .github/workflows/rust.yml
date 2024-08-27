@@ -16,9 +16,15 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Build
+    - name: Build ijzer
       run: cargo build --verbose
       working-directory: ./ijzer
-    - name: Run tests
+    - name: Run tests ijzer
       run: cargo test --verbose
       working-directory: ./ijzer
+    - name: Build macro
+      run: cargo build --verbose
+      working-directory: ./ijzer_macro
+    - name: Run tests macros
+      run: cargo test --verbose
+      working-directory: ./ijzer_macro
