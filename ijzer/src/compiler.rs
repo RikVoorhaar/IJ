@@ -18,6 +18,28 @@ pub fn number_type_from_string(number_type: &str) -> Result<TokenStream, syn::Er
     })?;
     Ok(parsed_val)
 }
+pub fn annotation_from_type(var_type: &IJType) -> TokenStream {
+    match var_type {
+        IJType::Number(None) => quote!(_),
+        IJType::Number(Some(n)) => quote!(#n),
+        IJType::Tensor(None) => quote!(ijzer::tensor::Tensor::<_>),
+        IJType::Tensor(Some(n)) => quote!(ijzer::tensor::Tensor::<#n>),
+        IJType::Scalar(None) => quote!(ijzer::tensor::Tensor::<_>),
+        IJType::Scalar(Some(n)) => quote!(ijzer::tensor::Tensor::<#n>),
+        IJType::Function(signature) => {
+            let input_types = signature
+                .input
+                .iter()
+                .map(annotation_from_type)
+                .collect::<Vec<_>>();
+            let output_type = annotation_from_type(&signature.output);
+            quote! {
+                fn(#(#input_types),*) -> #output_type
+            }
+        }
+        _ => panic!("Unsupported type: {:?}", var_type),
+    }
+}
 
 pub fn compile_line_from_node(
     node: Rc<Node>,
@@ -152,28 +174,6 @@ impl CompilerContext {
     pub fn get_varname(&self, id: usize) -> Ident {
         Ident::new(&format!("_{}", id), Span::call_site())
     }
-    pub fn annotation_from_type(&self, var_type: &IJType) -> TokenStream {
-        match var_type {
-            IJType::Number(None) => quote!(_),
-            IJType::Number(Some(n)) => quote!(#n),
-            IJType::Tensor(None) => quote!(ijzer::tensor::Tensor::<_>),
-            IJType::Tensor(Some(n)) => quote!(ijzer::tensor::Tensor::<#n>),
-            IJType::Scalar(None) => quote!(ijzer::tensor::Tensor::<_>),
-            IJType::Scalar(Some(n)) => quote!(ijzer::tensor::Tensor::<#n>),
-            IJType::Function(signature) => {
-                let input_types = signature
-                    .input
-                    .iter()
-                    .map(|t| self.annotation_from_type(t))
-                    .collect::<Vec<_>>();
-                let output_type = self.annotation_from_type(&signature.output);
-                quote! {
-                    fn(#(#input_types),*) -> #output_type
-                }
-            }
-            _ => panic!("Unsupported type: {:?}", var_type),
-        }
-    }
 }
 
 pub trait CompileNode {
@@ -188,7 +188,7 @@ struct Number;
 impl CompileNode for Number {
     fn compile(
         node: Rc<Node>,
-        compiler: &mut CompilerContext,
+        _compiler: &mut CompilerContext,
         _: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::Number(number) = &node.op {
@@ -197,7 +197,7 @@ impl CompileNode for Number {
             let parsed_val = syn::parse_str::<proc_macro2::TokenStream>(&val).map_err(|_| {
                 syn::Error::new_spanned(&val, "Failed to parse value into a Rust TokenStream")
             })?;
-            let t = compiler.annotation_from_type(&IJType::Scalar(None));
+            let t = annotation_from_type(&IJType::Scalar(None));
             let res = quote! {
                 #t::scalar(#parsed_val)
             };
@@ -212,7 +212,7 @@ struct Array;
 impl CompileNode for Array {
     fn compile(
         node: Rc<Node>,
-        compiler: &mut CompilerContext,
+        _compiler: &mut CompilerContext,
         _: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::Array(s) = &node.op {
@@ -221,7 +221,7 @@ impl CompileNode for Array {
             let parsed_val = syn::parse_str::<proc_macro2::TokenStream>(&val).map_err(|_| {
                 syn::Error::new_spanned(&val, "Failed to parse value into a Rust TokenStream")
             })?;
-            let t = compiler.annotation_from_type(&IJType::Scalar(None));
+            let t = annotation_from_type(&IJType::Scalar(None));
             let res = quote! {
                 #t::from_vec(vec![#parsed_val], None)
             };
@@ -334,7 +334,7 @@ struct Assign;
 impl CompileNode for Assign {
     fn compile(
         node: Rc<Node>,
-        compiler: &mut CompilerContext,
+        _compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::Assign = &node.op {
@@ -349,7 +349,7 @@ impl CompileNode for Assign {
             .skip(2)
             .map(|n| {
                 let s = child_streams[&n.id].clone();
-                let t = compiler.annotation_from_type(&n.output_type);
+                let t = annotation_from_type(&n.output_type);
                 quote!(#s: #t)
             })
             .collect::<Vec<_>>();
@@ -370,12 +370,12 @@ struct Add;
 impl CompileNode for Add {
     fn compile(
         node: Rc<Node>,
-        compiler: &mut CompilerContext,
+        _compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
-        let tensor_t = compiler.annotation_from_type(&IJType::Tensor(None));
-        let number_t = compiler.annotation_from_type(&IJType::Number(None));
+        let tensor_t = annotation_from_type(&IJType::Tensor(None));
+        let number_t = annotation_from_type(&IJType::Number(None));
 
         let res = match node.output_type.clone() {
             IJType::Tensor(None) | IJType::Scalar(None) => {
@@ -420,12 +420,12 @@ struct Subtract;
 impl CompileNode for Subtract {
     fn compile(
         node: Rc<Node>,
-        compiler: &mut CompilerContext,
+        _compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::Subtract = &node.op {
-            let number_t = compiler.annotation_from_type(&IJType::Number(None));
-            let tensor_t = compiler.annotation_from_type(&IJType::Tensor(None));
+            let number_t = annotation_from_type(&IJType::Number(None));
+            let tensor_t = annotation_from_type(&IJType::Tensor(None));
             let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
             let res = match node.output_type.clone() {
                 IJType::Tensor(None) | IJType::Scalar(None) => {
@@ -469,12 +469,12 @@ struct Negate;
 impl CompileNode for Negate {
     fn compile(
         node: Rc<Node>,
-        compiler: &mut CompilerContext,
+        _compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::Negate = &node.op {
-            let number_t = compiler.annotation_from_type(&IJType::Number(None));
-            let tensor_t = compiler.annotation_from_type(&IJType::Tensor(None));
+            let number_t = annotation_from_type(&IJType::Number(None));
+            let tensor_t = annotation_from_type(&IJType::Tensor(None));
             let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
             let res = match node.output_type.clone() {
                 IJType::Tensor(None) | IJType::Scalar(None) => {
@@ -515,12 +515,12 @@ struct Multiply;
 impl CompileNode for Multiply {
     fn compile(
         node: Rc<Node>,
-        compiler: &mut CompilerContext,
+        _compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::Multiply = &node.op {
-            let number_t = compiler.annotation_from_type(&IJType::Number(None));
-            let tensor_t = compiler.annotation_from_type(&IJType::Tensor(None));
+            let number_t = annotation_from_type(&IJType::Number(None));
+            let tensor_t = annotation_from_type(&IJType::Tensor(None));
             let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
             let res = match node.output_type.clone() {
                 IJType::Tensor(None) | IJType::Scalar(None) => {
@@ -602,7 +602,7 @@ impl CompileNode for Reduce {
             panic!("Expected reduce node, found {:?}", node.op);
         }
         let operands = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
-        let tensor_t = compiler.annotation_from_type(&IJType::Tensor(None));
+        let tensor_t = annotation_from_type(&IJType::Tensor(None));
         match operands.len() {
             1 => {
                 let functional_operand = &operands[0];
@@ -643,7 +643,7 @@ impl FunctionComposition {
 impl CompileNode for FunctionComposition {
     fn compile(
         node: Rc<Node>,
-        compiler: &mut CompilerContext,
+        _compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         let num_functions = if let Operation::FunctionComposition(n) = &node.op {
@@ -675,7 +675,7 @@ impl CompileNode for FunctionComposition {
             .enumerate()
         {
             let ident = Ident::new(&format!("_{}_{}", node.id, i + 1), Span::call_site());
-            let type_annotation = compiler.annotation_from_type(arg_type);
+            let type_annotation = annotation_from_type(arg_type);
             args_with_type.push(quote! { #ident: #type_annotation });
             args.push(quote! { #ident });
         }
@@ -765,7 +765,6 @@ impl TypeConversion {
         from: &IJType,
         to: &IJType,
         child_stream: TokenStream,
-        compiler: &CompilerContext,
         id: usize,
     ) -> Result<TokenStream> {
         let res = match (from, to) {
@@ -777,11 +776,11 @@ impl TypeConversion {
             }
             (IJType::Number(_), IJType::Number(_)) => quote! {#child_stream},
             (IJType::Number(_), IJType::Scalar(_)) => {
-                let tensor_t = compiler.annotation_from_type(&IJType::Tensor(None));
+                let tensor_t = annotation_from_type(&IJType::Tensor(None));
                 quote! {#tensor_t::scalar(#child_stream)}
             }
             (IJType::Number(_), IJType::Tensor(_)) => {
-                let tensor_t = compiler.annotation_from_type(&IJType::Tensor(None));
+                let tensor_t = annotation_from_type(&IJType::Tensor(None));
                 quote! {#tensor_t::scalar(#child_stream)}
             }
             (IJType::Function(ref signature_from), IJType::Function(ref signature_to)) => {
@@ -796,14 +795,8 @@ impl TypeConversion {
                     .zip(signature_to.input.clone())
                     .zip(idents.clone())
                 {
-                    input_conversions.push(Self::convert_type(
-                        &to,
-                        from,
-                        quote!(#ident),
-                        compiler,
-                        id,
-                    )?);
-                    let arg_type = compiler.annotation_from_type(&to);
+                    input_conversions.push(Self::convert_type(&to, from, quote!(#ident), id)?);
+                    let arg_type = annotation_from_type(&to);
                     args.push(quote!(#ident: #arg_type));
                 }
                 let input_stream = quote! {(#child_stream)(#(#input_conversions),*)};
@@ -811,7 +804,6 @@ impl TypeConversion {
                     &signature_from.output,
                     &signature_to.output,
                     input_stream,
-                    compiler,
                     id,
                 )?;
                 quote! {
@@ -828,7 +820,7 @@ impl TypeConversion {
 impl CompileNode for TypeConversion {
     fn compile(
         node: Rc<Node>,
-        compiler: &mut CompilerContext,
+        _compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if node.operands.len() != 1 {
@@ -839,7 +831,6 @@ impl CompileNode for TypeConversion {
             &node.input_types[0],
             &node.output_type,
             child_stream,
-            compiler,
             node.id,
         )
     }
@@ -867,7 +858,7 @@ struct GeneralizedContraction;
 impl CompileNode for GeneralizedContraction {
     fn compile(
         node: Rc<Node>,
-        compiler: &mut CompilerContext,
+        _compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         let child_streams = node
@@ -875,7 +866,7 @@ impl CompileNode for GeneralizedContraction {
             .iter()
             .map(|n| child_streams[&n.id].clone())
             .collect::<Vec<_>>();
-        let tensor_t = compiler.annotation_from_type(&IJType::Tensor(None));
+        let tensor_t = annotation_from_type(&IJType::Tensor(None));
         let f_stream = child_streams[0].clone();
         let f_stream_extract = quote! {
             (|z: &#tensor_t| (#f_stream)(z.clone()).extract_scalar().unwrap())
