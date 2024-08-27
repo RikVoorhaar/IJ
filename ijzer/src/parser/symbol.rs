@@ -21,11 +21,11 @@ impl ParseNode for Symbol {
                 .ok_or(SyntaxError::UnknownSymbol(name.clone()))?;
 
             let (node, rest) = match variable.typ.clone() {
-                IJType::Tensor(None) => (
+                IJType::Tensor(n) => (
                     Node::new(
                         Operation::Symbol(name.clone()),
                         vec![],
-                        IJType::Tensor(None),
+                        IJType::Tensor(n),
                         vec![],
                         context,
                     )?,
@@ -43,21 +43,21 @@ impl ParseNode for Symbol {
                     )?;
                     (node, rest)
                 }
-                IJType::Scalar(None) => (
+                IJType::Scalar(n) => (
                     Node::new(
                         Operation::Symbol(name.clone()),
                         vec![],
-                        IJType::Scalar(None),
+                        IJType::Scalar(n),
                         vec![],
                         context,
                     )?,
                     slice,
                 ),
-                IJType::Number(None) => (
+                IJType::Number(n) => (
                     Node::new(
                         Operation::Symbol(name.clone()),
                         vec![],
-                        IJType::Number(None),
+                        IJType::Number(n),
                         vec![],
                         context,
                     )?,
@@ -110,5 +110,43 @@ impl ParseNodeFunctional for Symbol {
         } else {
             Err(SyntaxError::ExpectedFunction(context.token_slice_to_string(slice)).into())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::parse_str;
+    use crate::types::FunctionSignature;
+
+    #[test]
+    fn test_symbol_number_type() -> Result<()> {
+        let mut context = ASTContext::new();
+        parse_str("var x: N<a>", &mut context)?;
+        let node = parse_str("x", &mut context)?;
+        assert_eq!(node.output_type, IJType::Number(Some("a".to_string())));
+
+        let mut context = ASTContext::new();
+        parse_str("var x: T<a>", &mut context)?;
+        let node = parse_str("x", &mut context)?;
+        assert_eq!(node.output_type, IJType::Tensor(Some("a".to_string())));
+
+        let mut context = ASTContext::new();
+        parse_str("var x: S<a>", &mut context)?;
+        let node = parse_str("x", &mut context)?;
+        assert_eq!(node.output_type, IJType::Scalar(Some("a".to_string())));
+
+        let mut context = ASTContext::new();
+        parse_str("var x: Fn(S<a>->T<a>)", &mut context)?;
+        let node = parse_str("~x", &mut context)?;
+        assert_eq!(
+            node.output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Scalar(Some("a".to_string()))],
+                IJType::Tensor(Some("a".to_string())),
+            ))
+        );
+
+        Ok(())
     }
 }
