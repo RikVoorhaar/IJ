@@ -100,11 +100,11 @@ impl ParseNodeFunctional for MinusOp {
         _op: Token,
         slice: TokenSlice,
         context: &mut ASTContext,
-        needed_outputs: Option<&[IJType]>,
+        needed_output: Option<&[IJType]>,
     ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
         let rest = slice.move_start(1)?;
         let mut nodes = vec![];
-        if check_ok_needed_outputs(needed_outputs, &IJType::Scalar(None)) {
+        if check_ok_needed_outputs(needed_output, &IJType::Scalar(None)) {
             nodes.push(Rc::new(Node::new(
                 Operation::Subtract,
                 vec![],
@@ -119,7 +119,8 @@ impl ParseNodeFunctional for MinusOp {
                 vec![],
                 context,
             )?));
-        } else if check_ok_needed_outputs(needed_outputs, &IJType::Number(None)) {
+        }
+        if check_ok_needed_outputs(needed_output, &IJType::Number(None)) {
             nodes.push(Rc::new(Node::new(
                 Operation::Subtract,
                 vec![],
@@ -134,7 +135,8 @@ impl ParseNodeFunctional for MinusOp {
                 vec![],
                 context,
             )?));
-        } else if check_ok_needed_outputs(needed_outputs, &IJType::Tensor(None)) {
+        }
+        if check_ok_needed_outputs(needed_output, &IJType::Tensor(None)) {
             let output_type = IJType::Tensor(None);
             let input_types = vec![
                 vec![IJType::Tensor(None), IJType::Tensor(None)],
@@ -156,9 +158,10 @@ impl ParseNodeFunctional for MinusOp {
                     context,
                 )?));
             }
-        } else {
+        }
+        if nodes.is_empty() {
             return Err(SyntaxError::FunctionSignatureMismatch(
-                format!("{:?}", needed_outputs),
+                format!("{:?}", needed_output),
                 "Fn(T,T->T) or Fn(S,S->S) or Fn(T,S->T) or Fn(S,T->S) or Fn(N,N->N) or Fn(N->N) or Fn(S->S) or Fn(T->T)".to_string(),
             )
             .into());
@@ -292,6 +295,21 @@ mod tests {
         let result = parse_str_no_context("- 1<a> 2<b>");
         assert!(result.is_err());
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_minus_functional() -> Result<()> {
+        let (node, _) = parse_str_no_context("~-: Fn(T->T)")?;
+        assert_eq!(node.op, Operation::Negate);
+        assert_eq!(node.input_types, vec![]);
+        assert_eq!(
+            node.output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor(None)],
+                IJType::Tensor(None)
+            ))
+        );
         Ok(())
     }
 }
