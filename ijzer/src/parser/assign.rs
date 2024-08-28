@@ -119,8 +119,9 @@ pub fn parse_group_assign(
     rhs: TokenSlice,
 ) -> Result<Rc<Node>> {
     let lhs_tokens = context.get_tokens_from_slice(lhs);
-    let end_index = find_matching_parenthesis(context, lhs, &Token::LParen, &Token::RParen)?;
-    if end_index != lhs_tokens.len() - 1 {
+    let end_index =
+        find_matching_parenthesis(context, lhs.move_start(1)?, &Token::LParen, &Token::RParen)?;
+    if end_index != lhs_tokens.len() - 2 {
         return Err(SyntaxError::InvalidAssignmentStatement(format!(
             "Expected closing parenthesis but got '{}'",
             context.token_slice_to_string(lhs.move_end(end_index)?)
@@ -128,17 +129,50 @@ pub fn parse_group_assign(
         .into());
     }
     let lhs_slices = comma_separate(lhs.move_start(1)?.move_end(end_index)?, context)?;
-    let lhs_symbol_names = lhs_slices
-        .iter()
-        .map(|slice| match context.get_token_at_index(slice.start)? {
-            Token::Symbol(symbol_token) => Ok(symbol_token.name.clone()),
-            _ => Err(SyntaxError::InvalidAssignmentStatement(format!(
-                "Expected symbol but got '{}'",
-                context.token_slice_to_string(*slice)
-            ))
-            .into()),
-        })
-        .collect::<Result<Vec<_>>>()?;
+    let mut lhs_symbol_names = Vec::new();
+    let mut lhs_symbol_types = Vec::new();
+    for slice in &lhs_slices {
+        match context.get_token_at_index(slice.start)? {
+            Token::Symbol(symbol_token) => {
+                lhs_symbol_names.push(symbol_token.name.clone());
+                if !slice.move_start(1)?.is_empty() {
+                    let slice = slice.move_start(1)?;
+                    match context.get_token_at_index(slice.start)? {
+                        Token::TypeDeclaration => {
+                            let (output_type, num_tokens) = IJType::parse_tokens(
+                                &context.get_tokens_from_slice(slice.move_start(1)?),
+                            )?;
+                            lhs_symbol_types.push(Some(output_type));
+                            let rest = slice.move_start(num_tokens + 1)?;
+                            if !rest.is_empty() {
+                                return Err(SyntaxError::InvalidAssignmentStatement(format!(
+                                    "Got unparsed tokens '{}' after type declaration",
+                                    context.token_slice_to_string(rest)
+                                ))
+                                .into());
+                            }
+                        }
+                        _ => {
+                            return Err(SyntaxError::InvalidAssignmentStatement(format!(
+                                "Expected type declaration after symbol but got '{}'",
+                                context.token_slice_to_string(slice)
+                            ))
+                            .into());
+                        }
+                    }
+                } else {
+                    lhs_symbol_types.push(None);
+                }
+            }
+            _ => {
+                return Err(SyntaxError::InvalidAssignmentStatement(format!(
+                    "Expected symbol but got '{}'",
+                    context.token_slice_to_string(*slice)
+                ))
+                .into())
+            }
+        }
+    }
     let (rhs_node, rest) = next_node(rhs, context)?;
     if !rest.is_empty() {
         return Err(SyntaxError::InvalidAssignmentStatement(format!(
@@ -156,11 +190,24 @@ pub fn parse_group_assign(
             .into());
         }
         let mut symbol_nodes = vec![];
-        for (lhs_name, rhs_type) in lhs_symbol_names.iter().zip(group_types.iter()) {
+        for ((lhs_name, lhs_type), rhs_type) in lhs_symbol_names
+            .iter()
+            .zip(lhs_symbol_types.iter())
+            .zip(group_types.iter())
+        {
             context.insert_variable(Variable {
                 name: lhs_name.clone(),
                 typ: rhs_type.clone(),
             });
+            if let Some(lhs_type) = lhs_type {
+                if !lhs_type.type_match(rhs_type) {
+                    return Err(SyntaxError::InvalidAssignmentStatement(format!(
+                        "LHS type '{}' does not match RHS type '{}'",
+                        lhs_type, rhs_type
+                    ))
+                    .into());
+                }
+            }
             symbol_nodes.push(Rc::new(Node::new(
                 Operation::Symbol(lhs_name.clone()),
                 vec![],
@@ -228,7 +275,7 @@ pub fn parse_assign(context: &mut ASTContext) -> Result<Rc<Node>> {
         ))
     };
     if let Some(output_type) = output_type {
-        if output_type != symbol_type {
+        if !output_type.type_match(&symbol_type) {
             return Err(SyntaxError::InvalidAssignmentStatement(format!(
                 "LHS has type '{}' but RHS has type '{}'",
                 output_type, symbol_type
@@ -659,6 +706,35 @@ mod tests {
                 IJType::Scalar(None),
             ))
         );
+        Ok(())
+    }
+
+    #[test]
+    fn test_assign_group() -> Result<()> {
+        let tokens = lexer("(x,y) = (1,2)")?;
+        let mut context = ASTContext::from_tokens(tokens.clone());
+        let assign_node = parse_assign(&mut context)?;
+        let node0 = assign_node.operands[0].clone();
+        assert_eq!(node0.output_type, IJType::Group(vec![IJType::Scalar(None), IJType::Scalar(None)]));
+        assert_eq!(node0.op, Operation::Group);
+        assert_eq!(node0.operands.len(), 2);
+
+
+        let tokens = lexer("(x: S<a>, y: S) = (1<a>,2<b>)")?;
+        let mut context = ASTContext::from_tokens(tokens.clone());
+        let assign_node = parse_assign(&mut context)?;
+        let node0 = assign_node.operands[0].clone();
+        assert_eq!(node0.output_type, IJType::Group(vec![IJType::Scalar(Some("a".to_string())), IJType::Scalar(Some("b".to_string()))]));
+        assert_eq!(node0.op, Operation::Group);
+        assert_eq!(node0.operands.len(), 2);
+
+        let tokens = lexer("(x: S<a>, y: S) = (1<a>,2)")?;
+        let mut context = ASTContext::from_tokens(tokens.clone());
+        let assign_node = parse_assign(&mut context)?;
+        let node0 = assign_node.operands[0].clone();
+        assert_eq!(node0.output_type, IJType::Group(vec![IJType::Scalar(Some("a".to_string())), IJType::Scalar(None)]));
+        assert_eq!(node0.op, Operation::Group);
+        assert_eq!(node0.operands.len(), 2);
         Ok(())
     }
 }
