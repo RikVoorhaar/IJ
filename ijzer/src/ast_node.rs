@@ -144,6 +144,21 @@ impl Node {
             id: context.get_increment_id(),
         })
     }
+    pub fn new_skip_number_inference(
+        op: Operation,
+        input_types: Vec<IJType>,
+        output_type: IJType,
+        operands: Vec<Rc<Node>>,
+        context: &mut ASTContext,
+    ) -> Result<Self> {
+        Ok(Node {
+            op,
+            output_type,
+            input_types,
+            operands,
+            id: context.get_increment_id(),
+        })
+    }
 }
 
 impl ASTContext {

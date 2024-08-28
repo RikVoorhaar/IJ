@@ -199,6 +199,9 @@ pub enum Token {
 
     #[regex(r"<\w+>", |lex| lex.slice().trim_start_matches('<').trim_end_matches('>').parse().ok())]
     NumberType(String),
+
+    #[regex(r"(eye|randu|randn|zeros|ones)", |lex| Some(lex.slice().to_string()))]
+    TensorBuilder(String),
 }
 
 impl Display for Token {
@@ -235,6 +238,7 @@ impl Display for Token {
             Self::Apply => write!(f, "."),
             Self::GeneralizedContraction => write!(f, "?"),
             Self::NumberType(s) => write!(f, "<{}>", s),
+            Self::TensorBuilder(s) => write!(f, "{}", s),
         }
     }
 }
@@ -284,5 +288,16 @@ mod tests {
         assert_eq!(tokens_with_comment, tokens_without_comment);
         assert_eq!(tokens_with_multiline.len(), tokens_with_comment.len());
         assert_eq!(tokens_with_multiline, tokens_with_comment);
+    }
+
+    #[test]
+    fn test_tensor_builders() {
+        // This test is necessary because we neeed to make sure that the tensor builder regex
+        // has higher priority than the symbol regex.
+        let input = "eye randu randn zeros ones";
+        let tokens = lexer(input).unwrap();
+        assert!(tokens.iter().all(|t| matches!(t, Token::TensorBuilder(_))));
+        println!("{:?}", tokens);
+        assert_eq!(tokens.len(), 5);
     }
 }

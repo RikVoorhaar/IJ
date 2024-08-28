@@ -169,7 +169,9 @@ impl CompilerContext {
             Operation::AsFunction => AsFunction::compile(node, self, child_streams)?,
             Operation::GeneralizedContraction => {
                 GeneralizedContraction::compile(node, self, child_streams)?
-            } // _ => NotImplemented::compile(node, self, child_streams)?,
+            }
+            Operation::TensorBuilder(_) => TensorBuilder::compile(node, self, child_streams)?,
+            // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
         Ok(stream)
@@ -890,7 +892,8 @@ impl CompileNode for GeneralizedContraction {
             .collect::<Vec<_>>();
         let f_stream = child_streams[0].clone();
         let f_node = &node.operands[0];
-        let f_arg_annot = annotation_from_type(&f_node.output_type.extract_signature().unwrap().input[0])?;
+        let f_arg_annot =
+            annotation_from_type(&f_node.output_type.extract_signature().unwrap().input[0])?;
         let f_stream_extract = quote! {
             (|z: &#f_arg_annot| (#f_stream)(z.clone()).extract_scalar().unwrap())
         };
@@ -917,6 +920,33 @@ impl CompileNode for GeneralizedContraction {
                     node.operands.len()
                 );
             }
+        }
+    }
+}
+
+struct TensorBuilder;
+impl CompileNode for TensorBuilder {
+    fn compile(
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        if let Operation::TensorBuilder(builder_name) = &node.op {
+            let builder_name_stream = syn::parse_str::<proc_macro2::TokenStream>(builder_name)
+                .map_err(|_| {
+                    syn::Error::new_spanned(
+                        builder_name,
+                        "Failed to parse builder name into a Rust TokenStream",
+                    )
+                })?;
+            let child_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
+            let number_type = node.output_type.extract_number_type().unwrap();
+            let tensor_t = annotation_from_type(&IJType::Tensor(number_type))?;
+            Ok(quote! {
+                #tensor_t::#builder_name_stream(#child_stream.to_vec().as_slice())
+            })
+        } else {
+            unreachable!()
         }
     }
 }
@@ -1207,6 +1237,31 @@ mod tests {
     fn test_generalized_contraction_functional() -> Result<()> {
         let input = "~?/+*";
         let expected = "| x : ijzer :: tensor :: Tensor :: < _ > , y : ijzer :: tensor :: Tensor :: < _ > | x . generalized_contraction (& y , (| z : & ijzer :: tensor :: Tensor :: < _ > | (| _1 : ijzer :: tensor :: Tensor :: < _ > | _1 . reduce (| a : _ , b : _ | a + b)) (z . clone ()) . extract_scalar () . unwrap ()) , | a : _ , b : _ | a * b) . unwrap ()";
+        compiler_compare(input, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_tensor_builder() -> Result<()> {
+        let input = "zeros [1,2]";
+        let expected = "ijzer::tensor::Tensor::<_>::zeros(ijzer::tensor::Tensor::<_>::from_vec(vec![1,2],None).to_vec().as_slice())";
+        compiler_compare(input, expected);
+
+        let input = "ones<f64> [1]";
+        let expected = "ijzer::tensor::Tensor::<f64>::ones(ijzer::tensor::Tensor::<_>::from_vec(vec![1],None).to_vec().as_slice())";
+        compiler_compare(input, expected);
+
+        let input = "var x: T<usize>; randu<f32> x";
+        let expected = "ijzer::tensor::Tensor::<f32>::randu(x.to_vec().as_slice())";
+        compiler_compare(input, expected);
+
+        let input = "var x: T<usize>; randn<f32> x";
+        let expected = "ijzer::tensor::Tensor::<f32>::randn(x.to_vec().as_slice())";
+        compiler_compare(input, expected);
+
+        let input = "eye<f32> [3,3]<usize>";
+        let expected = "ijzer::tensor::Tensor::<f32>::eye(ijzer::tensor::Tensor::<usize>::from_vec(vec![3,3],None).to_vec().as_slice())";
         compiler_compare(input, expected);
 
         Ok(())

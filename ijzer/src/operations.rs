@@ -24,6 +24,7 @@ pub enum Operation {
     Apply,
     AsFunction,
     GeneralizedContraction,
+    TensorBuilder(String),
 }
 
 impl Debug for Operation {
@@ -49,6 +50,7 @@ impl Debug for Operation {
             Self::Apply => write!(f, "Apply"),
             Self::AsFunction => write!(f, "AsFunction"),
             Self::GeneralizedContraction => write!(f, "GeneralizedContraction"),
+            Self::TensorBuilder(s) => write!(f, "TensorBuilder({})", s),
         }
     }
 }

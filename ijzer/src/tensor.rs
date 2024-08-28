@@ -46,6 +46,18 @@ pub fn broadcast_shapes(shape1: &[usize], shape2: &[usize]) -> Option<Vec<usize>
 }
 
 impl<T: Clone + Num> Tensor<T> {
+    pub fn new(data: Box<[T]>, shape: Vec<usize>) -> Tensor<T> {
+        let strides = strides_from_shape(&shape);
+        let size = shape.iter().product();
+        if data.len() != size {
+            panic!("Data length must match the product of the shape dimensions");
+        }
+        Tensor {
+            data,
+            shape,
+            strides,
+        }
+    }
     pub fn shape(&self) -> &[usize] {
         &self.shape
     }
@@ -63,33 +75,25 @@ impl<T: Clone + Num> Tensor<T> {
 
     pub fn zeros(shape: &[usize]) -> Tensor<T> {
         let shape = shape.to_vec();
-        let strides = strides_from_shape(&shape);
         let data = vec![T::zero(); shape.iter().product()].into_boxed_slice();
-        Tensor {
-            shape,
-            strides,
-            data,
-        }
+        Tensor::new(data, shape)
     }
     pub fn ones(shape: &[usize]) -> Tensor<T> {
         let shape = shape.to_vec();
-        let strides = strides_from_shape(&shape);
         let data = vec![T::one(); shape.iter().product()].into_boxed_slice();
-        Tensor {
-            shape,
-            strides,
-            data,
+        Tensor::new(data, shape)
+    }
+    pub fn eye(shape: &[usize]) -> Tensor<T> {
+        let mut tensor = Self::zeros(shape);
+        for i in 0..*shape.iter().min().unwrap() {
+            tensor[&vec![i; shape.len()]] = T::one();
         }
+        tensor
     }
     pub fn scalar(value: T) -> Tensor<T> {
         let shape = vec![1];
-        let strides = vec![1];
         let data = vec![value].into_boxed_slice();
-        Tensor {
-            shape,
-            strides,
-            data,
-        }
+        Tensor::new(data, shape)
     }
     pub fn is_scalar(&self) -> bool {
         self.shape == vec![1]
@@ -103,12 +107,7 @@ impl<T: Clone + Num> Tensor<T> {
 
     pub fn from_vec(data: Vec<T>, shape: Option<Vec<usize>>) -> Tensor<T> {
         let shape = shape.unwrap_or_else(|| vec![data.len()]);
-        let strides = strides_from_shape(&shape);
-        Tensor {
-            shape,
-            strides,
-            data: data.into_boxed_slice(),
-        }
+        Tensor::new(data.into_boxed_slice(), shape)
     }
     pub fn to_vec(&self) -> Vec<T> {
         self.data.clone().into_vec()
@@ -126,11 +125,7 @@ impl<T: Clone + Num> Tensor<T> {
         for i in 0..self.size() {
             new_data.push(f(self.data[i].clone()));
         }
-        Tensor {
-            data: new_data.into_boxed_slice(),
-            shape: self.shape.clone(),
-            strides: self.strides.clone(),
-        }
+        Tensor::new(new_data.into_boxed_slice(), self.shape.clone())
     }
     pub fn apply_binary_op(&self, other: &Tensor<T>, f: impl Fn(T, T) -> T) -> Option<Tensor<T>> {
         let out_shape = broadcast_shapes(&self.shape, &other.shape)?;
@@ -286,33 +281,23 @@ impl<T: Clone + Float> Tensor<T> {
     pub fn randn(shape: &[usize]) -> Tensor<T> {
         let mut rng = rand::thread_rng();
         let normal = rand_distr::Normal::new(0.0, 1.0).unwrap();
-        let data: Vec<T> = shape
-            .iter()
+        let size = shape.iter().product();
+        let data: Vec<T> = (0..size)
             .map(|_| T::from(rng.sample(normal)).unwrap())
             .collect();
         let shape = shape.to_vec();
-        let strides = strides_from_shape(&shape);
-        Tensor {
-            shape,
-            strides,
-            data: data.into_boxed_slice(),
-        }
+        Tensor::new(data.into_boxed_slice(), shape)
     }
 
     pub fn randu(shape: &[usize]) -> Tensor<T> {
         let mut rng = rand::thread_rng();
         let uniform = rand_distr::Uniform::new(0.0, 1.0);
-        let data: Vec<T> = shape
-            .iter()
+        let size = shape.iter().product();
+        let data: Vec<T> = (0..size)
             .map(|_| T::from(rng.sample(uniform)).unwrap())
             .collect();
         let shape = shape.to_vec();
-        let strides = strides_from_shape(&shape);
-        Tensor {
-            shape,
-            strides,
-            data: data.into_boxed_slice(),
-        }
+        Tensor::new(data.into_boxed_slice(), shape)
     }
 }
 
@@ -393,6 +378,40 @@ mod tests {
         assert_eq!(tensor.shape, vec![1, 3, 4]);
         assert_eq!(tensor.strides, vec![12, 4, 1]);
         assert_eq!(tensor.data.len(), 12);
+        assert!(tensor.data.iter().all(|&x| x == 1.0));
+    }
+    #[test]
+    fn test_tensor_eye() {
+        let tensor = Tensor::<f64>::eye(&[3, 3]);
+        assert_eq!(tensor.shape, vec![3, 3]);
+        assert_eq!(tensor.strides, vec![3, 1]);
+        assert_eq!(tensor.data.len(), 9);
+        assert!(tensor.data.iter().enumerate().all(|(i, &x)| {
+            if i % 4 == 0 {
+                x == 1.0
+            } else {
+                x == 0.0
+            }
+        }));
+
+        let tensor = Tensor::<f64>::eye(&[3, 1]);
+        assert_eq!(tensor.shape, vec![3, 1]);
+        assert_eq!(tensor.strides, vec![1, 1]);
+        assert_eq!(tensor.data.len(), 3);
+        println!("{:?}", tensor.data);
+        assert!(tensor.data.iter().enumerate().all(|(i, &x)| {
+            if i == 0 {
+                x == 1.0
+            } else {
+                x == 0.0
+            }
+        }));
+
+        let tensor = Tensor::<f64>::eye(&[3]);
+        assert_eq!(tensor.shape, vec![3]);
+        assert_eq!(tensor.strides, vec![1]);
+        assert_eq!(tensor.data.len(), 3);
+        println!("{:?}", tensor.data);
         assert!(tensor.data.iter().all(|&x| x == 1.0));
     }
 
@@ -577,6 +596,13 @@ mod tests {
         let shape = vec![2, 3];
         let tensor = Tensor::<f64>::randn(&shape);
         assert_eq!(tensor.shape(), &shape);
+        assert_eq!(tensor.data.len(), 6);
+        assert_eq!(tensor.size(), 6);
+
+        let shape = vec![2, 3];
+        let tensor = Tensor::<f32>::randn(&shape);
+        assert_eq!(tensor.data.len(), 6);
+        assert_eq!(tensor.shape(), &shape);
         assert_eq!(tensor.size(), 6);
     }
 
@@ -587,6 +613,7 @@ mod tests {
         assert!(tensor.to_vec().iter().all(|&x| (0.0..=1.0).contains(&x)));
         assert_eq!(tensor.shape(), &shape);
         assert_eq!(tensor.size(), 8);
+        assert_eq!(tensor.data.len(), 8);
     }
 
     #[test]
