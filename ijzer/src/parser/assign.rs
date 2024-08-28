@@ -16,7 +16,6 @@ fn parse_assign_lhs(
     slice: TokenSlice,
 ) -> Result<(String, Vec<Rc<Node>>, Option<IJType>)> {
     let tokens = context.get_tokens_from_slice(slice);
-    println!("{:?}", tokens);
     let symbol_name = if let [Token::Symbol(symbol_token), ..] = tokens.as_slice() {
         symbol_token.name.clone()
     } else {
@@ -113,6 +112,133 @@ fn parse_assign_lhs(
     Ok((symbol_name, args, output_type))
 }
 
+/// Special case for group assignment. The LHS must be a comma separated list of symbols and the RHS must return a group.
+pub fn parse_group_assign(
+    context: &mut ASTContext,
+    lhs: TokenSlice,
+    rhs: TokenSlice,
+) -> Result<Rc<Node>> {
+    let lhs_tokens = context.get_tokens_from_slice(lhs);
+    let end_index =
+        find_matching_parenthesis(context, lhs.move_start(1)?, &Token::LParen, &Token::RParen)?;
+    if end_index != lhs_tokens.len() - 2 {
+        return Err(SyntaxError::InvalidAssignmentStatement(format!(
+            "Expected closing parenthesis but got '{}'",
+            context.token_slice_to_string(lhs.move_end(end_index)?)
+        ))
+        .into());
+    }
+    let lhs_slices = comma_separate(lhs.move_start(1)?.move_end(end_index)?, context)?;
+    let mut lhs_symbol_names = Vec::new();
+    let mut lhs_symbol_types = Vec::new();
+    for slice in &lhs_slices {
+        match context.get_token_at_index(slice.start)? {
+            Token::Symbol(symbol_token) => {
+                lhs_symbol_names.push(symbol_token.name.clone());
+                if !slice.move_start(1)?.is_empty() {
+                    let slice = slice.move_start(1)?;
+                    match context.get_token_at_index(slice.start)? {
+                        Token::TypeDeclaration => {
+                            let (output_type, num_tokens) = IJType::parse_tokens(
+                                &context.get_tokens_from_slice(slice.move_start(1)?),
+                            )?;
+                            lhs_symbol_types.push(Some(output_type));
+                            let rest = slice.move_start(num_tokens + 1)?;
+                            if !rest.is_empty() {
+                                return Err(SyntaxError::InvalidAssignmentStatement(format!(
+                                    "Got unparsed tokens '{}' after type declaration",
+                                    context.token_slice_to_string(rest)
+                                ))
+                                .into());
+                            }
+                        }
+                        _ => {
+                            return Err(SyntaxError::InvalidAssignmentStatement(format!(
+                                "Expected type declaration after symbol but got '{}'",
+                                context.token_slice_to_string(slice)
+                            ))
+                            .into());
+                        }
+                    }
+                } else {
+                    lhs_symbol_types.push(None);
+                }
+            }
+            _ => {
+                return Err(SyntaxError::InvalidAssignmentStatement(format!(
+                    "Expected symbol but got '{}'",
+                    context.token_slice_to_string(*slice)
+                ))
+                .into())
+            }
+        }
+    }
+    let (rhs_node, rest) = next_node(rhs, context)?;
+    if !rest.is_empty() {
+        return Err(SyntaxError::InvalidAssignmentStatement(format!(
+            "Got unparsed tokens '{}' after assignment",
+            context.token_slice_to_string(rest)
+        ))
+        .into());
+    }
+    if let IJType::Group(group_types) = &rhs_node.output_type {
+        if group_types.len() != lhs_symbol_names.len() {
+            return Err(SyntaxError::IncorrectNumberOfVariablesInAssignment(
+                lhs_symbol_names.len(),
+                group_types.len(),
+            )
+            .into());
+        }
+        let mut symbol_nodes = vec![];
+        for ((lhs_name, lhs_type), rhs_type) in lhs_symbol_names
+            .iter()
+            .zip(lhs_symbol_types.iter())
+            .zip(group_types.iter())
+        {
+            context.insert_variable(Variable {
+                name: lhs_name.clone(),
+                typ: rhs_type.clone(),
+            });
+            if let Some(lhs_type) = lhs_type {
+                if !lhs_type.type_match(rhs_type) {
+                    return Err(SyntaxError::InvalidAssignmentStatement(format!(
+                        "LHS type '{}' does not match RHS type '{}'",
+                        lhs_type, rhs_type
+                    ))
+                    .into());
+                }
+            }
+            symbol_nodes.push(Rc::new(Node::new(
+                Operation::Symbol(lhs_name.clone()),
+                vec![],
+                rhs_type.clone(),
+                vec![],
+                context,
+            )?));
+        }
+        let group_node = Rc::new(Node::new(
+            Operation::Group,
+            vec![],
+            IJType::Group(group_types.clone()),
+            symbol_nodes,
+            context,
+        )?);
+        let assign_node = Rc::new(Node::new(
+            Operation::Assign,
+            vec![
+                IJType::Group(group_types.clone()),
+                rhs_node.output_type.clone(),
+            ],
+            IJType::Void,
+            vec![group_node, rhs_node],
+            context,
+        )?);
+        Ok(assign_node)
+    } else {
+        Err(SyntaxError::ExpectedGroupOutput(rhs_node.output_type.clone().to_string()).into())
+    }
+}
+
 pub fn parse_assign(context: &mut ASTContext) -> Result<Rc<Node>> {
     let tokens = context.get_tokens();
 
@@ -127,6 +253,9 @@ pub fn parse_assign(context: &mut ASTContext) -> Result<Rc<Node>> {
         )
         .into());
     };
+    if context.get_token_at_index(lhs.start)? == &Token::LParen {
+        return parse_group_assign(context, lhs, rhs);
+    }
     let (symbol_name, args, output_type) = parse_assign_lhs(context, lhs)?;
     let (rhs_node, rest) = next_node(rhs, context)?;
     if !rest.is_empty() {
@@ -146,7 +275,7 @@ pub fn parse_assign(context: &mut ASTContext) -> Result<Rc<Node>> {
         ))
     };
     if let Some(output_type) = output_type {
-        if output_type != symbol_type {
+        if !output_type.type_match(&symbol_type) {
             return Err(SyntaxError::InvalidAssignmentStatement(format!(
                 "LHS has type '{}' but RHS has type '{}'",
                 output_type, symbol_type
@@ -334,8 +463,14 @@ mod tests {
         let mut context = ASTContext::from_tokens(tokens.clone());
         let node = parse_assign(&mut context)?;
         assert_eq!(node.op, Operation::Assign);
-        assert_eq!(node.operands[0].output_type, IJType::Scalar(Some("i64".to_string())));
-        assert_eq!(node.operands[1].output_type, IJType::Scalar(Some("i64".to_string())));
+        assert_eq!(
+            node.operands[0].output_type,
+            IJType::Scalar(Some("i64".to_string()))
+        );
+        assert_eq!(
+            node.operands[1].output_type,
+            IJType::Scalar(Some("i64".to_string()))
+        );
         Ok(())
     }
 
@@ -350,7 +485,10 @@ mod tests {
         assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
         assert_eq!(
             node.operands[0].output_type,
-            IJType::Function(FunctionSignature::new(vec![IJType::Tensor(None)], IJType::Tensor(None)))
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor(None)],
+                IJType::Tensor(None)
+            ))
         );
         assert_eq!(node.operands[1].output_type, IJType::Tensor(None));
         assert_eq!(node.operands[2].output_type, IJType::Tensor(None));
@@ -368,7 +506,10 @@ mod tests {
         assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
         assert_eq!(
             node.operands[0].output_type,
-            IJType::Function(FunctionSignature::new(vec![IJType::Scalar(None)], IJType::Scalar(None)))
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Scalar(None)],
+                IJType::Scalar(None)
+            ))
         );
         assert_eq!(node.operands[1].output_type, IJType::Scalar(None));
         assert_eq!(node.operands[2].output_type, IJType::Scalar(None));
@@ -385,10 +526,19 @@ mod tests {
         assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
         assert_eq!(
             node.operands[0].output_type,
-            IJType::Function(FunctionSignature::new(vec![IJType::Scalar(Some("i64".to_string()))], IJType::Scalar(Some("i64".to_string()))))
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Scalar(Some("i64".to_string()))],
+                IJType::Scalar(Some("i64".to_string()))
+            ))
         );
-        assert_eq!(node.operands[1].output_type, IJType::Scalar(Some("i64".to_string())));
-        assert_eq!(node.operands[2].output_type, IJType::Scalar(Some("i64".to_string())));
+        assert_eq!(
+            node.operands[1].output_type,
+            IJType::Scalar(Some("i64".to_string()))
+        );
+        assert_eq!(
+            node.operands[2].output_type,
+            IJType::Scalar(Some("i64".to_string()))
+        );
         Ok(())
     }
 
@@ -403,7 +553,10 @@ mod tests {
         assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
         assert_eq!(
             node.operands[0].output_type,
-            IJType::Function(FunctionSignature::new(vec![IJType::Tensor(None)], IJType::Scalar(None)))
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor(None)],
+                IJType::Scalar(None)
+            ))
         );
         assert_eq!(node.operands[1].output_type, IJType::Scalar(None));
         assert_eq!(node.operands[2].output_type, IJType::Tensor(None));
@@ -421,7 +574,10 @@ mod tests {
         assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
         assert_eq!(
             node.operands[0].output_type,
-            IJType::Function(FunctionSignature::new(vec![IJType::Tensor(None)], IJType::Tensor(None)))
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor(None)],
+                IJType::Tensor(None)
+            ))
         );
         assert_eq!(node.operands[1].output_type, IJType::Tensor(None));
         assert_eq!(node.operands[2].output_type, IJType::Tensor(None));
@@ -439,7 +595,10 @@ mod tests {
         assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
         assert_eq!(
             node.operands[0].output_type,
-            IJType::Function(FunctionSignature::new(vec![IJType::Tensor(None)], IJType::Scalar(None)))
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor(None)],
+                IJType::Scalar(None)
+            ))
         );
         assert_eq!(node.operands[1].output_type, IJType::Scalar(None));
         assert_eq!(node.operands[2].output_type, IJType::Tensor(None));
@@ -511,10 +670,19 @@ mod tests {
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
                 vec![
-                    IJType::Function(FunctionSignature::new(vec![IJType::Scalar(None)], IJType::Tensor(None))),
-                    IJType::Function(FunctionSignature::new(vec![IJType::Tensor(None)], IJType::Scalar(None)))
+                    IJType::Function(FunctionSignature::new(
+                        vec![IJType::Scalar(None)],
+                        IJType::Tensor(None)
+                    )),
+                    IJType::Function(FunctionSignature::new(
+                        vec![IJType::Tensor(None)],
+                        IJType::Scalar(None)
+                    ))
                 ],
-                IJType::Function(FunctionSignature::new(vec![IJType::Tensor(None)], IJType::Tensor(None)))
+                IJType::Function(FunctionSignature::new(
+                    vec![IJType::Tensor(None)],
+                    IJType::Tensor(None)
+                ))
             ))
         );
         assert_eq!(
@@ -529,8 +697,8 @@ mod tests {
             IJType::Function(FunctionSignature::new(
                 vec![IJType::Scalar(None)],
                 IJType::Tensor(None),
-                ))
-            );
+            ))
+        );
         assert_eq!(
             node.operands[3].output_type,
             IJType::Function(FunctionSignature::new(
@@ -538,6 +706,35 @@ mod tests {
                 IJType::Scalar(None),
             ))
         );
+        Ok(())
+    }
+
+    #[test]
+    fn test_assign_group() -> Result<()> {
+        let tokens = lexer("(x,y) = (1,2)")?;
+        let mut context = ASTContext::from_tokens(tokens.clone());
+        let assign_node = parse_assign(&mut context)?;
+        let node0 = assign_node.operands[0].clone();
+        assert_eq!(node0.output_type, IJType::Group(vec![IJType::Scalar(None), IJType::Scalar(None)]));
+        assert_eq!(node0.op, Operation::Group);
+        assert_eq!(node0.operands.len(), 2);
+
+
+        let tokens = lexer("(x: S<a>, y: S) = (1<a>,2<b>)")?;
+        let mut context = ASTContext::from_tokens(tokens.clone());
+        let assign_node = parse_assign(&mut context)?;
+        let node0 = assign_node.operands[0].clone();
+        assert_eq!(node0.output_type, IJType::Group(vec![IJType::Scalar(Some("a".to_string())), IJType::Scalar(Some("b".to_string()))]));
+        assert_eq!(node0.op, Operation::Group);
+        assert_eq!(node0.operands.len(), 2);
+
+        let tokens = lexer("(x: S<a>, y: S) = (1<a>,2)")?;
+        let mut context = ASTContext::from_tokens(tokens.clone());
+        let assign_node = parse_assign(&mut context)?;
+        let node0 = assign_node.operands[0].clone();
+        assert_eq!(node0.output_type, IJType::Group(vec![IJType::Scalar(Some("a".to_string())), IJType::Scalar(None)]));
+        assert_eq!(node0.op, Operation::Group);
+        assert_eq!(node0.operands.len(), 2);
         Ok(())
     }
 }

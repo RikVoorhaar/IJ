@@ -77,6 +77,35 @@ pub fn find_matching_parenthesis_on_tokens(
     None
 }
 
+pub fn comma_separate_on_tokens(tokens: &[Token]) -> Vec<usize> {
+    let mut indices = vec![];
+    let mut depth = 0;
+    for (i, token) in tokens.iter().enumerate() {
+        match token {
+            Token::LParen | Token::LSqBracket => depth += 1,
+            Token::RParen | Token::RSqBracket => depth -= 1,
+            Token::Comma => {
+                if depth == 0 {
+                    indices.push(i);
+                }
+            }
+            _ => (),
+        }
+    }
+    indices
+}
+
+pub fn split_tokens_at_indices(tokens: &[Token], indices: &[usize]) -> Vec<Vec<Token>> {
+    let mut start = 0;
+    let mut split_tokens: Vec<Vec<Token>> = Vec::new();
+    for &index in indices {
+        let (left, _) = tokens.split_at(index);
+        split_tokens.push(left[start..].to_vec());
+        start = index + 1;
+    }
+    split_tokens.push(tokens[start..].to_vec());
+    split_tokens
+}
 pub fn lexer(input: &str) -> Result<Vec<Token>> {
     let lex = Token::lexer(input);
     let mut tokens = Vec::new();
@@ -307,5 +336,21 @@ mod tests {
         assert!(tokens.iter().all(|t| matches!(t, Token::TensorBuilder(_))));
         println!("{:?}", tokens);
         assert_eq!(tokens.len(), 5);
+    }
+
+    #[test]
+    fn test_comma_separate_on_tokens() {
+        let input = "1, (2, [3, 4]),5, 6";
+        let tokens = lexer(input).unwrap();
+        let indices = comma_separate_on_tokens(&tokens);
+        println!("{:?}", indices);
+        assert_eq!(indices, vec![1, 11, 13]);
+
+        let split_tokens = split_tokens_at_indices(&tokens, &indices);
+        assert_eq!(split_tokens.len(), 4);
+        assert_eq!(split_tokens[0], lexer("1").unwrap());
+        assert_eq!(split_tokens[1], lexer("(2, [3, 4])").unwrap());
+        assert_eq!(split_tokens[2], lexer("5").unwrap());
+        assert_eq!(split_tokens[3], lexer("6").unwrap());
     }
 }

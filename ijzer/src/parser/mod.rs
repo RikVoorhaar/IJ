@@ -402,4 +402,32 @@ mod tests {
             &SyntaxError::UnexpectedSemicolon
         ));
     }
+
+    #[test]
+    fn test_group_return_type() -> Result<()> {
+        let mut context = ASTContext::new();
+        parse_str("var f: Fn(T->(S,T))", &mut context)?;
+        let node = parse_str("f [1]", &mut context)?;
+        assert_eq!(
+            node.output_type,
+            IJType::Group(vec![IJType::Scalar(None), IJType::Tensor(None)])
+        );
+
+        let mut context = ASTContext::new();
+        parse_str("var f: Fn(T->(S,T))", &mut context)?;
+        let node = parse_str("x = f[1]", &mut context)?;
+        assert_eq!(node.op, Operation::Assign);
+        let node0 = &node.operands[0];
+        assert_eq!(
+            node0.output_type,
+            IJType::Group(vec![IJType::Scalar(None), IJType::Tensor(None)])
+        );
+        let node1 = &node.operands[1];
+        assert_eq!(
+            node1.output_type,
+            IJType::Group(vec![IJType::Scalar(None), IJType::Tensor(None)])
+        );
+
+        Ok(())
+    }
 }
