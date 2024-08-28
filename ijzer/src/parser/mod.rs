@@ -63,6 +63,9 @@ use tensor_builder::TensorBuilder;
 mod transpose;
 use transpose::Transpose;
 
+mod shape;
+use shape::Shape;
+
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
@@ -112,6 +115,7 @@ pub fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node
         }
         Token::TensorBuilder(_) => TensorBuilder::next_node(op.clone(), rest, context),
         Token::Transpose => Transpose::next_node(op.clone(), rest, context),
+        Token::Shape => Shape::next_node(op.clone(), rest, context),
         _ => Err(SyntaxError::UnexpectedToken(op.clone()).into()),
     }
 }
@@ -186,12 +190,12 @@ fn next_node_functional(
             context,
             needed_outputs,
         )?,
-        Token::Transpose => Transpose::next_node_functional_impl(
-            Token::Transpose,
-            slice,
-            context,
-            needed_outputs,
-        )?,
+        Token::Transpose => {
+            Transpose::next_node_functional_impl(Token::Transpose, slice, context, needed_outputs)?
+        }
+        Token::Shape => {
+            Shape::next_node_functional_impl(Token::Shape, slice, context, needed_outputs)?
+        }
         _ => {
             return Err(SyntaxError::SliceCannotBeParsedAsFunction(
                 context.token_slice_to_string(slice),
@@ -212,9 +216,11 @@ pub fn next_node_specific_function(
     let function_type = IJType::Function(signature.clone());
     let (function_options, rest) =
         next_node_functional(slice, context, Some(&[*signature.output]))?;
-    let function = function_options
-        .into_iter()
-        .find(|n| n.output_type.type_match_function(&function_type).unwrap_or(false));
+    let function = function_options.into_iter().find(|n| {
+        n.output_type
+            .type_match_function(&function_type)
+            .unwrap_or(false)
+    });
 
     if function.is_none() {
         return Err(SyntaxError::TypeError(
