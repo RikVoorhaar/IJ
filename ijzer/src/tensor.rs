@@ -46,6 +46,18 @@ pub fn broadcast_shapes(shape1: &[usize], shape2: &[usize]) -> Option<Vec<usize>
 }
 
 impl<T: Clone + Num> Tensor<T> {
+    pub fn new(data: Box<[T]>, shape: Vec<usize>) -> Tensor<T> {
+        let strides = strides_from_shape(&shape);
+        let size = shape.iter().product();
+        if data.len() != size {
+            panic!("Data length must match the product of the shape dimensions");
+        }
+        Tensor {
+            data,
+            shape,
+            strides,
+        }
+    }
     pub fn shape(&self) -> &[usize] {
         &self.shape
     }
@@ -63,23 +75,13 @@ impl<T: Clone + Num> Tensor<T> {
 
     pub fn zeros(shape: &[usize]) -> Tensor<T> {
         let shape = shape.to_vec();
-        let strides = strides_from_shape(&shape);
         let data = vec![T::zero(); shape.iter().product()].into_boxed_slice();
-        Tensor {
-            shape,
-            strides,
-            data,
-        }
+        Tensor::new(data, shape)
     }
     pub fn ones(shape: &[usize]) -> Tensor<T> {
         let shape = shape.to_vec();
-        let strides = strides_from_shape(&shape);
         let data = vec![T::one(); shape.iter().product()].into_boxed_slice();
-        Tensor {
-            shape,
-            strides,
-            data,
-        }
+        Tensor::new(data, shape)
     }
     pub fn eye(shape: &[usize]) -> Tensor<T> {
         let mut tensor = Self::zeros(shape);
@@ -90,13 +92,8 @@ impl<T: Clone + Num> Tensor<T> {
     }
     pub fn scalar(value: T) -> Tensor<T> {
         let shape = vec![1];
-        let strides = vec![1];
         let data = vec![value].into_boxed_slice();
-        Tensor {
-            shape,
-            strides,
-            data,
-        }
+        Tensor::new(data, shape)
     }
     pub fn is_scalar(&self) -> bool {
         self.shape == vec![1]
@@ -110,12 +107,7 @@ impl<T: Clone + Num> Tensor<T> {
 
     pub fn from_vec(data: Vec<T>, shape: Option<Vec<usize>>) -> Tensor<T> {
         let shape = shape.unwrap_or_else(|| vec![data.len()]);
-        let strides = strides_from_shape(&shape);
-        Tensor {
-            shape,
-            strides,
-            data: data.into_boxed_slice(),
-        }
+        Tensor::new(data.into_boxed_slice(), shape)
     }
     pub fn to_vec(&self) -> Vec<T> {
         self.data.clone().into_vec()
@@ -133,11 +125,7 @@ impl<T: Clone + Num> Tensor<T> {
         for i in 0..self.size() {
             new_data.push(f(self.data[i].clone()));
         }
-        Tensor {
-            data: new_data.into_boxed_slice(),
-            shape: self.shape.clone(),
-            strides: self.strides.clone(),
-        }
+        Tensor::new(new_data.into_boxed_slice(), self.shape.clone())
     }
     pub fn apply_binary_op(&self, other: &Tensor<T>, f: impl Fn(T, T) -> T) -> Option<Tensor<T>> {
         let out_shape = broadcast_shapes(&self.shape, &other.shape)?;
@@ -298,12 +286,7 @@ impl<T: Clone + Float> Tensor<T> {
             .map(|_| T::from(rng.sample(normal)).unwrap())
             .collect();
         let shape = shape.to_vec();
-        let strides = strides_from_shape(&shape);
-        Tensor {
-            shape,
-            strides,
-            data: data.into_boxed_slice(),
-        }
+        Tensor::new(data.into_boxed_slice(), shape)
     }
 
     pub fn randu(shape: &[usize]) -> Tensor<T> {
@@ -314,12 +297,7 @@ impl<T: Clone + Float> Tensor<T> {
             .map(|_| T::from(rng.sample(uniform)).unwrap())
             .collect();
         let shape = shape.to_vec();
-        let strides = strides_from_shape(&shape);
-        Tensor {
-            shape,
-            strides,
-            data: data.into_boxed_slice(),
-        }
+        Tensor::new(data.into_boxed_slice(), shape)
     }
 }
 
