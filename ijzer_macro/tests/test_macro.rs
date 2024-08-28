@@ -163,7 +163,7 @@ fn test_reduce() {
         "#
     }
 
-    let x = Tensor::from_vec(vec![1.0, 2.0, 3.0], Some(vec![2]));
+    let x = Tensor::from_vec(vec![1.0, 2.0, 3.0], Some(vec![3]));
     let expected = Tensor::from_vec(vec![6.0], Some(vec![1]));
     let y = _test_reduce_2(x.clone(), |a, b| a * b);
     assert_eq!(y.to_vec(), expected.to_vec());
@@ -178,7 +178,7 @@ fn test_function_composition() {
         "#
     }
 
-    let expected = Tensor::from_vec(vec![10], Some(vec![2]));
+    let expected = Tensor::from_vec(vec![10], Some(vec![1]));
     let y = _test_function_composition();
     assert_eq!(y.to_vec(), expected.to_vec());
 
@@ -192,7 +192,7 @@ fn test_function_composition() {
         "#
     }
 
-    let expected = Tensor::from_vec(vec![11], Some(vec![2]));
+    let expected = Tensor::from_vec(vec![11], Some(vec![1]));
     let y =
         _test_external_function_composition(|a, b| a.apply_binary_op(&b, |x, y| x * y).unwrap());
     assert_eq!(y.to_vec(), expected.to_vec());
