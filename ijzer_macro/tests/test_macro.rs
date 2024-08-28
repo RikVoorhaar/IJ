@@ -383,3 +383,18 @@ fn test_shape() {
     let y = _test_functional(x.clone());
     assert_eq!(y.to_vec(), expected.to_vec());
 }
+
+#[test]
+fn test_group_return() {
+    #[ijzer]
+    fn _test_group_return() -> Tensor<i64> {
+        r#"
+        (x,y) = ( [1,2,3,4]<i64>, [5,6,7,8]<i64>)
+        * x y
+        "#
+    }
+
+    let expected = Tensor::from_vec(vec![5, 12, 21, 32], Some(vec![2, 2]));
+    let y = _test_group_return();
+    assert_eq!(y.to_vec(), expected.to_vec());
+}

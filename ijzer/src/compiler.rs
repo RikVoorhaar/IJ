@@ -40,6 +40,13 @@ pub fn annotation_from_type(var_type: &IJType) -> Result<TokenStream> {
                 fn(#(#input_types),*) -> #output_type
             }
         }
+        IJType::Group(types) => {
+            let group_types = types
+                .iter()
+                .map(annotation_from_type)
+                .collect::<Result<Vec<_>>>()?;
+            quote!((#(#group_types),*))
+        }
         _ => panic!("Unsupported type: {:?}", var_type),
     };
     Ok(res)
@@ -352,6 +359,7 @@ impl CompileNode for Assign {
             panic!("Expected assign node, found {:?}", node);
         }
         let lhs_stream = child_streams[&node.operands[0].id].clone();
+        let lhs_annot = annotation_from_type(&node.operands[0].output_type)?;
         let rhs_stream = child_streams[&node.operands[1].id].clone();
         let args_streams = node
             .operands
@@ -366,7 +374,7 @@ impl CompileNode for Assign {
 
         if args_streams.is_empty() {
             Ok(quote!(
-                let #lhs_stream = #rhs_stream;
+                let #lhs_stream: #lhs_annot = #rhs_stream;
             ))
         } else {
             Ok(quote!(
@@ -1081,7 +1089,7 @@ mod tests {
     fn test_assign_tensor() {
         let input1 = "x: T<_> = [1]<_>";
         let input2 = "x = [1]<_>";
-        let expected = "let x = ijzer::tensor::Tensor::<_>::from_vec(vec![1], None);";
+        let expected = "let x: ijzer::tensor::Tensor::<_> = ijzer::tensor::Tensor::<_>::from_vec(vec![1], None);";
         compiler_compare(input1, expected);
         compiler_compare(input2, expected);
     }
@@ -1090,7 +1098,7 @@ mod tests {
     fn test_assign_scalar() {
         let input1 = "x: S = 1";
         let input2 = "x = 1";
-        let expected = "let x = ijzer::tensor::Tensor::<_>::scalar(1);";
+        let expected = "let x: ijzer::tensor::Tensor::<_> = ijzer::tensor::Tensor::<_>::scalar(1);";
         compiler_compare(input1, expected);
         compiler_compare(input2, expected);
     }
@@ -1104,7 +1112,7 @@ mod tests {
         let input3 = "
         x = [1];
         y= + x x;";
-        let expexted = "let x = ijzer::tensor::Tensor::<_>::from_vec(vec![1], None); let y = x.apply_binary_op(&x, |a: _, b: _| a + b).unwrap();";
+        let expexted = "let x: ijzer::tensor::Tensor::<_> = ijzer::tensor::Tensor::<_>::from_vec(vec![1], None); let y: ijzer::tensor::Tensor::<_> = x.apply_binary_op(&x, |a: _, b: _| a + b).unwrap();";
         compiler_compare(input1, expexted);
         compiler_compare(input2, expexted);
         compiler_compare(input3, expexted);
@@ -1377,6 +1385,18 @@ mod tests {
         let expected = "(|_x: ijzer::tensor::Tensor::<_>| ijzer::tensor::Tensor::<usize>::from_vec(_x.shape().to_vec(), None))(x)";
         compiler_compare(input, expected);
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_group_assign() -> Result<()> {
+        let input = "(x: S<a>, y: S) = (1<a>,2)";
+        let expected = "let (x , y) : (ijzer :: tensor :: Tensor :: < a > , ijzer :: tensor :: Tensor :: < _ >) = (ijzer :: tensor :: Tensor :: < a > :: scalar (1) , ijzer :: tensor :: Tensor :: < _ > :: scalar (2)) ;";
+        compiler_compare(input, expected);
+
+        let input = "var f: Fn(T->(T,T)); (x: T, y: T) = f [1]";
+        let expected = "let (x , y) : (ijzer :: tensor :: Tensor :: < _ > , ijzer :: tensor :: Tensor :: < _ >) = f (ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None)) ;";
+        compiler_compare(input, expected);
         Ok(())
     }
 }

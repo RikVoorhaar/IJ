@@ -59,7 +59,7 @@ fn parse_ast(context: &mut ASTContext) -> Result<Rc<Node>> {
     match context.tokens.as_slice() {
         [] => Err(SyntaxError::EmptyInput.into()),
         [Token::Variable, ..] => parse_var_statement(context),
-        [Token::Symbol(_), rest @ ..] if rest.contains(&Token::Assign) => parse_assign(context),
+        tokens if tokens.contains(&Token::Assign) => parse_assign(context),
         _ => {
             let (node, remainder) = super::next_node(context.full_slice(), context)?;
             if !remainder.is_empty() {
@@ -172,7 +172,10 @@ mod tests {
         let (node, context) = result.unwrap();
         assert_eq!(node.op, Operation::Nothing);
         let expected_var = Variable {
-            typ: IJType::Function(FunctionSignature::new(vec![IJType::Scalar(None)], IJType::Tensor(None))),
+            typ: IJType::Function(FunctionSignature::new(
+                vec![IJType::Scalar(None)],
+                IJType::Tensor(None),
+            )),
             name: "scale".to_string(),
         };
         let actual_var = context.symbols.get("scale").unwrap();
