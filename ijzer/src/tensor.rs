@@ -120,6 +120,18 @@ impl<T: Clone + Num> Tensor<T> {
         self.strides = strides_from_shape(&self.shape);
         Ok(())
     }
+    pub fn transpose(&self) -> Tensor<T> {
+        let mut new_shape = self.shape.clone();
+        new_shape.reverse();
+        let mut new_tensor = Tensor::zeros(&new_shape);
+        for i in 0..self.size() {
+            let indices = self.flat_to_index(i);
+            let mut indices_rev = indices.clone();
+            indices_rev.reverse();
+            new_tensor[&indices_rev] = self[&indices].clone();
+        }
+        new_tensor
+    }
     pub fn map(&self, f: impl Fn(T) -> T) -> Tensor<T> {
         let mut new_data = Vec::with_capacity(self.size());
         for i in 0..self.size() {
@@ -734,5 +746,26 @@ mod tests {
             )
             .unwrap();
         assert_eq!(result.to_vec(), vec![17.0, 39.0]);
+    }
+
+    #[test]
+    fn test_transpose() {
+        let tensor = Tensor::from_vec(vec![1.0, 2.0, 3.0, 4.0], Some(vec![2, 2]));
+        let transposed_tensor = tensor.transpose();
+        assert_eq!(transposed_tensor.to_vec(), vec![1.0, 3.0, 2.0, 4.0]);
+
+        let tensor = Tensor::from_vec(vec![1.0, 2.0, 3.0, 4.0], Some(vec![4]));
+        let transposed_tensor = tensor.transpose();
+        assert_eq!(transposed_tensor.to_vec(), tensor.to_vec());
+
+        let tensor = Tensor::from_vec(
+            vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+            Some(vec![2, 2, 2]),
+        );
+        let transposed_tensor = tensor.transpose();
+        assert_eq!(
+            transposed_tensor.to_vec(),
+            vec![1.0, 5.0, 3.0, 7.0, 2.0, 6.0, 4.0, 8.0]
+        );
     }
 }

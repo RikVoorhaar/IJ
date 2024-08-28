@@ -60,6 +60,9 @@ use generalized_contraction::GeneralizedContraction;
 mod tensor_builder;
 use tensor_builder::TensorBuilder;
 
+mod transpose;
+use transpose::Transpose;
+
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
@@ -108,6 +111,7 @@ pub fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node
             GeneralizedContraction::next_node(op.clone(), rest, context)
         }
         Token::TensorBuilder(_) => TensorBuilder::next_node(op.clone(), rest, context),
+        Token::Transpose => Transpose::next_node(op.clone(), rest, context),
         _ => Err(SyntaxError::UnexpectedToken(op.clone()).into()),
     }
 }
@@ -178,6 +182,12 @@ fn next_node_functional(
         )?,
         Token::TensorBuilder(name) => TensorBuilder::next_node_functional_impl(
             Token::TensorBuilder(name.clone()),
+            slice,
+            context,
+            needed_outputs,
+        )?,
+        Token::Transpose => Transpose::next_node_functional_impl(
+            Token::Transpose,
             slice,
             context,
             needed_outputs,

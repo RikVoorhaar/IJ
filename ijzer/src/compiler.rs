@@ -171,6 +171,7 @@ impl CompilerContext {
                 GeneralizedContraction::compile(node, self, child_streams)?
             }
             Operation::TensorBuilder(_) => TensorBuilder::compile(node, self, child_streams)?,
+            Operation::Transpose => Transpose::compile(node, self, child_streams)?,
             // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
@@ -778,7 +779,7 @@ impl CompileNode for Apply {
         let operand_streams = child_streams.iter().skip(1);
 
         Ok(quote! {
-            #function_stream(#(#operand_streams),*)
+            (#function_stream)(#(#operand_streams),*)
         })
     }
 }
@@ -939,14 +940,64 @@ impl CompileNode for TensorBuilder {
                         "Failed to parse builder name into a Rust TokenStream",
                     )
                 })?;
-            let child_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
-            let number_type = node.output_type.extract_number_type().unwrap();
-            let tensor_t = annotation_from_type(&IJType::Tensor(number_type))?;
-            Ok(quote! {
-                #tensor_t::#builder_name_stream(#child_stream.to_vec().as_slice())
-            })
+
+            match node.operands.len() {
+                1 => {
+                    let child_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
+                    let number_type = node.output_type.extract_number_type().unwrap();
+                    let tensor_t = annotation_from_type(&IJType::Tensor(number_type))?;
+                    Ok(quote! {
+                        #tensor_t::#builder_name_stream(#child_stream.to_vec().as_slice())
+                    })
+                }
+                0 => {
+                    let tensor_type = node.output_type.extract_signature().unwrap().output;
+                    let tensor_t = annotation_from_type(&tensor_type)?;
+                    Ok(quote! {
+                        |_x: #tensor_t| #tensor_t::#builder_name_stream(_x.to_vec().as_slice())
+                    })
+                }
+
+                _ => {
+                    panic!(
+                        "Expected 0 or 1 operand for TensorBuilder, found {}",
+                        node.operands.len()
+                    );
+                }
+            }
         } else {
             unreachable!()
+        }
+    }
+}
+
+struct Transpose;
+impl CompileNode for Transpose {
+    fn compile(
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        match node.operands.len() {
+            1 => {
+                let child_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
+                Ok(quote! {
+                    #child_stream.transpose()
+                })
+            }
+            0 => {
+                let tensor_type = node.output_type.extract_signature().unwrap().output;
+                let tensor_t = annotation_from_type(&tensor_type)?;
+                Ok(quote! {
+                    |_x: #tensor_t| _x.transpose()
+                })
+            }
+            _ => {
+                panic!(
+                    "Expected 1 operand for Transpose, found {}",
+                    node.operands.len()
+                );
+            }
         }
     }
 }
@@ -1140,11 +1191,11 @@ mod tests {
         compiler_compare(input, expected);
 
         let input = "var f: Fn(T->T); <-Fn(S->T) f 1";
-        let expected = "(| _2_1 : ijzer :: tensor :: Tensor :: < _ > | ((f) (_2_1))) (ijzer :: tensor :: Tensor :: < _ > :: scalar (1))";
+        let expected = "((| _2_1 : ijzer :: tensor :: Tensor :: < _ > | ((f) (_2_1)))) (ijzer :: tensor :: Tensor :: < _ > :: scalar (1))";
         compiler_compare(input, expected);
 
         let input = "var f: Fn(T->N); <-Fn(S->T) f 1";
-        let expected = "(|_2_1:ijzer::tensor::Tensor::<_>|(ijzer::tensor::Tensor::<_>::scalar((f)(_2_1))))(ijzer::tensor::Tensor::<_>::scalar(1))";
+        let expected = "((|_2_1:ijzer::tensor::Tensor::<_>|(ijzer::tensor::Tensor::<_>::scalar((f)(_2_1)))))(ijzer::tensor::Tensor::<_>::scalar(1))";
         compiler_compare(input, expected);
 
         let input = "var f: Fn(S,S->S); /<-Fn(N,N->N) f [1]";
@@ -1198,15 +1249,15 @@ mod tests {
     #[test]
     fn test_apply() -> Result<()> {
         let input = "var f: Fn(S,S->S); .~f 1 2";
-        let expected = "f (ijzer :: tensor :: Tensor :: < _ > :: scalar (1) , ijzer :: tensor :: Tensor :: < _ > :: scalar (2))";
+        let expected = "(f) (ijzer :: tensor :: Tensor :: < _ > :: scalar (1) , ijzer :: tensor :: Tensor :: < _ > :: scalar (2))";
         compiler_compare(input, expected);
 
         let input = "var f: Fn(S<f64>,S<f64>->S<f64>); .~f 1<f64> 2<f64>";
-        let expected = "f (ijzer :: tensor :: Tensor :: < f64 > :: scalar (1) , ijzer :: tensor :: Tensor :: < f64 > :: scalar (2))";
+        let expected = "(f) (ijzer :: tensor :: Tensor :: < f64 > :: scalar (1) , ijzer :: tensor :: Tensor :: < f64 > :: scalar (2))";
         compiler_compare(input, expected);
 
         let input = "var f: Fn(S->Fn(S->S)); .(f 1) 2";
-        let expected = "f (ijzer :: tensor :: Tensor :: < _ > :: scalar (1)) (ijzer :: tensor :: Tensor :: < _ > :: scalar (2))";
+        let expected = "(f (ijzer :: tensor :: Tensor :: < _ > :: scalar (1))) (ijzer :: tensor :: Tensor :: < _ > :: scalar (2))";
         compiler_compare(input, expected);
         Ok(())
     }
@@ -1262,6 +1313,23 @@ mod tests {
 
         let input = "eye<f32> [3,3]<usize>";
         let expected = "ijzer::tensor::Tensor::<f32>::eye(ijzer::tensor::Tensor::<usize>::from_vec(vec![3,3],None).to_vec().as_slice())";
+        compiler_compare(input, expected);
+
+        let input = "var x: T<usize>; .~eye x";
+        let expected = "(|_x: ijzer::tensor::Tensor::<_>| ijzer::tensor::Tensor::<_>::eye(_x.to_vec().as_slice()))(x)";
+        compiler_compare(input, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_transpose() -> Result<()> {
+        let input = "var x: T<f64>; |x";
+        let expected = "x.transpose()";
+        compiler_compare(input, expected);
+
+        let input = "var x: T<f64>; .~|x";
+        let expected = "(|_x: ijzer::tensor::Tensor::<_>| _x.transpose())(x)";
         compiler_compare(input, expected);
 
         Ok(())
