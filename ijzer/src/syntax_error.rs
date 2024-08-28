@@ -146,4 +146,10 @@ pub enum SyntaxError {
 
     #[error("Number type mismatch {0} and {1}")]
     NumberTypeMismatch(String, String),
+
+    #[error("Number of variables {0} does not match number of outputs {1} in assignment")]
+    IncorrectNumberOfVariablesInAssignment(usize, usize),
+
+    #[error("Expected group output, but got type {0}")]
+    ExpectedGroupOutput(String),
 }

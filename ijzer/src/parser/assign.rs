@@ -16,7 +16,6 @@ fn parse_assign_lhs(
     slice: TokenSlice,
 ) -> Result<(String, Vec<Rc<Node>>, Option<IJType>)> {
     let tokens = context.get_tokens_from_slice(slice);
-    println!("{:?}", tokens);
     let symbol_name = if let [Token::Symbol(symbol_token), ..] = tokens.as_slice() {
         symbol_token.name.clone()
     } else {
@@ -113,6 +112,86 @@ fn parse_assign_lhs(
     Ok((symbol_name, args, output_type))
 }
 
+/// Special case for group assignment. The LHS must be a comma separated list of symbols and the RHS must return a group.
+pub fn parse_group_assign(
+    context: &mut ASTContext,
+    lhs: TokenSlice,
+    rhs: TokenSlice,
+) -> Result<Rc<Node>> {
+    let lhs_tokens = context.get_tokens_from_slice(lhs);
+    let end_index = find_matching_parenthesis(context, lhs, &Token::LParen, &Token::RParen)?;
+    if end_index != lhs_tokens.len() - 1 {
+        return Err(SyntaxError::InvalidAssignmentStatement(format!(
+            "Expected closing parenthesis but got '{}'",
+            context.token_slice_to_string(lhs.move_end(end_index)?)
+        ))
+        .into());
+    }
+    let lhs_slices = comma_separate(lhs.move_start(1)?.move_end(end_index)?, context)?;
+    let lhs_symbol_names = lhs_slices
+        .iter()
+        .map(|slice| match context.get_token_at_index(slice.start)? {
+            Token::Symbol(symbol_token) => Ok(symbol_token.name.clone()),
+            _ => Err(SyntaxError::InvalidAssignmentStatement(format!(
+                "Expected symbol but got '{}'",
+                context.token_slice_to_string(*slice)
+            ))
+            .into()),
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let (rhs_node, rest) = next_node(rhs, context)?;
+    if !rest.is_empty() {
+        return Err(SyntaxError::InvalidAssignmentStatement(format!(
+            "Got unparsed tokens '{}' after assignment",
+            context.token_slice_to_string(rest)
+        ))
+        .into());
+    }
+    if let IJType::Group(group_types) = &rhs_node.output_type {
+        if group_types.len() != lhs_symbol_names.len() {
+            return Err(SyntaxError::IncorrectNumberOfVariablesInAssignment(
+                lhs_symbol_names.len(),
+                group_types.len(),
+            )
+            .into());
+        }
+        let mut symbol_nodes = vec![];
+        for (lhs_name, rhs_type) in lhs_symbol_names.iter().zip(group_types.iter()) {
+            context.insert_variable(Variable {
+                name: lhs_name.clone(),
+                typ: rhs_type.clone(),
+            });
+            symbol_nodes.push(Rc::new(Node::new(
+                Operation::Symbol(lhs_name.clone()),
+                vec![],
+                rhs_type.clone(),
+                vec![],
+                context,
+            )?));
+        }
+        let group_node = Rc::new(Node::new(
+            Operation::Group,
+            vec![],
+            IJType::Group(group_types.clone()),
+            symbol_nodes,
+            context,
+        )?);
+        let assign_node = Rc::new(Node::new(
+            Operation::Assign,
+            vec![
+                IJType::Group(group_types.clone()),
+                rhs_node.output_type.clone(),
+            ],
+            IJType::Void,
+            vec![group_node, rhs_node],
+            context,
+        )?);
+        Ok(assign_node)
+    } else {
+        Err(SyntaxError::ExpectedGroupOutput(rhs_node.output_type.clone().to_string()).into())
+    }
+}
+
 pub fn parse_assign(context: &mut ASTContext) -> Result<Rc<Node>> {
     let tokens = context.get_tokens();
 
@@ -127,6 +206,9 @@ pub fn parse_assign(context: &mut ASTContext) -> Result<Rc<Node>> {
         )
         .into());
     };
+    if context.get_token_at_index(lhs.start)? == &Token::LParen {
+        return parse_group_assign(context, lhs, rhs);
+    }
     let (symbol_name, args, output_type) = parse_assign_lhs(context, lhs)?;
     let (rhs_node, rest) = next_node(rhs, context)?;
     if !rest.is_empty() {
@@ -334,8 +416,14 @@ mod tests {
         let mut context = ASTContext::from_tokens(tokens.clone());
         let node = parse_assign(&mut context)?;
         assert_eq!(node.op, Operation::Assign);
-        assert_eq!(node.operands[0].output_type, IJType::Scalar(Some("i64".to_string())));
-        assert_eq!(node.operands[1].output_type, IJType::Scalar(Some("i64".to_string())));
+        assert_eq!(
+            node.operands[0].output_type,
+            IJType::Scalar(Some("i64".to_string()))
+        );
+        assert_eq!(
+            node.operands[1].output_type,
+            IJType::Scalar(Some("i64".to_string()))
+        );
         Ok(())
     }
 
@@ -350,7 +438,10 @@ mod tests {
         assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
         assert_eq!(
             node.operands[0].output_type,
-            IJType::Function(FunctionSignature::new(vec![IJType::Tensor(None)], IJType::Tensor(None)))
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor(None)],
+                IJType::Tensor(None)
+            ))
         );
         assert_eq!(node.operands[1].output_type, IJType::Tensor(None));
         assert_eq!(node.operands[2].output_type, IJType::Tensor(None));
@@ -368,7 +459,10 @@ mod tests {
         assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
         assert_eq!(
             node.operands[0].output_type,
-            IJType::Function(FunctionSignature::new(vec![IJType::Scalar(None)], IJType::Scalar(None)))
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Scalar(None)],
+                IJType::Scalar(None)
+            ))
         );
         assert_eq!(node.operands[1].output_type, IJType::Scalar(None));
         assert_eq!(node.operands[2].output_type, IJType::Scalar(None));
@@ -385,10 +479,19 @@ mod tests {
         assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
         assert_eq!(
             node.operands[0].output_type,
-            IJType::Function(FunctionSignature::new(vec![IJType::Scalar(Some("i64".to_string()))], IJType::Scalar(Some("i64".to_string()))))
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Scalar(Some("i64".to_string()))],
+                IJType::Scalar(Some("i64".to_string()))
+            ))
         );
-        assert_eq!(node.operands[1].output_type, IJType::Scalar(Some("i64".to_string())));
-        assert_eq!(node.operands[2].output_type, IJType::Scalar(Some("i64".to_string())));
+        assert_eq!(
+            node.operands[1].output_type,
+            IJType::Scalar(Some("i64".to_string()))
+        );
+        assert_eq!(
+            node.operands[2].output_type,
+            IJType::Scalar(Some("i64".to_string()))
+        );
         Ok(())
     }
 
@@ -403,7 +506,10 @@ mod tests {
         assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
         assert_eq!(
             node.operands[0].output_type,
-            IJType::Function(FunctionSignature::new(vec![IJType::Tensor(None)], IJType::Scalar(None)))
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor(None)],
+                IJType::Scalar(None)
+            ))
         );
         assert_eq!(node.operands[1].output_type, IJType::Scalar(None));
         assert_eq!(node.operands[2].output_type, IJType::Tensor(None));
@@ -421,7 +527,10 @@ mod tests {
         assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
         assert_eq!(
             node.operands[0].output_type,
-            IJType::Function(FunctionSignature::new(vec![IJType::Tensor(None)], IJType::Tensor(None)))
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor(None)],
+                IJType::Tensor(None)
+            ))
         );
         assert_eq!(node.operands[1].output_type, IJType::Tensor(None));
         assert_eq!(node.operands[2].output_type, IJType::Tensor(None));
@@ -439,7 +548,10 @@ mod tests {
         assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
         assert_eq!(
             node.operands[0].output_type,
-            IJType::Function(FunctionSignature::new(vec![IJType::Tensor(None)], IJType::Scalar(None)))
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor(None)],
+                IJType::Scalar(None)
+            ))
         );
         assert_eq!(node.operands[1].output_type, IJType::Scalar(None));
         assert_eq!(node.operands[2].output_type, IJType::Tensor(None));
@@ -511,10 +623,19 @@ mod tests {
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
                 vec![
-                    IJType::Function(FunctionSignature::new(vec![IJType::Scalar(None)], IJType::Tensor(None))),
-                    IJType::Function(FunctionSignature::new(vec![IJType::Tensor(None)], IJType::Scalar(None)))
+                    IJType::Function(FunctionSignature::new(
+                        vec![IJType::Scalar(None)],
+                        IJType::Tensor(None)
+                    )),
+                    IJType::Function(FunctionSignature::new(
+                        vec![IJType::Tensor(None)],
+                        IJType::Scalar(None)
+                    ))
                 ],
-                IJType::Function(FunctionSignature::new(vec![IJType::Tensor(None)], IJType::Tensor(None)))
+                IJType::Function(FunctionSignature::new(
+                    vec![IJType::Tensor(None)],
+                    IJType::Tensor(None)
+                ))
             ))
         );
         assert_eq!(
@@ -529,8 +650,8 @@ mod tests {
             IJType::Function(FunctionSignature::new(
                 vec![IJType::Scalar(None)],
                 IJType::Tensor(None),
-                ))
-            );
+            ))
+        );
         assert_eq!(
             node.operands[3].output_type,
             IJType::Function(FunctionSignature::new(
