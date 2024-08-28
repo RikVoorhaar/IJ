@@ -265,3 +265,51 @@ fn test_matrix_multiplication() {
     let z = _test_matrix_multiplication(x.clone(), y.clone());
     assert_eq!(z.to_vec(), expected.to_vec());
 }
+
+#[test]
+fn test_tensor_builder() {
+    #[ijzer]
+    fn _test_tensor_builder_ones() -> Tensor<i64> {
+        r#"
+        ones [2,3]<usize>
+        "#
+    }
+    let expected = Tensor::ones(&[2, 3]);
+    let y = _test_tensor_builder_ones();
+    assert_eq!(y.to_vec(), expected.to_vec());
+
+    #[ijzer]
+    fn _test_tensor_builder_zeros(shape: Tensor<usize>) -> Tensor<i64> {
+        r#"
+        var shape: T<usize>
+        zeros shape
+        "#
+    }
+    let shape = Tensor::from_vec(vec![2, 2, 1], None);
+    let expected = Tensor::zeros(&[2, 2, 1]);
+    let y = _test_tensor_builder_zeros(shape);
+    assert_eq!(y.to_vec(), expected.to_vec());
+
+    #[ijzer]
+    fn _test_tensor_builder_eye() -> Tensor<f64> {
+        r#"
+        x = eye<f64> [3,3]
+        y = ones<f64> [3,3]
+        ?/+* x y
+        "#
+    }
+    let expected = Tensor::ones(&[3, 3]);
+    let y = _test_tensor_builder_eye();
+    assert_eq!(y.to_vec(), expected.to_vec());
+
+    #[ijzer]
+    fn _test_tensor_builder_randu_randn() -> Tensor<f64> {
+        r#"
+        A = randu<f64> [3,4]
+        B = randn<f64> [4,5]
+        ?/+* A B
+        "#
+    }
+    let y = _test_tensor_builder_randu_randn();
+    assert_eq!(y.shape(), &[3, 5]);
+}
