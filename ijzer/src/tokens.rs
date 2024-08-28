@@ -205,6 +205,9 @@ pub enum Token {
 
     #[token("|")]
     Transpose,
+
+    #[token("%")]
+    Shape,
 }
 
 impl Display for Token {
@@ -243,6 +246,7 @@ impl Display for Token {
             Self::NumberType(s) => write!(f, "<{}>", s),
             Self::TensorBuilder(s) => write!(f, "{}", s),
             Self::Transpose => write!(f, "|"),
+            Self::Shape => write!(f, "%"),
         }
     }
 }

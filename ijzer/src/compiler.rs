@@ -172,6 +172,7 @@ impl CompilerContext {
             }
             Operation::TensorBuilder(_) => TensorBuilder::compile(node, self, child_streams)?,
             Operation::Transpose => Transpose::compile(node, self, child_streams)?,
+            Operation::Shape => Shape::compile(node, self, child_streams)?,
             // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
@@ -1002,6 +1003,37 @@ impl CompileNode for Transpose {
     }
 }
 
+struct Shape;
+impl CompileNode for Shape {
+    fn compile(
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        match node.operands.len() {
+            1 => {
+                let child_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
+                Ok(quote! {
+                    ijzer::tensor::Tensor::<usize>::from_vec(#child_stream.shape().to_vec(), None)
+                })
+            }
+            0 => {
+                let tensor_type = node.output_type.extract_signature().unwrap().input[0].clone();
+                let tensor_t = annotation_from_type(&tensor_type)?;
+                Ok(quote! {
+                    |_x: #tensor_t| ijzer::tensor::Tensor::<usize>::from_vec(_x.shape().to_vec(), None)
+                })
+            }
+            _ => {
+                panic!(
+                    "Expected 1 operand for Shape, found {}",
+                    node.operands.len()
+                );
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1330,6 +1362,19 @@ mod tests {
 
         let input = "var x: T<f64>; .~|x";
         let expected = "(|_x: ijzer::tensor::Tensor::<_>| _x.transpose())(x)";
+        compiler_compare(input, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_shape() -> Result<()> {
+        let input = "var x: T; %x";
+        let expected = "ijzer::tensor::Tensor::<usize>::from_vec(x.shape().to_vec(), None)";
+        compiler_compare(input, expected);
+
+        let input = "var x: T;.~%x";
+        let expected = "(|_x: ijzer::tensor::Tensor::<_>| ijzer::tensor::Tensor::<usize>::from_vec(_x.shape().to_vec(), None))(x)";
         compiler_compare(input, expected);
 
         Ok(())
