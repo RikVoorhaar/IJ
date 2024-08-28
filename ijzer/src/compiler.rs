@@ -940,12 +940,31 @@ impl CompileNode for TensorBuilder {
                         "Failed to parse builder name into a Rust TokenStream",
                     )
                 })?;
-            let child_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
-            let number_type = node.output_type.extract_number_type().unwrap();
-            let tensor_t = annotation_from_type(&IJType::Tensor(number_type))?;
-            Ok(quote! {
-                #tensor_t::#builder_name_stream(#child_stream.to_vec().as_slice())
-            })
+
+            match node.operands.len() {
+                1 => {
+                    let child_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
+                    let number_type = node.output_type.extract_number_type().unwrap();
+                    let tensor_t = annotation_from_type(&IJType::Tensor(number_type))?;
+                    Ok(quote! {
+                        #tensor_t::#builder_name_stream(#child_stream.to_vec().as_slice())
+                    })
+                }
+                0 => {
+                    let tensor_type = node.output_type.extract_signature().unwrap().output;
+                    let tensor_t = annotation_from_type(&tensor_type)?;
+                    Ok(quote! {
+                        |_x: #tensor_t| #tensor_t::#builder_name_stream(_x.to_vec().as_slice())
+                    })
+                }
+
+                _ => {
+                    panic!(
+                        "Expected 0 or 1 operand for TensorBuilder, found {}",
+                        node.operands.len()
+                    );
+                }
+            }
         } else {
             unreachable!()
         }
@@ -1294,6 +1313,10 @@ mod tests {
 
         let input = "eye<f32> [3,3]<usize>";
         let expected = "ijzer::tensor::Tensor::<f32>::eye(ijzer::tensor::Tensor::<usize>::from_vec(vec![3,3],None).to_vec().as_slice())";
+        compiler_compare(input, expected);
+
+        let input = "var x: T<usize>; .~eye x";
+        let expected = "(|_x: ijzer::tensor::Tensor::<_>| ijzer::tensor::Tensor::<_>::eye(_x.to_vec().as_slice()))(x)";
         compiler_compare(input, expected);
 
         Ok(())

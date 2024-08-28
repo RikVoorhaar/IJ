@@ -329,3 +329,32 @@ fn test_apply_unary() {
     let y = _test_apply(x.clone());
     assert_eq!(y.to_vec(), expected.to_vec());
 }
+
+#[test]
+fn test_transpose() {
+    #[ijzer]
+    fn _test_transpose_functional(x: Tensor<i64>) -> Tensor<i64> {
+        r#"
+        var x: T
+        .~| x
+        "#
+    }
+
+    let x = Tensor::from_vec(vec![1, 2, 3, 4], Some(vec![2, 2]));
+    let expected = Tensor::from_vec(vec![1, 3, 2, 4], Some(vec![2, 2]));
+    let y = _test_transpose_functional(x.clone());
+    assert_eq!(y.to_vec(), expected.to_vec());
+
+    #[ijzer]
+    fn _test_transpose_method(x: Tensor<i64>) -> Tensor<i64> {
+        r#"
+        var x: T
+        |x
+        "#
+    }
+
+    let x = Tensor::from_vec(vec![1, 2, 3, 4], Some(vec![2, 2]));
+    let expected = Tensor::from_vec(vec![1, 3, 2, 4], Some(vec![2, 2]));
+    let y = _test_transpose_method(x.clone());
+    assert_eq!(y.to_vec(), expected.to_vec());
+}
