@@ -228,7 +228,7 @@ fn test_type_conversion() {
 }
 
 #[test]
-fn test_apply() {
+fn test_apply_higher_function() {
     type TensorFun = Box<dyn Fn(Tensor<i64>) -> Tensor<i64>>;
     #[ijzer]
     fn _test_apply(f: fn(Tensor<i64>) -> TensorFun) -> Tensor<i64> {
@@ -312,4 +312,20 @@ fn test_tensor_builder() {
     }
     let y = _test_tensor_builder_randu_randn();
     assert_eq!(y.shape(), &[3, 5]);
+}
+
+#[test]
+fn test_apply_unary() {
+    #[ijzer]
+    fn _test_apply(x: Tensor<i64>) -> Tensor<i64> {
+        r#"
+        var x: T
+        .~/+ x
+        "#
+    }
+
+    let x = Tensor::from_vec(vec![1, 2, 3, 4], Some(vec![2, 2]));
+    let expected = Tensor::from_vec(vec![10], Some(vec![1]));
+    let y = _test_apply(x.clone());
+    assert_eq!(y.to_vec(), expected.to_vec());
 }
