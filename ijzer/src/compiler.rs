@@ -171,7 +171,7 @@ impl CompilerContext {
                 GeneralizedContraction::compile(node, self, child_streams)?
             }
             Operation::TensorBuilder(_) => TensorBuilder::compile(node, self, child_streams)?,
-            // _ => NotImplemented::compile(node, self, child_streams)?,
+            _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
         Ok(stream)

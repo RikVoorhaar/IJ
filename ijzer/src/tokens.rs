@@ -202,6 +202,9 @@ pub enum Token {
 
     #[regex(r"(eye|randu|randn|zeros|ones)", |lex| Some(lex.slice().to_string()))]
     TensorBuilder(String),
+
+    #[token("|")]
+    Transpose,
 }
 
 impl Display for Token {
@@ -239,6 +242,7 @@ impl Display for Token {
             Self::GeneralizedContraction => write!(f, "?"),
             Self::NumberType(s) => write!(f, "<{}>", s),
             Self::TensorBuilder(s) => write!(f, "{}", s),
+            Self::Transpose => write!(f, "|"),
         }
     }
 }
