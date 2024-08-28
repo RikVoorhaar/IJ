@@ -1,5 +1,8 @@
 use crate::syntax_error::SyntaxError;
-use crate::tokens::{find_matching_parenthesis_on_tokens, lexer, Token};
+use crate::tokens::{
+    comma_separate_on_tokens, find_matching_parenthesis_on_tokens, lexer, split_tokens_at_indices,
+    Token,
+};
 use anyhow::Result;
 use std::fmt::Debug;
 
@@ -153,6 +156,34 @@ impl IJType {
                         let inside = &rest[..index];
                         let sig = FunctionSignature::from_tokens(inside)?;
                         Ok((IJType::Function(sig), index + 3))
+                    }
+                }
+            }
+            [Token::LParen, rest @ ..] => {
+                let right_paren_index =
+                    find_matching_parenthesis_on_tokens(rest, &Token::LParen, &Token::RParen);
+
+                match right_paren_index {
+                    None => Err(SyntaxError::UnmatchedParenthesis(
+                        "Mismatched parentheses in type".to_string(),
+                    )
+                    .into()),
+                    Some(index) => {
+                        let inside = &rest[..index];
+                        let splits = comma_separate_on_tokens(inside);
+                        let mut types = Vec::new();
+                        for sub_type_tokens in split_tokens_at_indices(inside, &splits) {
+                            let (t, group_len) = IJType::parse_tokens(&sub_type_tokens)?;
+                            if sub_type_tokens.len() != group_len {
+                                return Err(SyntaxError::UnhandledTokens(format!(
+                                    "{:?}",
+                                    sub_type_tokens[group_len..].to_vec()
+                                ))
+                                .into());
+                            }
+                            types.push(t);
+                        }
+                        Ok((IJType::Group(types), index + 2))
                     }
                 }
             }
@@ -417,5 +448,41 @@ mod tests {
             ))
         );
         assert_eq!(tokens[i..].len(), 1);
+    }
+
+    #[test]
+    fn test_ijtype_parse_tokens_group() {
+        let tokens = lexer("(T,S)").unwrap();
+        let (t, _) = IJType::parse_tokens(&tokens).unwrap();
+        println!("{:?}", t);
+        assert_eq!(
+            t,
+            IJType::Group(vec![IJType::Tensor(None), IJType::Scalar(None)])
+        );
+
+        let tokens = lexer("((T,S),S)").unwrap();
+        let (t, _) = IJType::parse_tokens(&tokens).unwrap();
+        println!("{:?}", t);
+        assert_eq!(
+            t,
+            IJType::Group(vec![
+                IJType::Group(vec![IJType::Tensor(None), IJType::Scalar(None)]),
+                IJType::Scalar(None),
+            ])
+        );
+
+        let tokens = lexer("Fn(T,T->(S<usize>,S))").unwrap();
+        let (t, _) = IJType::parse_tokens(&tokens).unwrap();
+        println!("{:?}", t);
+        assert_eq!(
+            t,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Tensor(None), IJType::Tensor(None)],
+                IJType::Group(vec![
+                    IJType::Scalar(Some("usize".to_string())),
+                    IJType::Scalar(None)
+                ])
+            ))
+        );
     }
 }
