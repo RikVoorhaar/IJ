@@ -81,6 +81,13 @@ impl<T: Clone + Num> Tensor<T> {
             data,
         }
     }
+    pub fn eye(shape: &[usize]) -> Tensor<T> {
+        let mut tensor = Self::zeros(shape);
+        for i in 0..*shape.iter().min().unwrap() {
+            tensor[&vec![i; shape.len()]] = T::one();
+        }
+        tensor
+    }
     pub fn scalar(value: T) -> Tensor<T> {
         let shape = vec![1];
         let strides = vec![1];
@@ -393,6 +400,40 @@ mod tests {
         assert_eq!(tensor.shape, vec![1, 3, 4]);
         assert_eq!(tensor.strides, vec![12, 4, 1]);
         assert_eq!(tensor.data.len(), 12);
+        assert!(tensor.data.iter().all(|&x| x == 1.0));
+    }
+    #[test]
+    fn test_tensor_eye() {
+        let tensor = Tensor::<f64>::eye(&[3, 3]);
+        assert_eq!(tensor.shape, vec![3, 3]);
+        assert_eq!(tensor.strides, vec![3, 1]);
+        assert_eq!(tensor.data.len(), 9);
+        assert!(tensor.data.iter().enumerate().all(|(i, &x)| {
+            if i % 4 == 0 {
+                x == 1.0
+            } else {
+                x == 0.0
+            }
+        }));
+
+        let tensor = Tensor::<f64>::eye(&[3, 1]);
+        assert_eq!(tensor.shape, vec![3, 1]);
+        assert_eq!(tensor.strides, vec![1, 1]);
+        assert_eq!(tensor.data.len(), 3);
+        println!("{:?}", tensor.data);
+        assert!(tensor.data.iter().enumerate().all(|(i, &x)| {
+            if i == 0 {
+                x == 1.0
+            } else {
+                x == 0.0
+            }
+        }));
+
+        let tensor = Tensor::<f64>::eye(&[3]);
+        assert_eq!(tensor.shape, vec![3]);
+        assert_eq!(tensor.strides, vec![1]);
+        assert_eq!(tensor.data.len(), 3);
+        println!("{:?}", tensor.data);
         assert!(tensor.data.iter().all(|&x| x == 1.0));
     }
 
