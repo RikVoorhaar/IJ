@@ -293,8 +293,8 @@ impl<T: Clone + Float> Tensor<T> {
     pub fn randn(shape: &[usize]) -> Tensor<T> {
         let mut rng = rand::thread_rng();
         let normal = rand_distr::Normal::new(0.0, 1.0).unwrap();
-        let data: Vec<T> = shape
-            .iter()
+        let size = shape.iter().product();
+        let data: Vec<T> = (0..size)
             .map(|_| T::from(rng.sample(normal)).unwrap())
             .collect();
         let shape = shape.to_vec();
@@ -309,8 +309,8 @@ impl<T: Clone + Float> Tensor<T> {
     pub fn randu(shape: &[usize]) -> Tensor<T> {
         let mut rng = rand::thread_rng();
         let uniform = rand_distr::Uniform::new(0.0, 1.0);
-        let data: Vec<T> = shape
-            .iter()
+        let size = shape.iter().product();
+        let data: Vec<T> = (0..size)
             .map(|_| T::from(rng.sample(uniform)).unwrap())
             .collect();
         let shape = shape.to_vec();
@@ -618,6 +618,13 @@ mod tests {
         let shape = vec![2, 3];
         let tensor = Tensor::<f64>::randn(&shape);
         assert_eq!(tensor.shape(), &shape);
+        assert_eq!(tensor.data.len(), 6);
+        assert_eq!(tensor.size(), 6);
+
+        let shape = vec![2, 3];
+        let tensor = Tensor::<f32>::randn(&shape);
+        assert_eq!(tensor.data.len(), 6);
+        assert_eq!(tensor.shape(), &shape);
         assert_eq!(tensor.size(), 6);
     }
 
@@ -628,6 +635,7 @@ mod tests {
         assert!(tensor.to_vec().iter().all(|&x| (0.0..=1.0).contains(&x)));
         assert_eq!(tensor.shape(), &shape);
         assert_eq!(tensor.size(), 8);
+        assert_eq!(tensor.data.len(), 8);
     }
 
     #[test]
