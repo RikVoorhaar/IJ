@@ -358,3 +358,28 @@ fn test_transpose() {
     let y = _test_transpose_method(x.clone());
     assert_eq!(y.to_vec(), expected.to_vec());
 }
+
+#[test]
+fn test_shape() {
+    #[ijzer]
+    fn _test_shape(x: Tensor<i64>) -> Tensor<usize> {
+        r#"
+        var x: T<i64>
+        %x
+        "#
+    }
+    #[ijzer]
+    fn _test_functional(x: Tensor<i64>) -> Tensor<usize> {
+        r#"
+        var x: T<i64>
+        .~%x
+        "#
+    }
+
+    let x = Tensor::from_vec(vec![1, 2, 3, 4], Some(vec![2, 2]));
+    let expected = x.shape();
+    let y = _test_shape(x.clone());
+    assert_eq!(y.to_vec(), expected.to_vec());
+    let y = _test_functional(x.clone());
+    assert_eq!(y.to_vec(), expected.to_vec());
+}
