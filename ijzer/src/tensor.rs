@@ -1,5 +1,10 @@
 use anyhow::{anyhow, Result};
 use itertools::Itertools;
+use ndarray::{Array, Array2, ArrayBase, Dimension, IxDyn};
+
+use ndarray_linalg::qr::*;
+use ndarray_linalg::svd::*;
+use ndarray_linalg::{Lapack, Scalar};
 use num_traits::{Float, Num};
 use rand::Rng;
 use std::fmt;
@@ -89,6 +94,16 @@ impl<T: Clone + Num> Tensor<T> {
             tensor[&vec![i; shape.len()]] = T::one();
         }
         tensor
+    }
+    pub fn diag(tensor: &Tensor<T>) -> Tensor<T> {
+        let shape_diag = [tensor.shape.clone(), tensor.shape.clone()].concat();
+        let mut result = Tensor::zeros(&shape_diag);
+        for i in 0..tensor.size() {
+            let index = tensor.flat_to_index(i);
+            let diag_index = [index.clone(), index.clone()].concat();
+            result[&diag_index] = tensor[&index].clone();
+        }
+        result
     }
     pub fn scalar(value: T) -> Tensor<T> {
         let shape = vec![1];
@@ -223,9 +238,9 @@ impl<T: Clone + Num> Tensor<T> {
         other: &Tensor<T>,
         f: impl Fn(&Tensor<T>) -> T,
         g: impl Fn(T, T) -> T,
-    ) -> Result<Tensor<T>, &'static str> {
+    ) -> Result<Tensor<T>> {
         if self.shape.last() != other.shape.first() {
-            return Err("Incompatible shapes for dot product");
+            return Err(anyhow!("Incompatible shapes for dot product"));
         }
         let left_shape = self.shape[..self.shape.len() - 1].to_vec();
         let right_shape = other.shape[1..].to_vec();
@@ -287,6 +302,49 @@ impl<T: Clone + Num> Tensor<T> {
         };
 
         Ok(result)
+    }
+    pub fn dot(&self, other: &Tensor<T>) -> Result<Tensor<T>> {
+        self.generalized_contraction(
+            other,
+            |x| x.reduce(|a, b| a + b).extract_scalar().unwrap(),
+            |a, b| a * b,
+        )
+    }
+    pub fn to_ndarray2(&self) -> Array2<T> {
+        let shape = self.shape.clone();
+        let shape2d = match shape.len() {
+            1 => (shape[0], 1),
+            2 => (shape[0], shape[1]),
+            _ => (shape[0], shape.iter().skip(1).product()),
+        };
+        let data = self.data.clone().into_vec();
+        Array2::from_shape_vec(shape2d, data).unwrap()
+    }
+    pub fn from_ndarray<D: Dimension>(array: ArrayBase<ndarray::OwnedRepr<T>, D>) -> Tensor<T> {
+        let shape = array.shape().to_vec();
+        let data = array.into_iter().collect::<Vec<T>>();
+        Tensor::new(data.into_boxed_slice(), shape)
+    }
+    pub fn to_ndarray(&self) -> Array<T, IxDyn> {
+        let shape = IxDyn(&self.shape);
+        let data = self.data.clone().into_vec();
+        Array::from_shape_vec(shape, data).unwrap()
+    }
+}
+impl<T: Num + Clone + Scalar + Lapack> Tensor<T> {
+    pub fn qr(&self) -> Result<(Tensor<T>, Tensor<T>)> {
+        let (q, r) = self.to_ndarray2().qr()?;
+
+        Ok((Tensor::from_ndarray(q), Tensor::from_ndarray(r)))
+    }
+    pub fn svd(&self) -> Result<(Tensor<T>, Tensor<T>, Tensor<T>)> {
+        let (u, s, vt) = self.to_ndarray2().svd(true, true)?;
+        let s_converted = s.mapv(|x| T::from_real(x));
+        Ok((
+            Tensor::from_ndarray(u.unwrap()),
+            Tensor::from_ndarray(s_converted),
+            Tensor::from_ndarray(vt.unwrap()),
+        ))
     }
 }
 impl<T: Clone + Float> Tensor<T> {
@@ -374,6 +432,7 @@ impl<T: fmt::Display + Clone + Num> fmt::Display for Tensor<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use approx::assert_abs_diff_eq;
 
     #[test]
     fn test_tensor_zeros() {
@@ -767,5 +826,59 @@ mod tests {
             transposed_tensor.to_vec(),
             vec![1.0, 5.0, 3.0, 7.0, 2.0, 6.0, 4.0, 8.0]
         );
+    }
+
+    #[test]
+    fn test_to_ndarray2() {
+        let data = vec![1.0, 2.0, 3.0, 4.0];
+        let tensor = Tensor::from_vec(data.clone(), Some(vec![2, 2]));
+        let ndarray2 = tensor.to_ndarray2();
+        assert_eq!(ndarray2.shape(), &[2, 2]);
+        assert_eq!(
+            ndarray2.clone().into_iter().collect::<Vec<_>>(),
+            data.clone()
+        );
+        let tensor2 = Tensor::from_ndarray(ndarray2);
+        assert_eq!(tensor2.to_vec(), data);
+    }
+
+    #[test]
+    fn test_diag() {
+        let tensor = Tensor::from_vec(vec![1.0, 2.0], Some(vec![2]));
+        let diag = Tensor::diag(&tensor);
+        assert_eq!(diag.shape(), &vec![2, 2]);
+        assert_eq!(diag.to_vec(), vec![1.0, 0.0, 0.0, 2.0]);
+
+        let tensor = Tensor::from_vec(vec![1.0, 2.0], Some(vec![2, 1]));
+        let diag = Tensor::diag(&tensor);
+        assert_eq!(diag.shape(), &vec![2, 1, 2, 1]);
+        assert_eq!(diag.to_vec(), vec![1.0, 0.0, 0.0, 2.0]);
+    }
+
+    #[test]
+    fn test_qr() -> Result<()> {
+        let input = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0];
+        let tensor = Tensor::from_vec(input.clone(), Some(vec![3, 3]));
+        let (q, r) = tensor.qr().unwrap();
+        println!("{:?}", q.to_vec());
+        println!("{:?}", r.to_vec());
+        let result = q.dot(&r)?;
+        for (a, b) in result.to_vec().iter().zip(input.iter()) {
+            assert_abs_diff_eq!(a, b, epsilon = 1e-6);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_svd() -> Result<()> {
+        let input = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0];
+        let tensor = Tensor::from_vec(input.clone(), Some(vec![3, 3]));
+        let (u, s, vt) = tensor.svd()?;
+        let s_diag = Tensor::diag(&s);
+        let result = u.dot(&s_diag)?.dot(&vt)?;
+        for (a, b) in result.to_vec().iter().zip(input.iter()) {
+            assert_abs_diff_eq!(a, b, epsilon = 1e-6);
+        }
+        Ok(())
     }
 }
