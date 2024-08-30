@@ -3,9 +3,13 @@ use itertools::Itertools;
 use ndarray::{Array, Array2, ArrayBase, Dimension, IxDyn};
 
 use ndarray_linalg::qr::*;
+use ndarray_linalg::solve::*;
 use ndarray_linalg::svd::*;
+use ndarray_linalg::triangular::*;
+use ndarray_linalg::cholesky::*;
+
 use ndarray_linalg::{Lapack, Scalar};
-use num_traits::{Float, Num};
+use num_traits::{Float, Num, Zero};
 use rand::Rng;
 use std::fmt;
 use std::ops::{Index, IndexMut};
@@ -346,7 +350,93 @@ impl<T: Num + Clone + Scalar + Lapack> Tensor<T> {
             Tensor::from_ndarray(vt.unwrap()),
         ))
     }
+
+    pub fn solve_square(&self, other: &Tensor<T>) -> Result<Tensor<T>> {
+        let l_shape = self.shape[..self.shape.len() - 1].to_vec();
+        let l = l_shape.iter().product();
+        let m = *self.shape.last().unwrap();
+        let n = other.shape[l_shape.len()..].iter().product();
+        let mut a = self.clone();
+        a.reshape(&[l, m])?;
+        let mut b = other.clone();
+        b.reshape(&[l, n])?;
+        let x = matrix_solve_square(&a.to_ndarray2(), &b.to_ndarray2())?;
+        Ok(Tensor::from_ndarray(x))
+    }
 }
+
+// Solve a matrix equation of form A*X = B, where A is (l,m), B is (l,n), X is (m,n). Uses LU factorization, and assumes l=m (A is square)
+fn matrix_solve_square<T: Clone + Num + Scalar + Lapack>(
+    a: &Array2<T>,
+    b: &Array2<T>,
+) -> Result<Array2<T>> {
+    let (l, m) = a.dim();
+    let (ll, n) = b.dim();
+    if l != m {
+        return Err(anyhow!("Matrix A must be square"));
+    }
+    if l != ll {
+        return Err(anyhow!("Matrix A and B must have same number of rows"));
+    }
+    let lu = a.factorize()?;
+    let mut x = Array2::zeros((m, n));
+    for i in 0..n {
+        let b_col = b.column(i);
+        x.column_mut(i).assign(&lu.solve(&b_col)?);
+    }
+    Ok(x)
+}
+
+// Solve A*X = B, where A is (l,m), B is (l,n), X is (m,n). Uses QR factorization, and assumes l>m (A is tall / overdetermined)
+fn matrix_solve_overdetermined<T: Clone + Num + Scalar + Lapack>(
+    a: &Array2<T>,
+    b: &Array2<T>,
+) -> Result<Array2<T>> {
+    let (l, m) = a.dim();
+    let (ll, n) = b.dim();
+    if l < m {
+        return Err(anyhow!("Matrix A must have more rows than columns"));
+    }
+    if l != ll {
+        return Err(anyhow!("Matrix A and B must have same number of rows"));
+    }
+    let (q, r) = a.qr()?;
+    let b_orth = q.t().dot(b);
+    let mut x = Array2::zeros((m, n));
+    for i in 0..n {
+        let b_col = b_orth.column(i).to_owned();
+        x.column_mut(i)
+            .assign(&r.solve_triangular(UPLO::Upper, Diag::NonUnit, &b_col)?);
+    }
+    Ok(x)
+}
+
+// Solve A*X = B, where A is (l,m), B is (l,n), X is (m,n). Gives least square solution by solving normal equations using SVD to multiply by pseudoinverse
+fn matrix_solve_least_squares<T: Clone + Num + Scalar + Lapack>(
+    a: &Array2<T>,
+    b: &Array2<T>,
+) -> Result<Array2<T>> {
+    let (l, m) = a.dim();
+    let (ll, n) = b.dim();
+    if l > m {
+        return Err(anyhow!("Matrix A must have more columns than rows"));
+    }
+    if l != ll {
+        return Err(anyhow!("Matrix A and B must have same number of rows"));
+    }
+    let (u, s, vt) = a.svd(true, true)?;
+    let s_inv = s.mapv(|x| {
+        if x.is_zero() {
+            T::zero()
+        } else {
+            T::one() / T::from_real(x)
+        }
+    });
+    let a_pinv = vt.t().dot(&s_inv)?.dot(&u.t())?;
+    let x = a_pinv.dot(b);
+    Ok(x)
+}
+
 impl<T: Clone + Float> Tensor<T> {
     pub fn randn(shape: &[usize]) -> Tensor<T> {
         let mut rng = rand::thread_rng();
@@ -878,6 +968,67 @@ mod tests {
         let result = u.dot(&s_diag)?.dot(&vt)?;
         for (a, b) in result.to_vec().iter().zip(input.iter()) {
             assert_abs_diff_eq!(a, b, epsilon = 1e-6);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_solve() -> Result<()> {
+        let a = Tensor::<f64>::randn(&[3, 3]);
+        let x = Tensor::<f64>::randn(&[3, 4]);
+        let b = a.clone().dot(&x)?;
+        let x_sol = a.solve_square(&b)?;
+        let result = a.dot(&x_sol)?;
+        for (x_sol_, x_) in x_sol.to_vec().iter().zip(x.to_vec().iter()) {
+            assert_abs_diff_eq!(x_sol_, x_, epsilon = 1e-6);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_solve_square() -> Result<()> {
+        let a = Tensor::<f64>::randn(&[3, 3]).to_ndarray2();
+        let x = Tensor::<f64>::randn(&[3, 4]).to_ndarray2();
+        let b = a.dot(&x);
+        let x_sol = matrix_solve_square(&a, &b)?;
+        let result = a.dot(&x_sol);
+        for (x_sol_, x_) in x_sol.iter().zip(x.iter()) {
+            assert_abs_diff_eq!(x_sol_, x_, epsilon = 1e-6);
+        }
+        for (r, b_) in result.iter().zip(b.iter()) {
+            assert_abs_diff_eq!(r, b_, epsilon = 1e-6);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_solve_overdetermined() -> Result<()> {
+        let a = Tensor::<f64>::randn(&[4, 3]).to_ndarray2();
+        let x = Tensor::<f64>::randn(&[3, 5]).to_ndarray2();
+        let b = a.dot(&x);
+        let x_sol = matrix_solve_overdetermined(&a, &b)?;
+        let result = a.dot(&x_sol);
+        for (x_sol_, x_) in x_sol.iter().zip(x.iter()) {
+            assert_abs_diff_eq!(x_sol_, x_, epsilon = 1e-6);
+        }
+        for (r, b_) in result.iter().zip(b.iter()) {
+            assert_abs_diff_eq!(r, b_, epsilon = 1e-6);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_solve_least_squares() -> Result<()> {
+        let a = Tensor::<f64>::randn(&[3, 5]).to_ndarray2();
+        let x = Tensor::<f64>::randn(&[5,2]).to_ndarray2();
+        let b = a.dot(&x);
+        let x_sol = matrix_solve_least_squares(&a, &b)?;
+        let result = a.dot(&x_sol);
+        // for (x_sol_, x_) in x_sol.iter().zip(x.iter()) {
+        //     assert_abs_diff_eq!(x_sol_, x_, epsilon = 1e-6);
+        // }
+        for (r, b_) in result.iter().zip(b.iter()) {
+            assert_abs_diff_eq!(r, b_, epsilon = 1e-6);
         }
         Ok(())
     }
