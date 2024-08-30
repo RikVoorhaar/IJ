@@ -66,6 +66,15 @@ use transpose::Transpose;
 mod shape;
 use shape::Shape;
 
+mod qr;
+use qr::QR;
+
+mod svd;
+use svd::Svd;
+
+mod solve;
+use solve::Solve;
+
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
@@ -116,6 +125,9 @@ pub fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node
         Token::TensorBuilder(_) => TensorBuilder::next_node(op.clone(), rest, context),
         Token::Transpose => Transpose::next_node(op.clone(), rest, context),
         Token::Shape => Shape::next_node(op.clone(), rest, context),
+        Token::Solve => Solve::next_node(op.clone(), rest, context),
+        Token::SVD => Svd::next_node(op.clone(), rest, context),
+        Token::QR => QR::next_node(op.clone(), rest, context),
         _ => Err(SyntaxError::UnexpectedToken(op.clone()).into()),
     }
 }
@@ -196,6 +208,11 @@ fn next_node_functional(
         Token::Shape => {
             Shape::next_node_functional_impl(Token::Shape, slice, context, needed_outputs)?
         }
+        Token::Solve => {
+            Solve::next_node_functional_impl(Token::Solve, slice, context, needed_outputs)?
+        }
+        Token::SVD => Svd::next_node_functional_impl(Token::SVD, slice, context, needed_outputs)?,
+        Token::QR => QR::next_node_functional_impl(Token::QR, slice, context, needed_outputs)?,
         _ => {
             return Err(SyntaxError::SliceCannotBeParsedAsFunction(
                 context.token_slice_to_string(slice),

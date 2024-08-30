@@ -180,7 +180,8 @@ impl CompilerContext {
             Operation::TensorBuilder(_) => TensorBuilder::compile(node, self, child_streams)?,
             Operation::Transpose => Transpose::compile(node, self, child_streams)?,
             Operation::Shape => Shape::compile(node, self, child_streams)?,
-            // _ => NotImplemented::compile(node, self, child_streams)?,
+
+            _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
         Ok(stream)

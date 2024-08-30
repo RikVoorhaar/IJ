@@ -390,7 +390,7 @@ fn matrix_solve_square<T: Clone + Num + Scalar + Lapack>(
         return Err(anyhow!("Matrix A and B must have same number of rows"));
     }
     let lu = a.factorize()?;
-    let mut x = Array2::zeros((m, n));
+let mut x = Array2::zeros((m, n));
     for i in 0..n {
         let b_col = b.column(i);
         x.column_mut(i).assign(&lu.solve(&b_col)?);
