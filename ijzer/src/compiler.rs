@@ -1152,15 +1152,17 @@ impl CompileNode for Diag {
         match node.operands.len() {
             1 => {
                 let child_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
+                let tensor_type = node.output_type.clone();
+                let tensor_t = annotation_from_type(&tensor_type)?;
                 Ok(quote! {
-                    #child_stream.diag()
+                    #tensor_t::diag(&#child_stream)
                 })
             }
             0 => {
                 let tensor_type = node.output_type.extract_signature().unwrap().input[0].clone();
                 let tensor_t = annotation_from_type(&tensor_type)?;
                 Ok(quote! {
-                    |_x: #tensor_t| _x.diag()
+                    |_x: #tensor_t| #tensor_t::diag(&_x)
                 })
             }
             _ => {
@@ -1579,15 +1581,17 @@ mod tests {
     #[test]
     fn test_diag() -> Result<()> {
         let input = r"var x: T; diag x";
-        let expected = "x.diag()";
+        let expected = "ijzer::tensor::Tensor::<_>::diag(&x)";
         compiler_compare(input, expected);
 
         let input = r"~diag";
-        let expected = "| _x: ijzer :: tensor :: Tensor :: < _ > | _x.diag()";
+        let expected =
+            "| _x: ijzer :: tensor :: Tensor :: < _ > | ijzer::tensor::Tensor::<_>::diag(&_x)";
         compiler_compare(input, expected);
 
         let input = r"var x: T; y = diag x";
-        let expected = "let y: ijzer :: tensor :: Tensor :: < _ > = x.diag () ;";
+        let expected =
+            "let y: ijzer :: tensor :: Tensor :: < _ > = ijzer::tensor::Tensor::<_>::diag(&x);";
         compiler_compare(input, expected);
 
         Ok(())
