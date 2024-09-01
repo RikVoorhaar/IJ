@@ -2,7 +2,6 @@ use anyhow::{anyhow, Result};
 use itertools::Itertools;
 use ndarray::{s, Array, Array2, ArrayBase, Dimension, IxDyn};
 
-use ndarray_linalg::diagonal::*;
 use ndarray_linalg::qr::*;
 use ndarray_linalg::solve::*;
 use ndarray_linalg::svd::*;
@@ -390,7 +389,7 @@ fn matrix_solve_square<T: Clone + Num + Scalar + Lapack>(
         return Err(anyhow!("Matrix A and B must have same number of rows"));
     }
     let lu = a.factorize()?;
-let mut x = Array2::zeros((m, n));
+    let mut x = Array2::zeros((m, n));
     for i in 0..n {
         let b_col = b.column(i);
         x.column_mut(i).assign(&lu.solve(&b_col)?);

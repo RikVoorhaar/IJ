@@ -180,8 +180,10 @@ impl CompilerContext {
             Operation::TensorBuilder(_) => TensorBuilder::compile(node, self, child_streams)?,
             Operation::Transpose => Transpose::compile(node, self, child_streams)?,
             Operation::Shape => Shape::compile(node, self, child_streams)?,
-
-            _ => NotImplemented::compile(node, self, child_streams)?,
+            Operation::QR => QR::compile(node, self, child_streams)?,
+            Operation::SVD => Svd::compile(node, self, child_streams)?,
+            Operation::Solve => Solve::compile(node, self, child_streams)?,
+            // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
         Ok(stream)
@@ -1043,6 +1045,102 @@ impl CompileNode for Shape {
     }
 }
 
+struct QR;
+impl CompileNode for QR {
+    fn compile(
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        match node.operands.len() {
+            1 => {
+                let child_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
+                Ok(quote! {
+                    #child_stream.qr()
+                })
+            }
+            0 => {
+                let tensor_type = node.output_type.extract_signature().unwrap().input[0].clone();
+                let tensor_t = annotation_from_type(&tensor_type)?;
+                Ok(quote! {
+                    |_x: #tensor_t| _x.qr()
+                })
+            }
+            _ => {
+                panic!(
+                    "Expected 0 or 1 operand for QR, found {}",
+                    node.operands.len()
+                );
+            }
+        }
+    }
+}
+
+struct Svd;
+impl CompileNode for Svd {
+    fn compile(
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        match node.operands.len() {
+            1 => {
+                let child_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
+                Ok(quote! {
+                    #child_stream.svd()
+                })
+            }
+            0 => {
+                let tensor_type = node.output_type.extract_signature().unwrap().input[0].clone();
+                let tensor_t = annotation_from_type(&tensor_type)?;
+                Ok(quote! {
+                    |_x: #tensor_t| _x.svd()
+                })
+            }
+            _ => {
+                panic!(
+                    "Expected 0 or 1 operand for SVD, found {}",
+                    node.operands.len()
+                );
+            }
+        }
+    }
+}
+
+struct Solve;
+impl CompileNode for Solve {
+    fn compile(
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        match node.operands.len() {
+            2 => {
+                let lhs_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
+                let rhs_stream = child_streams.get(&node.operands[1].id).unwrap().clone();
+                Ok(quote! {
+                    #lhs_stream.solve(&#rhs_stream)
+                })
+            }
+            0 => {
+                let tensor_type0 = node.output_type.extract_signature().unwrap().input[0].clone();
+                let tensor_type1 = node.output_type.extract_signature().unwrap().input[1].clone();
+                let tensor_t0 = annotation_from_type(&tensor_type0)?;
+                let tensor_t1 = annotation_from_type(&tensor_type1)?;
+                Ok(quote! {
+                    |_x: #tensor_t0, _y: #tensor_t1| _x.solve(&_y)
+                })
+            }
+            _ => {
+                panic!(
+                    "Expected 0 or 2 operands for Solve, found {}",
+                    node.operands.len()
+                );
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1397,6 +1495,54 @@ mod tests {
 
         let input = "var f: Fn(T->(T,T)); (x: T, y: T) = f [1]";
         let expected = "let (x , y) : (ijzer :: tensor :: Tensor :: < _ > , ijzer :: tensor :: Tensor :: < _ >) = f (ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None)) ;";
+        compiler_compare(input, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn test_solve() -> Result<()> {
+        let input = r"var x: T; var y: T; \ x y";
+        let expected = "x.solve(&y)";
+        compiler_compare(input, expected);
+
+        let input = r"~\";
+        let expected = "| _x: ijzer :: tensor :: Tensor :: < _ > , _y: ijzer :: tensor :: Tensor :: < _ > | _x.solve(&_y)";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; z = \ x y";
+        let expected = "let z: ijzer :: tensor :: Tensor :: < _ > = x.solve(&y);";
+        compiler_compare(input, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn test_qr() -> Result<()> {
+        let input = r"var x: T; qr x";
+        let expected = "x.qr()";
+        compiler_compare(input, expected);
+
+        let input = r"~qr ";
+        let expected = "| _x: ijzer :: tensor :: Tensor :: < _ > | _x.qr()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; (q,r) = qr x";
+        let expected = "let (q , r) : (ijzer :: tensor :: Tensor :: < _ > , ijzer :: tensor :: Tensor :: < _ >) = x.qr () ;";
+        compiler_compare(input, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn test_svd() -> Result<()> {
+        let input = r"var x: T; svd x";
+        let expected = "x.svd()";
+        compiler_compare(input, expected);
+
+        let input = r"~svd";
+        let expected = "| _x: ijzer :: tensor :: Tensor :: < _ > | _x.svd()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; (u,s,v) = svd x";
+        let expected = "let (u , s , v) : (ijzer :: tensor :: Tensor :: < _ > , ijzer :: tensor :: Tensor :: < _ > , ijzer :: tensor :: Tensor :: < _ >) = x.svd () ;";
         compiler_compare(input, expected);
         Ok(())
     }
