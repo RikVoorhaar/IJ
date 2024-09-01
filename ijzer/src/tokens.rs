@@ -246,6 +246,9 @@ pub enum Token {
 
     #[token(r"\")]
     Solve,
+
+    #[token("diag")]
+    Diag,
 }
 
 impl Display for Token {
@@ -288,6 +291,7 @@ impl Display for Token {
             Self::QR => write!(f, "qr"),
             Self::SVD => write!(f, "svd"),
             Self::Solve => write!(f, r"\"),
+            Self::Diag => write!(f, "diag"),
         }
     }
 }

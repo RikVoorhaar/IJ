@@ -181,8 +181,9 @@ impl CompilerContext {
             Operation::Transpose => Transpose::compile(node, self, child_streams)?,
             Operation::Shape => Shape::compile(node, self, child_streams)?,
             Operation::QR => QR::compile(node, self, child_streams)?,
-            Operation::SVD => Svd::compile(node, self, child_streams)?,
+            Operation::Svd => Svd::compile(node, self, child_streams)?,
             Operation::Solve => Solve::compile(node, self, child_streams)?,
+            Operation::Diag => Diag::compile(node, self, child_streams)?,
             // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
@@ -1141,6 +1142,34 @@ impl CompileNode for Solve {
     }
 }
 
+struct Diag;
+impl CompileNode for Diag {
+    fn compile(
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        match node.operands.len() {
+            1 => {
+                let child_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
+                Ok(quote! {
+                    #child_stream.diag()
+                })
+            }
+            0 => {
+                let tensor_type = node.output_type.extract_signature().unwrap().input[0].clone();
+                let tensor_t = annotation_from_type(&tensor_type)?;
+                Ok(quote! {
+                    |_x: #tensor_t| _x.diag()
+                })
+            }
+            _ => {
+                panic!("Expected 1 operand for Diag, found {}", node.operands.len());
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1544,6 +1573,23 @@ mod tests {
         let input = r"var x: T; (u,s,v) = svd x";
         let expected = "let (u , s , v) : (ijzer :: tensor :: Tensor :: < _ > , ijzer :: tensor :: Tensor :: < _ > , ijzer :: tensor :: Tensor :: < _ >) = x.svd () ;";
         compiler_compare(input, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn test_diag() -> Result<()> {
+        let input = r"var x: T; diag x";
+        let expected = "x.diag()";
+        compiler_compare(input, expected);
+
+        let input = r"~diag";
+        let expected = "| _x: ijzer :: tensor :: Tensor :: < _ > | _x.diag()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; y = diag x";
+        let expected = "let y: ijzer :: tensor :: Tensor :: < _ > = x.diag () ;";
+        compiler_compare(input, expected);
+
         Ok(())
     }
 }

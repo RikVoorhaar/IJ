@@ -28,8 +28,9 @@ pub enum Operation {
     Transpose,
     Shape,
     QR,
-    SVD,
+    Svd,
     Solve,
+    Diag,
 }
 
 impl Debug for Operation {
@@ -59,8 +60,9 @@ impl Debug for Operation {
             Self::Transpose => write!(f, "Transpose"),
             Self::Shape => write!(f, "Shape"),
             Self::QR => write!(f, "qr"),
-            Self::SVD => write!(f, "svd"),
+            Self::Svd => write!(f, "svd"),
             Self::Solve => write!(f, r"\"),
+            Self::Diag => write!(f, "diag"),
         }
     }
 }
