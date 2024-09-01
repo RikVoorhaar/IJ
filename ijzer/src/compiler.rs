@@ -1057,14 +1057,14 @@ impl CompileNode for QR {
             1 => {
                 let child_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
                 Ok(quote! {
-                    #child_stream.qr()
+                    #child_stream.qr().unwrap()
                 })
             }
             0 => {
                 let tensor_type = node.output_type.extract_signature().unwrap().input[0].clone();
                 let tensor_t = annotation_from_type(&tensor_type)?;
                 Ok(quote! {
-                    |_x: #tensor_t| _x.qr()
+                    |_x: #tensor_t| _x.qr().unwrap()
                 })
             }
             _ => {
@@ -1088,14 +1088,14 @@ impl CompileNode for Svd {
             1 => {
                 let child_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
                 Ok(quote! {
-                    #child_stream.svd()
+                    #child_stream.svd().unwrap()
                 })
             }
             0 => {
                 let tensor_type = node.output_type.extract_signature().unwrap().input[0].clone();
                 let tensor_t = annotation_from_type(&tensor_type)?;
                 Ok(quote! {
-                    |_x: #tensor_t| _x.svd()
+                    |_x: #tensor_t| _x.svd().unwrap()
                 })
             }
             _ => {
@@ -1120,7 +1120,7 @@ impl CompileNode for Solve {
                 let lhs_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
                 let rhs_stream = child_streams.get(&node.operands[1].id).unwrap().clone();
                 Ok(quote! {
-                    #lhs_stream.solve(&#rhs_stream)
+                    #lhs_stream.solve(&#rhs_stream).unwrap()
                 })
             }
             0 => {
@@ -1129,7 +1129,7 @@ impl CompileNode for Solve {
                 let tensor_t0 = annotation_from_type(&tensor_type0)?;
                 let tensor_t1 = annotation_from_type(&tensor_type1)?;
                 Ok(quote! {
-                    |_x: #tensor_t0, _y: #tensor_t1| _x.solve(&_y)
+                    |_x: #tensor_t0, _y: #tensor_t1| _x.solve(&_y).unwrap()
                 })
             }
             _ => {
@@ -1531,15 +1531,15 @@ mod tests {
     #[test]
     fn test_solve() -> Result<()> {
         let input = r"var x: T; var y: T; \ x y";
-        let expected = "x.solve(&y)";
+        let expected = "x.solve(&y).unwrap()";
         compiler_compare(input, expected);
 
         let input = r"~\";
-        let expected = "| _x: ijzer :: tensor :: Tensor :: < _ > , _y: ijzer :: tensor :: Tensor :: < _ > | _x.solve(&_y)";
+        let expected = "| _x: ijzer :: tensor :: Tensor :: < _ > , _y: ijzer :: tensor :: Tensor :: < _ > | _x.solve(&_y).unwrap()";
         compiler_compare(input, expected);
 
         let input = r"var x: T; var y: T; z = \ x y";
-        let expected = "let z: ijzer :: tensor :: Tensor :: < _ > = x.solve(&y);";
+        let expected = "let z: ijzer :: tensor :: Tensor :: < _ > = x.solve(&y).unwrap();";
         compiler_compare(input, expected);
         Ok(())
     }
@@ -1547,15 +1547,15 @@ mod tests {
     #[test]
     fn test_qr() -> Result<()> {
         let input = r"var x: T; qr x";
-        let expected = "x.qr()";
+        let expected = "x.qr().unwrap()";
         compiler_compare(input, expected);
 
         let input = r"~qr ";
-        let expected = "| _x: ijzer :: tensor :: Tensor :: < _ > | _x.qr()";
+        let expected = "| _x: ijzer :: tensor :: Tensor :: < _ > | _x.qr().unwrap()";
         compiler_compare(input, expected);
 
         let input = r"var x: T; (q,r) = qr x";
-        let expected = "let (q , r) : (ijzer :: tensor :: Tensor :: < _ > , ijzer :: tensor :: Tensor :: < _ >) = x.qr () ;";
+        let expected = "let (q , r) : (ijzer :: tensor :: Tensor :: < _ > , ijzer :: tensor :: Tensor :: < _ >) = x.qr () . unwrap () ;";
         compiler_compare(input, expected);
         Ok(())
     }
@@ -1563,15 +1563,15 @@ mod tests {
     #[test]
     fn test_svd() -> Result<()> {
         let input = r"var x: T; svd x";
-        let expected = "x.svd()";
+        let expected = "x.svd().unwrap()";
         compiler_compare(input, expected);
 
         let input = r"~svd";
-        let expected = "| _x: ijzer :: tensor :: Tensor :: < _ > | _x.svd()";
+        let expected = "| _x: ijzer :: tensor :: Tensor :: < _ > | _x.svd().unwrap()";
         compiler_compare(input, expected);
 
         let input = r"var x: T; (u,s,v) = svd x";
-        let expected = "let (u , s , v) : (ijzer :: tensor :: Tensor :: < _ > , ijzer :: tensor :: Tensor :: < _ > , ijzer :: tensor :: Tensor :: < _ >) = x.svd () ;";
+        let expected = "let (u , s , v) : (ijzer :: tensor :: Tensor :: < _ > , ijzer :: tensor :: Tensor :: < _ > , ijzer :: tensor :: Tensor :: < _ >) = x.svd () . unwrap () ;";
         compiler_compare(input, expected);
         Ok(())
     }
