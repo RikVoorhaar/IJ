@@ -1,6 +1,14 @@
 use anyhow::{anyhow, Result};
 use itertools::Itertools;
-use num_traits::{Float, Num};
+use ndarray::{s, Array, Array2, ArrayBase, Dimension, IxDyn};
+
+use ndarray_linalg::qr::*;
+use ndarray_linalg::solve::*;
+use ndarray_linalg::svd::*;
+use ndarray_linalg::triangular::*;
+
+use ndarray_linalg::{Lapack, Scalar};
+use num_traits::{Float, Num, Zero};
 use rand::Rng;
 use std::fmt;
 use std::ops::{Index, IndexMut};
@@ -89,6 +97,16 @@ impl<T: Clone + Num> Tensor<T> {
             tensor[&vec![i; shape.len()]] = T::one();
         }
         tensor
+    }
+    pub fn diag(tensor: &Tensor<T>) -> Tensor<T> {
+        let shape_diag = [tensor.shape.clone(), tensor.shape.clone()].concat();
+        let mut result = Tensor::zeros(&shape_diag);
+        for i in 0..tensor.size() {
+            let index = tensor.flat_to_index(i);
+            let diag_index = [index.clone(), index.clone()].concat();
+            result[&diag_index] = tensor[&index].clone();
+        }
+        result
     }
     pub fn scalar(value: T) -> Tensor<T> {
         let shape = vec![1];
@@ -223,9 +241,9 @@ impl<T: Clone + Num> Tensor<T> {
         other: &Tensor<T>,
         f: impl Fn(&Tensor<T>) -> T,
         g: impl Fn(T, T) -> T,
-    ) -> Result<Tensor<T>, &'static str> {
+    ) -> Result<Tensor<T>> {
         if self.shape.last() != other.shape.first() {
-            return Err("Incompatible shapes for dot product");
+            return Err(anyhow!("Incompatible shapes for dot product"));
         }
         let left_shape = self.shape[..self.shape.len() - 1].to_vec();
         let right_shape = other.shape[1..].to_vec();
@@ -288,7 +306,151 @@ impl<T: Clone + Num> Tensor<T> {
 
         Ok(result)
     }
+    pub fn dot(&self, other: &Tensor<T>) -> Result<Tensor<T>> {
+        self.generalized_contraction(
+            other,
+            |x| x.reduce(|a, b| a + b).extract_scalar().unwrap(),
+            |a, b| a * b,
+        )
+    }
+    pub fn to_ndarray2(&self) -> Array2<T> {
+        let shape = self.shape.clone();
+        let shape2d = match shape.len() {
+            1 => (shape[0], 1),
+            2 => (shape[0], shape[1]),
+            _ => (shape[0], shape.iter().skip(1).product()),
+        };
+        let data = self.data.clone().into_vec();
+        Array2::from_shape_vec(shape2d, data).unwrap()
+    }
+    pub fn from_ndarray<D: Dimension>(array: ArrayBase<ndarray::OwnedRepr<T>, D>) -> Tensor<T> {
+        let shape = array.shape().to_vec();
+        let data = array.into_iter().collect::<Vec<T>>();
+        Tensor::new(data.into_boxed_slice(), shape)
+    }
+    pub fn to_ndarray(&self) -> Array<T, IxDyn> {
+        let shape = IxDyn(&self.shape);
+        let data = self.data.clone().into_vec();
+        Array::from_shape_vec(shape, data).unwrap()
+    }
 }
+impl<T: Num + Clone + Scalar + Lapack> Tensor<T> {
+    pub fn qr(&self) -> Result<(Tensor<T>, Tensor<T>)> {
+        let (q, r) = self.to_ndarray2().qr()?;
+
+        Ok((Tensor::from_ndarray(q), Tensor::from_ndarray(r)))
+    }
+    pub fn svd(&self) -> Result<(Tensor<T>, Tensor<T>, Tensor<T>)> {
+        let mat = self.to_ndarray2();
+        let (m, n) = mat.dim();
+        let min_dim = m.min(n);
+        let (u, s, vt) = mat.svd(true, true)?;
+        let s_converted = s.mapv(|x| T::from_real(x));
+        let u = u.unwrap().slice(s![..m, ..min_dim]).to_owned();
+        let vt = vt.unwrap().slice(s![..min_dim, ..n]).to_owned();
+
+        Ok((
+            Tensor::from_ndarray(u),
+            Tensor::from_ndarray(s_converted),
+            Tensor::from_ndarray(vt),
+        ))
+    }
+
+    pub fn solve(&self, other: &Tensor<T>) -> Result<Tensor<T>> {
+        let l_shape = self.shape[..self.shape.len() - 1].to_vec();
+        let l = l_shape.iter().product();
+        let m = *self.shape.last().unwrap();
+        let n = other.shape[l_shape.len()..].iter().product();
+        let mut a = self.clone();
+        a.reshape(&[l, m])?;
+        let mut b = other.clone();
+        b.reshape(&[l, n])?;
+        let x = match (l, m) {
+            (l, m) if l == m => matrix_solve_square(&a.to_ndarray2(), &b.to_ndarray2())?,
+            (l, m) if l > m => matrix_solve_overdetermined(&a.to_ndarray2(), &b.to_ndarray2())?,
+            (l, m) if l < m => matrix_solve_least_squares(&a.to_ndarray2(), &b.to_ndarray2())?,
+            _ => unreachable!(),
+        };
+        Ok(Tensor::from_ndarray(x))
+    }
+}
+
+// Solve a matrix equation of form A*X = B, where A is (l,m), B is (l,n), X is (m,n). Uses LU factorization, and assumes l=m (A is square)
+fn matrix_solve_square<T: Clone + Num + Scalar + Lapack>(
+    a: &Array2<T>,
+    b: &Array2<T>,
+) -> Result<Array2<T>> {
+    let (l, m) = a.dim();
+    let (ll, n) = b.dim();
+    if l != m {
+        return Err(anyhow!("Matrix A must be square"));
+    }
+    if l != ll {
+        return Err(anyhow!("Matrix A and B must have same number of rows"));
+    }
+    let lu = a.factorize()?;
+    let mut x = Array2::zeros((m, n));
+    for i in 0..n {
+        let b_col = b.column(i);
+        x.column_mut(i).assign(&lu.solve(&b_col)?);
+    }
+    Ok(x)
+}
+
+// Solve A*X = B, where A is (l,m), B is (l,n), X is (m,n). Uses QR factorization, and assumes l>m (A is tall / overdetermined)
+fn matrix_solve_overdetermined<T: Clone + Num + Scalar + Lapack>(
+    a: &Array2<T>,
+    b: &Array2<T>,
+) -> Result<Array2<T>> {
+    let (l, m) = a.dim();
+    let (ll, n) = b.dim();
+    if l < m {
+        return Err(anyhow!("Matrix A must have more rows than columns"));
+    }
+    if l != ll {
+        return Err(anyhow!("Matrix A and B must have same number of rows"));
+    }
+    let (q, r) = a.qr()?;
+    let b_orth = q.t().dot(b);
+    let mut x = Array2::zeros((m, n));
+    for i in 0..n {
+        let b_col = b_orth.column(i).to_owned();
+        x.column_mut(i)
+            .assign(&r.solve_triangular(UPLO::Upper, Diag::NonUnit, &b_col)?);
+    }
+    Ok(x)
+}
+
+// Solve A*X = B, where A is (l,m), B is (l,n), X is (m,n). Gives least square solution by solving normal equations using SVD to multiply by pseudoinverse
+fn matrix_solve_least_squares<T: Clone + Num + Scalar + Lapack>(
+    a: &Array2<T>,
+    b: &Array2<T>,
+) -> Result<Array2<T>> {
+    let (l, m) = a.dim();
+    let (ll, _) = b.dim();
+    if l > m {
+        return Err(anyhow!("Matrix A must have more columns than rows"));
+    }
+    if l != ll {
+        return Err(anyhow!("Matrix A and B must have same number of rows"));
+    }
+    let (u, s, vt) = a.svd(true, true)?;
+    let u = u.unwrap();
+    let vt = vt.unwrap();
+    // Take the first l rows of vt
+    let vt_truncated = vt.slice(s![..l, ..]);
+
+    let s_inv = s.mapv(|x| {
+        if x.is_zero() {
+            T::zero()
+        } else {
+            T::one() / T::from_real(x)
+        }
+    });
+    let s_inv_mat = Array2::from_diag(&s_inv);
+    Ok(vt_truncated.t().dot(&s_inv_mat.dot(&u.t().dot(b))))
+}
+
 impl<T: Clone + Float> Tensor<T> {
     pub fn randn(shape: &[usize]) -> Tensor<T> {
         let mut rng = rand::thread_rng();
@@ -374,6 +536,7 @@ impl<T: fmt::Display + Clone + Num> fmt::Display for Tensor<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use approx::assert_abs_diff_eq;
 
     #[test]
     fn test_tensor_zeros() {
@@ -767,5 +930,163 @@ mod tests {
             transposed_tensor.to_vec(),
             vec![1.0, 5.0, 3.0, 7.0, 2.0, 6.0, 4.0, 8.0]
         );
+    }
+
+    #[test]
+    fn test_to_ndarray2() {
+        let data = vec![1.0, 2.0, 3.0, 4.0];
+        let tensor = Tensor::from_vec(data.clone(), Some(vec![2, 2]));
+        let ndarray2 = tensor.to_ndarray2();
+        assert_eq!(ndarray2.shape(), &[2, 2]);
+        assert_eq!(
+            ndarray2.clone().into_iter().collect::<Vec<_>>(),
+            data.clone()
+        );
+        let tensor2 = Tensor::from_ndarray(ndarray2);
+        assert_eq!(tensor2.to_vec(), data);
+    }
+
+    #[test]
+    fn test_diag() {
+        let tensor = Tensor::from_vec(vec![1.0, 2.0], Some(vec![2]));
+        let diag = Tensor::diag(&tensor);
+        assert_eq!(diag.shape(), &vec![2, 2]);
+        assert_eq!(diag.to_vec(), vec![1.0, 0.0, 0.0, 2.0]);
+
+        let tensor = Tensor::from_vec(vec![1.0, 2.0], Some(vec![2, 1]));
+        let diag = Tensor::diag(&tensor);
+        assert_eq!(diag.shape(), &vec![2, 1, 2, 1]);
+        assert_eq!(diag.to_vec(), vec![1.0, 0.0, 0.0, 2.0]);
+    }
+
+    #[test]
+    fn test_qr() -> Result<()> {
+        let input = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0];
+        let tensor = Tensor::from_vec(input.clone(), Some(vec![3, 3]));
+        let (q, r) = tensor.qr().unwrap();
+        println!("{:?}", q.to_vec());
+        println!("{:?}", r.to_vec());
+        let result = q.dot(&r)?;
+        for (a, b) in result.to_vec().iter().zip(input.iter()) {
+            assert_abs_diff_eq!(a, b, epsilon = 1e-6);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_svd() -> Result<()> {
+        let input = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0];
+        let tensor = Tensor::from_vec(input.clone(), Some(vec![3, 3]));
+        let (u, s, vt) = tensor.svd()?;
+        let s_diag = Tensor::diag(&s);
+        let result = u.dot(&s_diag)?.dot(&vt)?;
+        for (a, b) in result.to_vec().iter().zip(input.iter()) {
+            assert_abs_diff_eq!(a, b, epsilon = 1e-6);
+        }
+
+        let input = vec![
+            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0,
+        ];
+        let tensor = Tensor::from_vec(input.clone(), Some(vec![3, 4]));
+        let (u, s, vt) = tensor.svd()?;
+        let s_diag = Tensor::diag(&s);
+        let result = u.dot(&s_diag)?.dot(&vt)?;
+        for (a, b) in result.to_vec().iter().zip(input.iter()) {
+            assert_abs_diff_eq!(a, b, epsilon = 1e-6);
+        }
+
+        let input = vec![
+            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0,
+        ];
+        let tensor = Tensor::from_vec(input.clone(), Some(vec![4, 3]));
+        let (u, s, vt) = tensor.svd()?;
+        let s_diag = Tensor::diag(&s);
+        let result = u.dot(&s_diag)?.dot(&vt)?;
+        for (a, b) in result.to_vec().iter().zip(input.iter()) {
+            assert_abs_diff_eq!(a, b, epsilon = 1e-6);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_solve() -> Result<()> {
+        let a = Tensor::<f64>::randn(&[3, 3]);
+        let x = Tensor::<f64>::randn(&[3, 4]);
+        let b = a.clone().dot(&x)?;
+        let x_sol = a.solve(&b)?;
+        let result = a.dot(&x_sol)?;
+        for (x_sol_, x_) in x_sol.to_vec().iter().zip(x.to_vec().iter()) {
+            assert_abs_diff_eq!(x_sol_, x_, epsilon = 1e-6);
+        }
+        for (r, b_) in result.to_vec().iter().zip(b.to_vec().iter()) {
+            assert_abs_diff_eq!(r, b_, epsilon = 1e-6);
+        }
+
+        let a = Tensor::<f64>::randn(&[4, 3]);
+        let x = Tensor::<f64>::randn(&[3, 5]);
+        let b = a.clone().dot(&x)?;
+        let x_sol = a.solve(&b)?;
+        let result = a.dot(&x_sol)?;
+        for (x_sol_, x_) in x_sol.to_vec().iter().zip(x.to_vec().iter()) {
+            assert_abs_diff_eq!(x_sol_, x_, epsilon = 1e-6);
+        }
+        for (r, b_) in result.to_vec().iter().zip(b.to_vec().iter()) {
+            assert_abs_diff_eq!(r, b_, epsilon = 1e-6);
+        }
+
+        let a = Tensor::<f64>::randn(&[3, 4]);
+        let x = Tensor::<f64>::randn(&[4, 5]);
+        let b = a.clone().dot(&x)?;
+        let x_sol = a.solve(&b)?;
+        let result = a.dot(&x_sol)?;
+        for (r, b_) in result.to_vec().iter().zip(b.to_vec().iter()) {
+            assert_abs_diff_eq!(r, b_, epsilon = 1e-6);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_solve_square() -> Result<()> {
+        let a = Tensor::<f64>::randn(&[3, 3]).to_ndarray2();
+        let x = Tensor::<f64>::randn(&[3, 4]).to_ndarray2();
+        let b = a.dot(&x);
+        let x_sol = matrix_solve_square(&a, &b)?;
+        let result = a.dot(&x_sol);
+        for (x_sol_, x_) in x_sol.iter().zip(x.iter()) {
+            assert_abs_diff_eq!(x_sol_, x_, epsilon = 1e-6);
+        }
+        for (r, b_) in result.iter().zip(b.iter()) {
+            assert_abs_diff_eq!(r, b_, epsilon = 1e-6);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_solve_overdetermined() -> Result<()> {
+        let a = Tensor::<f64>::randn(&[4, 3]).to_ndarray2();
+        let x = Tensor::<f64>::randn(&[3, 5]).to_ndarray2();
+        let b = a.dot(&x);
+        let x_sol = matrix_solve_overdetermined(&a, &b)?;
+        let result = a.dot(&x_sol);
+        for (x_sol_, x_) in x_sol.iter().zip(x.iter()) {
+            assert_abs_diff_eq!(x_sol_, x_, epsilon = 1e-6);
+        }
+        for (r, b_) in result.iter().zip(b.iter()) {
+            assert_abs_diff_eq!(r, b_, epsilon = 1e-6);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_solve_least_squares() -> Result<()> {
+        let a = Tensor::<f64>::randn(&[3, 5]).to_ndarray2();
+        let x = Tensor::<f64>::randn(&[5, 2]).to_ndarray2();
+        let b = a.dot(&x);
+        let x_sol = matrix_solve_least_squares(&a, &b)?;
+        let result = a.dot(&x_sol);
+        for (r, b_) in result.iter().zip(b.iter()) {
+            assert_abs_diff_eq!(r, b_, epsilon = 1e-6);
+        }
+        Ok(())
     }
 }

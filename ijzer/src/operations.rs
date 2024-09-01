@@ -27,6 +27,10 @@ pub enum Operation {
     TensorBuilder(String),
     Transpose,
     Shape,
+    QR,
+    Svd,
+    Solve,
+    Diag,
 }
 
 impl Debug for Operation {
@@ -55,6 +59,10 @@ impl Debug for Operation {
             Self::TensorBuilder(s) => write!(f, "TensorBuilder({})", s),
             Self::Transpose => write!(f, "Transpose"),
             Self::Shape => write!(f, "Shape"),
+            Self::QR => write!(f, "qr"),
+            Self::Svd => write!(f, "svd"),
+            Self::Solve => write!(f, r"\"),
+            Self::Diag => write!(f, "diag"),
         }
     }
 }

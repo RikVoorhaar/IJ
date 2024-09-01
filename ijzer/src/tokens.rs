@@ -237,6 +237,18 @@ pub enum Token {
 
     #[token("%")]
     Shape,
+
+    #[token("qr")]
+    QR,
+
+    #[token("svd")]
+    SVD,
+
+    #[token(r"\")]
+    Solve,
+
+    #[token("diag")]
+    Diag,
 }
 
 impl Display for Token {
@@ -276,6 +288,10 @@ impl Display for Token {
             Self::TensorBuilder(s) => write!(f, "{}", s),
             Self::Transpose => write!(f, "|"),
             Self::Shape => write!(f, "%"),
+            Self::QR => write!(f, "qr"),
+            Self::SVD => write!(f, "svd"),
+            Self::Solve => write!(f, r"\"),
+            Self::Diag => write!(f, "diag"),
         }
     }
 }

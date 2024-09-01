@@ -9,6 +9,8 @@ proc-macro2 = "1.0.78"
 quote = "1.0.35"
 regex = "1.10.3"
 syn = {version="2.0.52", features = ["full"]}
+anyhow = "1.0.86"
+approx = "0.5.1"
 
 [lib]
 proc-macro = true
