@@ -1,6 +1,9 @@
 // extern crate ijzer_macro;
 use ijzer::tensor::Tensor;
 use ijzer_macro::ijzer;
+use anyhow::Result;
+use approx::assert_abs_diff_eq;
+
 
 #[test]
 fn test_identity() {
@@ -398,3 +401,104 @@ fn test_group_return() {
     let y = _test_group_return();
     assert_eq!(y.to_vec(), expected.to_vec());
 }
+
+#[test]
+fn test_qr()->Result<()> {
+    #[ijzer]
+    fn _test_qr(x: Tensor<f64>) -> (Tensor<f64>, Tensor<f64>) {
+        r#"
+        var x: T<f64>
+        (q,r) = qr x
+        (q,r)
+        "#
+    }
+
+    let x = Tensor::from_vec(vec![1.0, 2.0, 3.0, 4.0], Some(vec![2, 2]));
+    let (q, r) = _test_qr(x.clone());
+    let (q_real, r_real) = x.qr()?;
+    assert_eq!(q.to_vec(), q_real.to_vec());
+    assert_eq!(r.to_vec(), r_real.to_vec());
+
+    Ok(())
+}
+
+#[test]
+fn test_svd()->Result<()> {
+    #[ijzer]
+    fn _test_svd(x: Tensor<f64>) -> (Tensor<f64>, Tensor<f64>, Tensor<f64>) {
+        r#"
+        var x: T<f64>
+        (u,s,vt) = svd x
+        (u,s,vt)
+        "#
+    }
+
+    let x = Tensor::from_vec(vec![1.0, 2.0, 3.0, 4.0], Some(vec![2, 2]));
+    let (u,s,vt) = _test_svd(x.clone());
+    let (u_real, s_real, vt_real) = x.svd()?;
+    assert_eq!(u.to_vec(), u_real.to_vec());
+    assert_eq!(s.to_vec(), s_real.to_vec());
+    assert_eq!(vt.to_vec(), vt_real.to_vec());
+
+    Ok(())
+}
+
+#[test]
+fn test_solve()->Result<()> {
+    #[ijzer]
+    fn _test_solve(a: Tensor<f64>, b: Tensor<f64>) -> Tensor<f64> {
+        r#"
+        var a: T<f64>
+        var b: T<f64>
+        \ a b
+        "#
+    }
+
+    let a = Tensor::from_vec(vec![1.0, 2.0, 3.0, 4.0], Some(vec![2, 2]));
+    let b = Tensor::from_vec(vec![5.0, 6.0], Some(vec![2]));
+    let x = _test_solve(a.clone(), b.clone());
+    let x_real = a.solve(&b)?;
+    assert_eq!(x.to_vec(), x_real.to_vec());
+
+    Ok(())
+}
+
+#[test]
+fn test_diag()->Result<()> {
+    #[ijzer]
+    fn _test_diag(x: Tensor<f64>) -> Tensor<f64> {
+        r#"
+        var x: T<f64>
+        diag x
+        "#
+    }
+
+    let x = Tensor::from_vec(vec![1.0, 2.0, 3.0, 4.0], Some(vec![2, 2]));
+    let d = _test_diag(x.clone());
+    let d_real = Tensor::diag(&x);
+    assert_eq!(d.to_vec(), d_real.to_vec());
+
+    Ok(())
+}
+
+#[test]
+fn test_svd_diag_mul() -> Result<()> {
+    #[ijzer]
+    fn _test_svd_diag_mul(x: Tensor<f64>) -> Tensor<f64> {
+        r#"
+        var x: T<f64>
+        (u,s,vt) = svd x
+        sd = diag s
+        ?/+* ?/+* u sd vt
+        "#
+    }
+
+    let x = Tensor::from_vec(vec![1.0, 2.0, 3.0, 4.0], Some(vec![2, 2]));
+    let y = _test_svd_diag_mul(x.clone());
+    for (a, b) in y.to_vec().iter().zip(x.to_vec().iter()) {
+        assert_abs_diff_eq!(a, b, epsilon = 1e-6);
+    }
+
+    Ok(())
+}
+    
