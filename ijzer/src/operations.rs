@@ -31,6 +31,7 @@ pub enum Operation {
     Svd,
     Solve,
     Diag,
+    Index,
 }
 
 impl Debug for Operation {
@@ -63,6 +64,7 @@ impl Debug for Operation {
             Self::Svd => write!(f, "svd"),
             Self::Solve => write!(f, r"\"),
             Self::Diag => write!(f, "diag"),
+            Self::Index => write!(f, "<|"),
         }
     }
 }

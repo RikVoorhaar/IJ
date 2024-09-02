@@ -78,6 +78,9 @@ use solve::Solve;
 mod diag;
 use diag::Diag;
 
+mod index;
+use index::Index;
+
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
@@ -132,6 +135,7 @@ pub fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node
         Token::SVD => Svd::next_node(op.clone(), rest, context),
         Token::QR => QR::next_node(op.clone(), rest, context),
         Token::Diag => Diag::next_node(op.clone(), rest, context),
+        Token::Index => Index::next_node(op.clone(), rest, context),
         _ => Err(SyntaxError::UnexpectedToken(op.clone()).into()),
     }
 }

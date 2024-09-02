@@ -249,6 +249,9 @@ pub enum Token {
 
     #[token("diag")]
     Diag,
+
+    #[token("<|")]
+    Index,
 }
 
 impl Display for Token {
@@ -292,6 +295,7 @@ impl Display for Token {
             Self::SVD => write!(f, "svd"),
             Self::Solve => write!(f, r"\"),
             Self::Diag => write!(f, "diag"),
+            Self::Index => write!(f, ">"),
         }
     }
 }

@@ -152,4 +152,10 @@ pub enum SyntaxError {
 
     #[error("Expected group output, but got type {0}")]
     ExpectedGroupOutput(String),
+
+    #[error("Expected [ token after index operator")]
+    ExpectedLSqBracketAfterIndex,
+
+    #[error("Indexing must either be a tensor or a list of numbers.")]
+    IndexingMustBeTensorOrNumbers,
 }
