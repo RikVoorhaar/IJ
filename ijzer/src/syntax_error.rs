@@ -158,4 +158,7 @@ pub enum SyntaxError {
 
     #[error("Indexing must either be a tensor or a list of numbers.")]
     IndexingMustBeTensorOrNumbers,
+
+    #[error("Cannot mix tensor and colon in indexing")]
+    CannotMixTensorAndColon,
 }

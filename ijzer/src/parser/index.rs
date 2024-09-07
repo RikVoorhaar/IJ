@@ -69,6 +69,16 @@ impl ParseNode for Index {
             n.output_type
                 .type_match(&IJType::Scalar(Some("usize".to_string())))
         });
+        let contains_colon = index_operands
+            .iter()
+            .any(|n| n.output_type.type_match(&IJType::Void));
+        let contains_tensor = index_operands
+            .iter()
+            .any(|n| n.output_type.type_match(&IJType::Tensor(None)));
+        if contains_tensor && contains_colon {
+            return Err(context
+                .add_context_to_syntax_error(SyntaxError::CannotMixTensorAndColon.into(), slice));
+        }
         let all_operands = [vec![tensor_operand.clone()], index_operands.clone()].concat();
         let node = if is_all_numbers {
             Rc::new(Node::new(
@@ -130,14 +140,37 @@ mod tests {
     }
 
     #[test]
-    fn test_colon_tensor() -> Result<()> {
-        let (node, _) = parse_str_no_context("<| [[0,1],[2,3]] [:,[0,1]]")?;
+    fn test_scalar_tensor() -> Result<()> {
+        let (node, _) = parse_str_no_context("<| [[0,1],[2,3]] [0,[0,1]]")?;
         assert_eq!(node.op, Operation::Index);
         assert_eq!(
             node.input_types,
             vec![IJType::Tensor(None), IJType::Void, IJType::Tensor(None)]
         );
         assert_eq!(node.output_type, IJType::Tensor(None));
+        Ok(())
+    }
+
+    #[test]
+    fn test_tensor_colon() -> Result<()> {
+        let res = parse_str_no_context("<| [[0,1],[2,3]] [[0,1],:]");
+        assert!(res.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_with_types() -> Result<()> {
+        let (node, _) = parse_str_no_context("<| [[0,1],[2,3]]<i64> [0<usize>,1<usize>]")?;
+        assert_eq!(node.op, Operation::Index);
+        assert_eq!(
+            node.input_types,
+            vec![
+                IJType::Tensor(Some("i64".to_string())),
+                IJType::Scalar(Some("usize".to_string())),
+                IJType::Scalar(Some("usize".to_string()))
+            ]
+        );
+        assert_eq!(node.output_type, IJType::Scalar(Some("i64".to_string())));
         Ok(())
     }
 }
