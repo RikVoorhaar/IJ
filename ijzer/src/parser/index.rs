@@ -22,8 +22,9 @@ impl ParseNode for Index {
             gather_operands(vec![vec![IJType::Tensor(None)]], slice, context)?;
         let tensor_operand = tensor_operands[0].clone();
 
-        let rest = rest.move_start(1)?;
         let next_token = context.get_token_at_index(rest.start)?;
+        let rest = rest.move_start(1)?;
+        println!("next_token: {:?}", next_token);
         if !matches!(next_token, Token::LSqBracket) {
             return Err(context.add_context_to_syntax_error(
                 SyntaxError::ExpectedLSqBracketAfterIndex.into(),
@@ -36,45 +37,44 @@ impl ParseNode for Index {
         let rest = rest.move_start(inside_size + 1)?;
 
         let slices = comma_separate(inside_slice, context)?;
-        let index_operands = match slices.len() {
-            1 => {
-                gather_operands(
-                    vec![
-                        vec![IJType::Tensor(Some("usize".to_string()))],
-                        vec![IJType::Number(Some("usize".to_string()))],
-                    ],
-                    slices[0],
-                    context,
-                )?
-                .0
+        let mut index_operands: Vec<Rc<Node>> = vec![];
+        for operand_slice in slices {
+            if operand_slice.is_empty() {
+                return Err(context
+                    .add_context_to_syntax_error(SyntaxError::EmptySlice.into(), inside_slice));
             }
-            _ => slices
-                .into_iter()
-                .map(|slice| {
-                    gather_operands(
-                        vec![vec![IJType::Number(Some("usize".to_string()))]],
-                        slice,
-                        context,
-                    )
-                    .map(|(operands, _)| operands)
-                })
-                .collect::<Result<Vec<_>>>()?
-                .into_iter()
-                .flatten()
-                .collect::<Vec<_>>(),
-        };
-        let is_all_numbers = index_operands
-            .iter()
-            .all(|n| n.output_type.type_match(&IJType::Number(None)));
-        let all_operands = vec![vec![tensor_operand.clone()], index_operands.clone()].concat();
+            let first_token = context.get_token_at_index(operand_slice.start)?;
+            if matches!(first_token, Token::TypeDeclaration) {
+                let node = Rc::new(Node::new(
+                    Operation::Nothing,
+                    vec![],
+                    IJType::Void,
+                    vec![],
+                    context,
+                )?);
+                index_operands.push(node);
+            } else {
+                let (node, _) = gather_operands(
+                    vec![
+                        vec![IJType::Scalar(Some("usize".to_string()))],
+                        vec![IJType::Tensor(Some("usize".to_string()))],
+                    ],
+                    operand_slice,
+                    context,
+                )?;
+                index_operands.push(node[0].clone());
+            }
+        }
+        let is_all_numbers = index_operands.iter().all(|n| {
+            n.output_type
+                .type_match(&IJType::Scalar(Some("usize".to_string())))
+        });
+        let all_operands = [vec![tensor_operand.clone()], index_operands.clone()].concat();
         let node = if is_all_numbers {
             Rc::new(Node::new(
                 Operation::Index,
-                index_operands
-                    .iter()
-                    .map(|n| n.output_type.clone())
-                    .collect(),
-                IJType::Number(
+                all_operands.iter().map(|n| n.output_type.clone()).collect(),
+                IJType::Scalar(
                     tensor_operand
                         .output_type
                         .extract_number_type()
@@ -84,12 +84,6 @@ impl ParseNode for Index {
                 context,
             )?)
         } else {
-            if index_operands.len() != 1 {
-                return Err(context.add_context_to_syntax_error(
-                    SyntaxError::IndexingMustBeTensorOrNumbers.into(),
-                    slice,
-                ));
-            }
             Rc::new(Node::new(
                 Operation::Index,
                 all_operands.iter().map(|n| n.output_type.clone()).collect(),
@@ -99,5 +93,51 @@ impl ParseNode for Index {
             )?)
         };
         Ok((node, rest))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::parse_str_no_context;
+
+    #[test]
+    fn test_all_numbers() -> Result<()> {
+        let (node, _) = parse_str_no_context("<| [[0,1],[2,3]] [0,1]")?;
+        assert_eq!(node.op, Operation::Index);
+        assert_eq!(
+            node.input_types,
+            vec![
+                IJType::Tensor(None),
+                IJType::Scalar(None),
+                IJType::Scalar(None)
+            ]
+        );
+        assert_eq!(node.output_type, IJType::Scalar(None));
+        Ok(())
+    }
+
+    #[test]
+    fn test_numbers_and_colon() -> Result<()> {
+        let (node, _) = parse_str_no_context("<| [[0,1],[2,3]] [0,:]")?;
+        assert_eq!(node.op, Operation::Index);
+        assert_eq!(
+            node.input_types,
+            vec![IJType::Tensor(None), IJType::Scalar(None), IJType::Void]
+        );
+        assert_eq!(node.output_type, IJType::Tensor(None));
+        Ok(())
+    }
+
+    #[test]
+    fn test_colon_tensor() -> Result<()> {
+        let (node, _) = parse_str_no_context("<| [[0,1],[2,3]] [:,[0,1]]")?;
+        assert_eq!(node.op, Operation::Index);
+        assert_eq!(
+            node.input_types,
+            vec![IJType::Tensor(None), IJType::Void, IJType::Tensor(None)]
+        );
+        assert_eq!(node.output_type, IJType::Tensor(None));
+        Ok(())
     }
 }
