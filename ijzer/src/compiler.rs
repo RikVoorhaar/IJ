@@ -184,7 +184,7 @@ impl CompilerContext {
             Operation::Svd => Svd::compile(node, self, child_streams)?,
             Operation::Solve => Solve::compile(node, self, child_streams)?,
             Operation::Diag => Diag::compile(node, self, child_streams)?,
-            // _ => NotImplemented::compile(node, self, child_streams)?,
+            _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
         Ok(stream)
