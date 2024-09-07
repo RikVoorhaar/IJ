@@ -237,8 +237,6 @@ impl<T: Clone + Num> Tensor<T> {
                 broadcast_shapes(&acc, &t).ok_or(anyhow!("Index shapes cannot be broadcasted"))
             })?;
         let mut output = Tensor::zeros(&shape);
-        println!("shape: {:?}", shape);
-        println!("self.shape: {:?}", self.shape);
 
         for idx in shape.iter().map(|&s| 0..s).multi_cartesian_product() {
             let mut index = Vec::new();
@@ -251,7 +249,6 @@ impl<T: Clone + Num> Tensor<T> {
                     .collect::<Vec<_>>();
                 index.push(index_tensor[&index_tensor_idx]);
             }
-            println!("index: {:?}", index);
 
             output[&idx] = self[&index].clone();
         }
@@ -1117,7 +1114,7 @@ mod tests {
         let tensor = Tensor::from_vec(vec![1.0, 2.0, 3.0, 4.0], Some(vec![2, 2]));
         let indices = vec![
             Tensor::from_vec(vec![0, 1], Some(vec![2])),
-            Tensor::from_vec(vec![1], Some(vec![1,1])),
+            Tensor::from_vec(vec![1], Some(vec![1, 1])),
         ];
         let result = tensor.multi_index(indices)?;
         assert_eq!(result.to_vec(), vec![2.0, 4.0]);

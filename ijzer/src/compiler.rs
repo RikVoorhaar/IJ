@@ -184,7 +184,8 @@ impl CompilerContext {
             Operation::Svd => Svd::compile(node, self, child_streams)?,
             Operation::Solve => Solve::compile(node, self, child_streams)?,
             Operation::Diag => Diag::compile(node, self, child_streams)?,
-            _ => NotImplemented::compile(node, self, child_streams)?,
+            Operation::Index => Index::compile(node, self, child_streams)?,
+            // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
         Ok(stream)
@@ -1168,6 +1169,62 @@ impl CompileNode for Diag {
             _ => {
                 panic!("Expected 1 operand for Diag, found {}", node.operands.len());
             }
+        }
+    }
+}
+
+struct Index;
+impl CompileNode for Index {
+    fn compile(
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        let tensor_operand = node.operands[0].clone();
+        let tensor_stream = child_streams.get(&tensor_operand.id).unwrap().clone();
+
+        let index_operands = &node.operands[1..];
+        let all_numbers = index_operands.iter().all(|n| {
+            n.output_type
+                .type_match(&IJType::Scalar(Some("usize".to_string())))
+        });
+        let contains_colon = index_operands
+            .iter()
+            .any(|n| n.output_type.type_match(&IJType::Void));
+
+        let tensor_t = annotation_from_type(&tensor_operand.output_type)?;
+        match (all_numbers, contains_colon) {
+            (true, _) => {
+                let index_operands_stream = index_operands
+                    .iter()
+                    .map(|n| child_streams.get(&n.id).unwrap().clone())
+                    .collect::<Vec<TokenStream>>();
+                let index_operands_stream = index_operands_stream
+                    .iter()
+                    .map(|n| quote! {#n.extract_scalar().unwrap()})
+                    .collect::<Vec<TokenStream>>();
+                Ok(quote! {
+                    #tensor_t::scalar(#tensor_stream[&vec![#(#index_operands_stream),*]].clone())
+                })
+            }
+            (false, true) => {
+                let mut index_operands_streams = vec![];
+                for index_operand in index_operands {
+                    match index_operand.output_type {
+                        IJType::Scalar(_) => {
+                            let stream = child_streams.get(&index_operand.id).unwrap().clone();
+                            index_operands_streams
+                                .push(quote! {Some(#stream.extract_scalar().unwrap())});
+                        }
+                        IJType::Void => index_operands_streams.push(quote! {None}),
+                        _ => unreachable!(),
+                    }
+                }
+                Ok(quote! {
+                    #tensor_t::sub_tensor(vec![#(#index_operands_streams),*])
+                })
+            }
+            (false, false) => Err(anyhow::anyhow!("Still need to implement this case. Here we use multi_index")),
         }
     }
 }
