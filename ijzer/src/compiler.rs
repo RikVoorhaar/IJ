@@ -1221,7 +1221,7 @@ impl CompileNode for Index {
                     }
                 }
                 Ok(quote! {
-                    #tensor_t::sub_tensor(vec![#(#index_operands_streams),*]).unwrap()
+                    #tensor_stream.sub_tensor(vec![#(#index_operands_streams),*]).unwrap()
                 })
             }
             (false, false) => {
@@ -1230,7 +1230,7 @@ impl CompileNode for Index {
                     .map(|n| child_streams.get(&n.id).unwrap().clone())
                     .collect::<Vec<TokenStream>>();
                 Ok(quote! {
-                    #tensor_t::multi_index(vec![#(#index_operands_streams),*]).unwrap()
+                    #tensor_stream.multi_index(vec![#(#index_operands_streams),*]).unwrap()
                 })
             }
         }
@@ -1669,12 +1669,11 @@ mod tests {
         compiler_compare(input, expected);
 
         let input = r"var x: T; <| x [1,:]";
-        let expected = "ijzer :: tensor :: Tensor :: < _ > :: sub_tensor (vec ! [Some (ijzer :: tensor :: Tensor :: < _ > :: scalar (1) . extract_scalar () . unwrap ()) , None]).unwrap()";
+        let expected = "x.sub_tensor (vec ! [Some (ijzer :: tensor :: Tensor :: < _ > :: scalar (1) . extract_scalar () . unwrap ()) , None]).unwrap()";
         compiler_compare(input, expected);
 
         let input = r"var x: T; var s1: T; var s2: T; <| x [s1,s2]";
-        let expected =
-            "ijzer :: tensor :: Tensor :: < _ > :: multi_index (vec ! [s1 , s2]).unwrap()";
+        let expected = "x.multi_index (vec ! [s1 , s2]).unwrap()";
         compiler_compare(input, expected);
 
         Ok(())

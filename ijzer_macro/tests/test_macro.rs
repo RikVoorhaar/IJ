@@ -1,9 +1,8 @@
 // extern crate ijzer_macro;
-use ijzer::tensor::Tensor;
-use ijzer_macro::ijzer;
 use anyhow::Result;
 use approx::assert_abs_diff_eq;
-
+use ijzer::tensor::Tensor;
+use ijzer_macro::ijzer;
 
 #[test]
 fn test_identity() {
@@ -403,7 +402,7 @@ fn test_group_return() {
 }
 
 #[test]
-fn test_qr()->Result<()> {
+fn test_qr() -> Result<()> {
     #[ijzer]
     fn _test_qr(x: Tensor<f64>) -> (Tensor<f64>, Tensor<f64>) {
         r#"
@@ -423,7 +422,7 @@ fn test_qr()->Result<()> {
 }
 
 #[test]
-fn test_svd()->Result<()> {
+fn test_svd() -> Result<()> {
     #[ijzer]
     fn _test_svd(x: Tensor<f64>) -> (Tensor<f64>, Tensor<f64>, Tensor<f64>) {
         r#"
@@ -434,7 +433,7 @@ fn test_svd()->Result<()> {
     }
 
     let x = Tensor::from_vec(vec![1.0, 2.0, 3.0, 4.0], Some(vec![2, 2]));
-    let (u,s,vt) = _test_svd(x.clone());
+    let (u, s, vt) = _test_svd(x.clone());
     let (u_real, s_real, vt_real) = x.svd()?;
     assert_eq!(u.to_vec(), u_real.to_vec());
     assert_eq!(s.to_vec(), s_real.to_vec());
@@ -444,7 +443,7 @@ fn test_svd()->Result<()> {
 }
 
 #[test]
-fn test_solve()->Result<()> {
+fn test_solve() -> Result<()> {
     #[ijzer]
     fn _test_solve(a: Tensor<f64>, b: Tensor<f64>) -> Tensor<f64> {
         r#"
@@ -464,7 +463,7 @@ fn test_solve()->Result<()> {
 }
 
 #[test]
-fn test_diag()->Result<()> {
+fn test_diag() -> Result<()> {
     #[ijzer]
     fn _test_diag(x: Tensor<f64>) -> Tensor<f64> {
         r#"
@@ -501,4 +500,45 @@ fn test_svd_diag_mul() -> Result<()> {
 
     Ok(())
 }
-    
+
+#[test]
+fn test_indexing() {
+    #[ijzer]
+    fn _test_indexing_scalar(x: Tensor<i64>) -> Tensor<i64> {
+        r#"
+        var x: T<i64>
+        <|x[0,0]
+        "#
+    }
+
+    let x = Tensor::from_vec(vec![1, 2, 3, 4], Some(vec![2, 2]));
+    let y = _test_indexing_scalar(x.clone());
+    assert_eq!(y.to_vec(), vec![1]);
+
+    #[ijzer]
+    fn _test_indexing_tensor(x: Tensor<i64>) -> Tensor<i64> {
+        r#"
+        var x: T<i64>
+        y1 = [0]
+        y2 = [0,1]
+        <|x[y1,y2]
+        "#
+    }
+
+    let x = Tensor::from_vec(vec![1, 2, 3, 4], Some(vec![2, 2]));
+    let y = _test_indexing_tensor(x.clone());
+    assert_eq!(y.to_vec(), vec![1, 2]);
+
+
+    #[ijzer]
+    fn _test_indexing_sub_tensor(x: Tensor<i64>) -> Tensor<i64> {
+        r#"
+        var x: T<i64>
+        <|x[0,:]
+        "#
+    }
+
+    let x = Tensor::from_vec(vec![1, 2, 3, 4], Some(vec![2, 2]));
+    let y = _test_indexing_tensor(x.clone());
+    assert_eq!(y.to_vec(), vec![1, 2]);
+}
