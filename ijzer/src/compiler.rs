@@ -1221,10 +1221,18 @@ impl CompileNode for Index {
                     }
                 }
                 Ok(quote! {
-                    #tensor_t::sub_tensor(vec![#(#index_operands_streams),*])
+                    #tensor_t::sub_tensor(vec![#(#index_operands_streams),*]).unwrap()
                 })
             }
-            (false, false) => Err(anyhow::anyhow!("Still need to implement this case. Here we use multi_index")),
+            (false, false) => {
+                let index_operands_streams = index_operands
+                    .iter()
+                    .map(|n| child_streams.get(&n.id).unwrap().clone())
+                    .collect::<Vec<TokenStream>>();
+                Ok(quote! {
+                    #tensor_t::multi_index(vec![#(#index_operands_streams),*]).unwrap()
+                })
+            }
         }
     }
 }
@@ -1649,6 +1657,24 @@ mod tests {
         let input = r"var x: T; y = diag x";
         let expected =
             "let y: ijzer :: tensor :: Tensor :: < _ > = ijzer::tensor::Tensor::<_>::diag(&x);";
+        compiler_compare(input, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_multi_index() -> Result<()> {
+        let input = r"var x: T; <| x [1,2]";
+        let expected = "ijzer::tensor::Tensor::<_>::scalar(x[&vec![ijzer::tensor::Tensor::<_>::scalar(1).extract_scalar().unwrap(),ijzer::tensor::Tensor::<_>::scalar(2).extract_scalar().unwrap()]].clone())";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; <| x [1,:]";
+        let expected = "ijzer :: tensor :: Tensor :: < _ > :: sub_tensor (vec ! [Some (ijzer :: tensor :: Tensor :: < _ > :: scalar (1) . extract_scalar () . unwrap ()) , None]).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var s1: T; var s2: T; <| x [s1,s2]";
+        let expected =
+            "ijzer :: tensor :: Tensor :: < _ > :: multi_index (vec ! [s1 , s2]).unwrap()";
         compiler_compare(input, expected);
 
         Ok(())

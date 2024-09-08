@@ -1,13 +1,10 @@
-use super::{
-    check_ok_needed_outputs, comma_separate, find_matching_parenthesis, gather_operands, ParseNode,
-    ParseNodeFunctional,
-};
+use super::{comma_separate, find_matching_parenthesis, gather_operands, ParseNode};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
-use crate::types::{FunctionSignature, IJType};
+use crate::types::IJType;
 use anyhow::Result;
 use std::rc::Rc;
 
@@ -145,7 +142,11 @@ mod tests {
         assert_eq!(node.op, Operation::Index);
         assert_eq!(
             node.input_types,
-            vec![IJType::Tensor(None), IJType::Void, IJType::Tensor(None)]
+            vec![
+                IJType::Tensor(None),
+                IJType::Scalar(None),
+                IJType::Tensor(None)
+            ]
         );
         assert_eq!(node.output_type, IJType::Tensor(None));
         Ok(())
