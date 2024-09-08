@@ -332,6 +332,17 @@ impl<T: Clone + Num> Tensor<T> {
             |a, b| a * b,
         )
     }
+
+    /// Concatenates a list of tensors of the same shape along a new axis
+    pub fn from_tensors(tensors: &[Tensor<T>]) -> Result<Tensor<T>> {
+        let item_shape = tensors.iter().next().unwrap().shape.clone();
+        if !tensors.iter().skip(1).all(|t| t.shape == item_shape) {
+            return Err(anyhow!("All tensors must have the same shape"));
+        }
+        let data = tensors.iter().flat_map(|t| t.data.clone()).collect();
+        let shape = [vec![tensors.len()], item_shape.clone()].concat();
+        Ok(Tensor::new(data, shape))
+    }
     pub fn to_ndarray2(&self) -> Array2<T> {
         let shape = self.shape.clone();
         let shape2d = match shape.len() {
@@ -1118,6 +1129,19 @@ mod tests {
         ];
         let result = tensor.multi_index(indices)?;
         assert_eq!(result.to_vec(), vec![2.0, 4.0]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_from_tensors() -> Result<()> {
+        let tensors = vec![
+            Tensor::from_vec(vec![1.0, 2.0], Some(vec![2])),
+            Tensor::from_vec(vec![3.0, 4.0], Some(vec![2])),
+            Tensor::from_vec(vec![5.0, 6.0], Some(vec![2])),
+        ];
+        let result = Tensor::from_tensors(&tensors)?;
+        assert_eq!(result.shape(), &vec![3, 2]);
+        assert_eq!(result.to_vec(), vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
         Ok(())
     }
 }
