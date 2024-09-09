@@ -17,9 +17,9 @@ pub fn next_node_simple_binary_op(
 ) -> Result<(Rc<Node>, TokenSlice)> {
     let types = vec![
         vec![IJType::Tensor(None), IJType::Tensor(None)],
-        vec![IJType::Scalar(None), IJType::Tensor(None)],
-        vec![IJType::Tensor(None), IJType::Scalar(None)],
-        vec![IJType::Scalar(None), IJType::Scalar(None)],
+        vec![IJType::Number(None), IJType::Tensor(None)],
+        vec![IJType::Tensor(None), IJType::Number(None)],
+        vec![IJType::Number(None), IJType::Number(None)],
     ];
     let (operands, rest) = gather_operands(types, slice, context)
         .with_context(|| anyhow!("Error caused by {:?}", op))?;
@@ -29,9 +29,9 @@ pub fn next_node_simple_binary_op(
         .collect::<Vec<IJType>>();
     let output_type = match input_types.as_slice() {
         [IJType::Tensor(_), IJType::Tensor(_)] => IJType::Tensor(None),
-        [IJType::Scalar(_), IJType::Tensor(_)] => IJType::Tensor(None),
-        [IJType::Tensor(_), IJType::Scalar(_)] => IJType::Tensor(None),
-        [IJType::Scalar(_), IJType::Scalar(_)] => IJType::Scalar(None),
+        [IJType::Number(_), IJType::Tensor(_)] => IJType::Tensor(None),
+        [IJType::Tensor(_), IJType::Number(_)] => IJType::Tensor(None),
+        [IJType::Number(_), IJType::Number(_)] => IJType::Number(None),
         _ => {
             return Err(context.add_context_to_syntax_error(
                 SyntaxError::TypeError(
@@ -60,9 +60,9 @@ fn _next_node_functional_binary(
 ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
     let rest = slice.move_start(1)?;
     let mut nodes = vec![];
-    if check_ok_needed_outputs(needed_outputs, &IJType::Scalar(None)) {
-        let output_type = IJType::Scalar(None);
-        let input_type = vec![IJType::Scalar(None), IJType::Scalar(None)];
+    if check_ok_needed_outputs(needed_outputs, &IJType::Number(None)) {
+        let output_type = IJType::Number(None);
+        let input_type = vec![IJType::Number(None), IJType::Number(None)];
         nodes.push(Rc::new(Node::new(
             operation.clone(),
             vec![],
@@ -86,8 +86,8 @@ fn _next_node_functional_binary(
         let output_type = IJType::Tensor(None);
         let input_types = vec![
             vec![IJType::Tensor(None), IJType::Tensor(None)],
-            vec![IJType::Scalar(None), IJType::Tensor(None)],
-            vec![IJType::Tensor(None), IJType::Scalar(None)],
+            vec![IJType::Number(None), IJType::Tensor(None)],
+            vec![IJType::Tensor(None), IJType::Number(None)],
         ];
         for input_type in input_types {
             nodes.push(Rc::new(Node::new(
@@ -157,7 +157,7 @@ mod tests {
         assert_eq!(node.op, Operation::Add);
         assert_eq!(
             node.input_types,
-            vec![IJType::Tensor(None), IJType::Scalar(None)]
+            vec![IJType::Tensor(None), IJType::Number(None)]
         );
         assert_eq!(node.output_type, IJType::Tensor(None));
     }
@@ -170,9 +170,9 @@ mod tests {
         assert_eq!(node.op, Operation::Add);
         assert_eq!(
             node.input_types,
-            vec![IJType::Scalar(None), IJType::Scalar(None)]
+            vec![IJType::Number(None), IJType::Number(None)]
         );
-        assert_eq!(node.output_type, IJType::Scalar(None));
+        assert_eq!(node.output_type, IJType::Number(None));
     }
 
     #[test]
@@ -196,7 +196,7 @@ mod tests {
         assert_eq!(node.op, Operation::Multiply);
         assert_eq!(
             node.input_types,
-            vec![IJType::Tensor(None), IJType::Scalar(None)]
+            vec![IJType::Tensor(None), IJType::Number(None)]
         );
         assert_eq!(node.output_type, IJType::Tensor(None));
     }
@@ -209,21 +209,21 @@ mod tests {
         assert_eq!(node.op, Operation::Multiply);
         assert_eq!(
             node.input_types,
-            vec![IJType::Scalar(None), IJType::Scalar(None)]
+            vec![IJType::Number(None), IJType::Number(None)]
         );
-        assert_eq!(node.output_type, IJType::Scalar(None));
+        assert_eq!(node.output_type, IJType::Number(None));
     }
 
     #[test]
     fn test_with_type_inference() -> Result<()> {
         let (node, _) = parse_str_no_context("+ 1 2<i64>")?;
-        assert_eq!(node.output_type, IJType::Scalar(Some("i64".to_string())));
+        assert_eq!(node.output_type, IJType::Number(Some("i64".to_string())));
 
         let (node, _) = parse_str_no_context("+ 1 2<_>")?;
-        assert_eq!(node.output_type, IJType::Scalar(Some("_".to_string())));
+        assert_eq!(node.output_type, IJType::Number(Some("_".to_string())));
 
         let (node, _) = parse_str_no_context("+ 1<_> 2<_>")?;
-        assert_eq!(node.output_type, IJType::Scalar(Some("_".to_string())));
+        assert_eq!(node.output_type, IJType::Number(Some("_".to_string())));
 
         let result = parse_str_no_context("+ 1<usize> 2<i64>");
         assert!(result.is_err());

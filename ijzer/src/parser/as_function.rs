@@ -99,18 +99,18 @@ mod tests {
     #[test]
     fn test_as_function_simple() -> Result<()> {
         let mut context = ASTContext::new();
-        parse_str("var f: Fn(S,S->S)", &mut context)?;
+        parse_str("var f: Fn(N,N->N)", &mut context)?;
 
         let node = parse_str("~f", &mut context)?;
         assert_eq!(node.op, Operation::Function("f".to_string()));
-        assert_eq!(node.output_type, IJType::scalar_function(2));
+        assert_eq!(node.output_type, IJType::number_function(2));
         Ok(())
     }
 
     #[test]
     fn test_as_function_with_type() -> Result<()> {
         let mut context = ASTContext::new();
-        parse_str("var f: Fn(S<a>,S<b>->S<c>)", &mut context)?;
+        parse_str("var f: Fn(N<a>,N<b>->N<c>)", &mut context)?;
 
         let node = parse_str("~f", &mut context)?;
         assert_eq!(node.op, Operation::Function("f".to_string()));
@@ -118,10 +118,10 @@ mod tests {
             node.output_type,
             IJType::Function(FunctionSignature::new(
                 vec![
-                    IJType::Scalar(Some("a".to_string())),
-                    IJType::Scalar(Some("b".to_string()))
+                    IJType::Number(Some("a".to_string())),
+                    IJType::Number(Some("b".to_string()))
                 ],
-                IJType::Scalar(Some("c".to_string()))
+                IJType::Number(Some("c".to_string()))
             ))
         );
         Ok(())
@@ -129,10 +129,10 @@ mod tests {
 
     #[test]
     fn test_as_function_declaration() -> Result<()> {
-        let (node, _) = parse_str_no_context("~+:Fn(S,S->S)")?;
+        let (node, _) = parse_str_no_context("~+:Fn(N,N->N)")?;
 
         assert_eq!(node.op, Operation::Add);
-        assert_eq!(node.output_type, IJType::scalar_function(2));
+        assert_eq!(node.output_type, IJType::number_function(2));
         Ok(())
     }
 
@@ -152,7 +152,7 @@ mod tests {
             node.output_type,
             IJType::Function(FunctionSignature::new(
                 vec![IJType::Tensor(None)],
-                IJType::Scalar(None)
+                IJType::Number(None)
             ))
         );
         Ok(())
@@ -160,10 +160,10 @@ mod tests {
 
     #[test]
     fn test_as_function_double() -> Result<()> {
-        let (node, _) = parse_str_no_context("~~+:Fn(S,S->S)")?;
+        let (node, _) = parse_str_no_context("~~+:Fn(N,N->N)")?;
 
         assert_eq!(node.op, Operation::Add);
-        assert_eq!(node.output_type, IJType::scalar_function(2));
+        assert_eq!(node.output_type, IJType::number_function(2));
         Ok(())
     }
 }

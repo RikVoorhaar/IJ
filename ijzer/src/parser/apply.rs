@@ -74,19 +74,19 @@ mod tests {
     #[test]
     fn test_apply_with_type() -> Result<()> {
         let mut context = ASTContext::new();
-        parse_str("var f: Fn(S,S->S)", &mut context)?;
+        parse_str("var f: Fn(N,N->N)", &mut context)?;
 
         let node = parse_str(".~f 1<i64> 2", &mut context)?;
         assert_eq!(node.op, Operation::Apply);
-        assert_eq!(node.output_type, IJType::Scalar(Some("i64".to_string())));
+        assert_eq!(node.output_type, IJType::Number(Some("i64".to_string())));
         assert_eq!(node.operands.len(), 3);
 
         let mut context = ASTContext::new();
-        parse_str("var f: Fn(S<a>,S<b>->S<c>)", &mut context)?;
+        parse_str("var f: Fn(N<a>,N<b>->N<c>)", &mut context)?;
 
         let node = parse_str(".~f 1<a> 2<b>", &mut context)?;
         assert_eq!(node.op, Operation::Apply);
-        assert_eq!(node.output_type, IJType::Scalar(Some("c".to_string())));
+        assert_eq!(node.output_type, IJType::Number(Some("c".to_string())));
         assert_eq!(node.operands.len(), 3);
         Ok(())
     }
@@ -94,7 +94,7 @@ mod tests {
     #[test]
     fn test_apply_with_composition() -> Result<()> {
         let mut context = ASTContext::new();
-        parse_str("var f: Fn(S,S->S)", &mut context)?;
+        parse_str("var f: Fn(N,N->N)", &mut context)?;
 
         let node = parse_str(".~@(-,f) 1 2", &mut context)?;
         assert_eq!(node.op, Operation::Apply);
@@ -105,7 +105,7 @@ mod tests {
     #[test]
     fn test_apply_function() -> Result<()> {
         let mut context = ASTContext::new();
-        parse_str("var f: Fn(S->Fn(S->S))", &mut context)?;
+        parse_str("var f: Fn(N->N->N)", &mut context)?;
 
         let node = parse_str(".(f 1) 2", &mut context)?;
         assert_eq!(node.op, Operation::Apply);

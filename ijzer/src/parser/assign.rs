@@ -354,7 +354,7 @@ mod tests {
 
     #[test]
     fn test_parse_assign_args_type() -> Result<()> {
-        let tokens = lexer("g($x: T, $y: S)")?;
+        let tokens = lexer("g($x: T, $y: N)")?;
         let mut context = ASTContext::from_tokens(tokens.clone());
         let slice = context.full_slice();
         let (symbol_name, args, output_type) = parse_assign_lhs(&mut context, slice)?;
@@ -363,7 +363,7 @@ mod tests {
         let arg0 = args[0].clone();
         assert_eq!(arg0.output_type, IJType::Tensor(None));
         let arg1 = args[1].clone();
-        assert_eq!(arg1.output_type, IJType::Scalar(None));
+        assert_eq!(arg1.output_type, IJType::Number(None));
         assert_eq!(output_type, None);
 
         Ok(())
@@ -371,7 +371,7 @@ mod tests {
 
     #[test]
     fn test_parse_assign_args_type_output_arrow() -> Result<()> {
-        let tokens = lexer("g($x: T, $y: S) -> T")?;
+        let tokens = lexer("g($x: T, $y: N) -> T")?;
         let mut context = ASTContext::from_tokens(tokens.clone());
         let slice = context.full_slice();
         let (symbol_name, args, output_type) = parse_assign_lhs(&mut context, slice)?;
@@ -380,11 +380,11 @@ mod tests {
         let arg0 = args[0].clone();
         assert_eq!(arg0.output_type, IJType::Tensor(None));
         let arg1 = args[1].clone();
-        assert_eq!(arg1.output_type, IJType::Scalar(None));
+        assert_eq!(arg1.output_type, IJType::Number(None));
         assert_eq!(
             output_type,
             Some(IJType::Function(FunctionSignature::new(
-                vec![IJType::Tensor(None), IJType::Scalar(None)],
+                vec![IJType::Tensor(None), IJType::Number(None)],
                 IJType::Tensor(None)
             )))
         );
@@ -394,7 +394,7 @@ mod tests {
 
     #[test]
     fn test_parse_assign_args_type_output_declaration() -> Result<()> {
-        let tokens = lexer("g($x: T, $y: S): Fn(T,S->T)")?;
+        let tokens = lexer("g($x: T, $y: N): Fn(T,N->T)")?;
         let mut context = ASTContext::from_tokens(tokens.clone());
         let slice = context.full_slice();
         let (symbol_name, args, output_type) = parse_assign_lhs(&mut context, slice)?;
@@ -403,11 +403,11 @@ mod tests {
         let arg0 = args[0].clone();
         assert_eq!(arg0.output_type, IJType::Tensor(None));
         let arg1 = args[1].clone();
-        assert_eq!(arg1.output_type, IJType::Scalar(None));
+        assert_eq!(arg1.output_type, IJType::Number(None));
         assert_eq!(
             output_type,
             Some(IJType::Function(FunctionSignature::new(
-                vec![IJType::Tensor(None), IJType::Scalar(None)],
+                vec![IJType::Tensor(None), IJType::Number(None)],
                 IJType::Tensor(None)
             )))
         );
@@ -452,24 +452,24 @@ mod tests {
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 2);
         assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
-        assert_eq!(node.operands[0].output_type, IJType::Scalar(None));
-        assert_eq!(node.operands[1].output_type, IJType::Scalar(None));
+        assert_eq!(node.operands[0].output_type, IJType::Number(None));
+        assert_eq!(node.operands[1].output_type, IJType::Number(None));
         Ok(())
     }
 
     #[test]
     fn test_assign_simple_scalar_with_number_type() -> Result<()> {
-        let tokens = lexer("g: S<i64> = 1<i64>")?;
+        let tokens = lexer("g: N<i64> = 1<i64>")?;
         let mut context = ASTContext::from_tokens(tokens.clone());
         let node = parse_assign(&mut context)?;
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(
             node.operands[0].output_type,
-            IJType::Scalar(Some("i64".to_string()))
+            IJType::Number(Some("i64".to_string()))
         );
         assert_eq!(
             node.operands[1].output_type,
-            IJType::Scalar(Some("i64".to_string()))
+            IJType::Number(Some("i64".to_string()))
         );
         Ok(())
     }
@@ -497,7 +497,7 @@ mod tests {
 
     #[test]
     fn test_assign_simple_function_scalar() -> Result<()> {
-        let tokens = lexer("g($x: S) = $x")?;
+        let tokens = lexer("g($x: N) = $x")?;
         let mut context = ASTContext::from_tokens(tokens.clone());
         let node = parse_assign(&mut context)?;
         println!("{:?}", node);
@@ -507,17 +507,17 @@ mod tests {
         assert_eq!(
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
-                vec![IJType::Scalar(None)],
-                IJType::Scalar(None)
+                vec![IJType::Number(None)],
+                IJType::Number(None)
             ))
         );
-        assert_eq!(node.operands[1].output_type, IJType::Scalar(None));
-        assert_eq!(node.operands[2].output_type, IJType::Scalar(None));
+        assert_eq!(node.operands[1].output_type, IJType::Number(None));
+        assert_eq!(node.operands[2].output_type, IJType::Number(None));
         Ok(())
     }
     #[test]
     fn test_assign_simple_function_scalar_with_number_type() -> Result<()> {
-        let tokens = lexer("g($x: S<i64>) = $x")?;
+        let tokens = lexer("g($x: N<i64>) = $x")?;
         let mut context = ASTContext::from_tokens(tokens.clone());
         let node = parse_assign(&mut context)?;
         println!("{:?}", node);
@@ -527,17 +527,17 @@ mod tests {
         assert_eq!(
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
-                vec![IJType::Scalar(Some("i64".to_string()))],
-                IJType::Scalar(Some("i64".to_string()))
+                vec![IJType::Number(Some("i64".to_string()))],
+                IJType::Number(Some("i64".to_string()))
             ))
         );
         assert_eq!(
             node.operands[1].output_type,
-            IJType::Scalar(Some("i64".to_string()))
+            IJType::Number(Some("i64".to_string()))
         );
         assert_eq!(
             node.operands[2].output_type,
-            IJType::Scalar(Some("i64".to_string()))
+            IJType::Number(Some("i64".to_string()))
         );
         Ok(())
     }
@@ -555,10 +555,10 @@ mod tests {
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
                 vec![IJType::Tensor(None)],
-                IJType::Scalar(None)
+                IJType::Number(None)
             ))
         );
-        assert_eq!(node.operands[1].output_type, IJType::Scalar(None));
+        assert_eq!(node.operands[1].output_type, IJType::Number(None));
         assert_eq!(node.operands[2].output_type, IJType::Tensor(None));
         Ok(())
     }
@@ -586,7 +586,7 @@ mod tests {
 
     #[test]
     fn test_assign_simple_reuse_var_annotated() -> Result<()> {
-        let tokens = lexer("g($x:T) -> S = /+ + $x $x")?;
+        let tokens = lexer("g($x:N) -> N = /+ + $x $x")?;
         let mut context = ASTContext::from_tokens(tokens.clone());
         let node = parse_assign(&mut context)?;
         println!("{:?}", node);
@@ -597,17 +597,17 @@ mod tests {
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
                 vec![IJType::Tensor(None)],
-                IJType::Scalar(None)
+                IJType::Number(None)
             ))
         );
-        assert_eq!(node.operands[1].output_type, IJType::Scalar(None));
+        assert_eq!(node.operands[1].output_type, IJType::Number(None));
         assert_eq!(node.operands[2].output_type, IJType::Tensor(None));
         Ok(())
     }
 
     #[test]
     fn test_assign_multiple_args() -> Result<()> {
-        let tokens = lexer("g($x:T, $y:S) -> S = /+ + $x $y")?;
+        let tokens = lexer("g($x:T, $y:N) -> N = /+ + $x $y")?;
         let mut context = ASTContext::from_tokens(tokens.clone());
         let node = parse_assign(&mut context)?;
         println!("{:?}", node);
@@ -617,13 +617,13 @@ mod tests {
         assert_eq!(
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
-                vec![IJType::Tensor(None), IJType::Scalar(None)],
-                IJType::Scalar(None)
+                vec![IJType::Tensor(None), IJType::Number(None)],
+                IJType::Number(None)
             ))
         );
-        assert_eq!(node.operands[1].output_type, IJType::Scalar(None));
+        assert_eq!(node.operands[1].output_type, IJType::Number(None));
         assert_eq!(node.operands[2].output_type, IJType::Tensor(None));
-        assert_eq!(node.operands[3].output_type, IJType::Scalar(None));
+        assert_eq!(node.operands[3].output_type, IJType::Number(None));
         Ok(())
     }
 
@@ -643,10 +643,10 @@ mod tests {
                     vec![IJType::Number(None), IJType::Number(None)],
                     IJType::Number(None),
                 ))],
-                IJType::Scalar(None)
+                IJType::Number(None)
             ))
         );
-        assert_eq!(node.operands[1].output_type, IJType::Scalar(None));
+        assert_eq!(node.operands[1].output_type, IJType::Number(None));
         assert_eq!(
             node.operands[2].output_type,
             IJType::Function(FunctionSignature::new(
@@ -659,7 +659,7 @@ mod tests {
 
     #[test]
     fn test_assign_functional_args_composition() -> Result<()> {
-        let tokens = lexer("g($x:Fn(S->T), $y:Fn(T->S)) -> Fn(T->T) = ~@($x,$y)")?;
+        let tokens = lexer("g($x:Fn(N->T), $y:Fn(T->N)) -> Fn(T->T) = ~@($x,$y)")?;
         let mut context = ASTContext::from_tokens(tokens.clone());
         let node = parse_assign(&mut context)?;
         println!("{:?}", node);
@@ -671,12 +671,12 @@ mod tests {
             IJType::Function(FunctionSignature::new(
                 vec![
                     IJType::Function(FunctionSignature::new(
-                        vec![IJType::Scalar(None)],
+                        vec![IJType::Number(None)],
                         IJType::Tensor(None)
                     )),
                     IJType::Function(FunctionSignature::new(
                         vec![IJType::Tensor(None)],
-                        IJType::Scalar(None)
+                        IJType::Number(None)
                     ))
                 ],
                 IJType::Function(FunctionSignature::new(
@@ -695,7 +695,7 @@ mod tests {
         assert_eq!(
             node.operands[2].output_type,
             IJType::Function(FunctionSignature::new(
-                vec![IJType::Scalar(None)],
+                vec![IJType::Number(None)],
                 IJType::Tensor(None),
             ))
         );
@@ -703,7 +703,7 @@ mod tests {
             node.operands[3].output_type,
             IJType::Function(FunctionSignature::new(
                 vec![IJType::Tensor(None)],
-                IJType::Scalar(None),
+                IJType::Number(None),
             ))
         );
         Ok(())
@@ -715,24 +715,24 @@ mod tests {
         let mut context = ASTContext::from_tokens(tokens.clone());
         let assign_node = parse_assign(&mut context)?;
         let node0 = assign_node.operands[0].clone();
-        assert_eq!(node0.output_type, IJType::Group(vec![IJType::Scalar(None), IJType::Scalar(None)]));
+        assert_eq!(node0.output_type, IJType::Group(vec![IJType::Number(None), IJType::Number(None)]));
         assert_eq!(node0.op, Operation::Group);
         assert_eq!(node0.operands.len(), 2);
 
 
-        let tokens = lexer("(x: S<a>, y: S) = (1<a>,2<b>)")?;
+        let tokens = lexer("(x: N<a>, y: N) = (1<a>,2<b>)")?;
         let mut context = ASTContext::from_tokens(tokens.clone());
         let assign_node = parse_assign(&mut context)?;
         let node0 = assign_node.operands[0].clone();
-        assert_eq!(node0.output_type, IJType::Group(vec![IJType::Scalar(Some("a".to_string())), IJType::Scalar(Some("b".to_string()))]));
+        assert_eq!(node0.output_type, IJType::Group(vec![IJType::Number(Some("a".to_string())), IJType::Number(Some("b".to_string()))]));
         assert_eq!(node0.op, Operation::Group);
         assert_eq!(node0.operands.len(), 2);
 
-        let tokens = lexer("(x: S<a>, y: S) = (1<a>,2)")?;
+        let tokens = lexer("(x: N<a>, y: N) = (1<a>,2)")?;
         let mut context = ASTContext::from_tokens(tokens.clone());
         let assign_node = parse_assign(&mut context)?;
         let node0 = assign_node.operands[0].clone();
-        assert_eq!(node0.output_type, IJType::Group(vec![IJType::Scalar(Some("a".to_string())), IJType::Scalar(None)]));
+        assert_eq!(node0.output_type, IJType::Group(vec![IJType::Number(Some("a".to_string())), IJType::Number(None)]));
         assert_eq!(node0.op, Operation::Group);
         assert_eq!(node0.operands.len(), 2);
         Ok(())
