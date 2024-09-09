@@ -15,7 +15,7 @@ pub enum Operation {
     Identity,
     Nothing,
     Function(String),
-    Array(String),
+    Array,
     Reduce,
     Scalar,
     FunctionComposition(usize),
@@ -31,6 +31,7 @@ pub enum Operation {
     Svd,
     Solve,
     Diag,
+    Index,
 }
 
 impl Debug for Operation {
@@ -47,7 +48,7 @@ impl Debug for Operation {
             Self::Identity => write!(f, "Identity"),
             Self::Nothing => write!(f, "Nothing"),
             Self::Function(s) => write!(f, "Function({})", s),
-            Self::Array(s) => write!(f, "Array[{}]", s),
+            Self::Array => write!(f, "Array"),
             Self::Reduce => write!(f, "Reduce"),
             Self::Scalar => write!(f, "Scalar"),
             Self::FunctionComposition(n) => write!(f, "FunctionComposition(functions: {})", n),
@@ -63,6 +64,7 @@ impl Debug for Operation {
             Self::Svd => write!(f, "svd"),
             Self::Solve => write!(f, r"\"),
             Self::Diag => write!(f, "diag"),
+            Self::Index => write!(f, "<|"),
         }
     }
 }

@@ -161,28 +161,20 @@ impl<T: Clone + Num> Tensor<T> {
         let out_shape = broadcast_shapes(&self.shape, &other.shape)?;
         let mut result = Tensor::zeros(&out_shape);
 
-        let shape1 = [
-            vec![1; out_shape.len() - self.shape.len()],
-            self.shape.to_vec(),
-        ]
-        .concat();
-        let shape2 = [
-            vec![1; out_shape.len() - other.shape.len()],
-            other.shape.to_vec(),
-        ]
-        .concat();
+        let shape1 = self.shape.to_vec();
+        let shape2 = other.shape.to_vec();
 
         for idx in out_shape.iter().map(|&s| 0..s).multi_cartesian_product() {
             let idx1 = idx
                 .iter()
-                .zip(shape1.iter())
                 .skip(out_shape.len() - self.shape.len())
+                .zip(shape1.iter())
                 .map(|(&i, &s)| i % s)
                 .collect::<Vec<_>>();
             let idx2 = idx
                 .iter()
-                .zip(shape2.iter())
                 .skip(out_shape.len() - other.shape.len())
+                .zip(shape2.iter())
                 .map(|(&i, &s)| i % s)
                 .collect::<Vec<_>>();
 
@@ -197,9 +189,9 @@ impl<T: Clone + Num> Tensor<T> {
         let result = self.data.iter().cloned().reduce(f).unwrap();
         Tensor::scalar(result)
     }
-    pub fn sub_tensor(&self, indices: Vec<Option<usize>>) -> Result<Tensor<T>, &'static str> {
+    pub fn sub_tensor(&self, indices: Vec<Option<usize>>) -> Result<Tensor<T>> {
         if indices.len() != self.shape.len() {
-            return Err("Indices length must match tensor shape length");
+            return Err(anyhow!("Indices length must match tensor shape length"));
         }
 
         let mut sub_shape = Vec::new();
@@ -209,7 +201,7 @@ impl<T: Clone + Num> Tensor<T> {
             match index {
                 Some(idx) => {
                     if idx >= self.shape[i] {
-                        return Err("Index out of bounds for tensor shape");
+                        return Err(anyhow!("Index out of bounds for tensor shape"));
                     }
                 }
                 None => {
@@ -234,6 +226,33 @@ impl<T: Clone + Num> Tensor<T> {
             }
             output[&idx] = self[&final_idx].clone();
         }
+        Ok(output)
+    }
+
+    pub fn multi_index(&self, indices: Vec<Tensor<usize>>) -> Result<Tensor<T>> {
+        let shape = indices
+            .iter()
+            .map(|t| t.shape().to_vec())
+            .try_fold(Vec::new(), |acc, t| {
+                broadcast_shapes(&acc, &t).ok_or(anyhow!("Index shapes cannot be broadcasted"))
+            })?;
+        let mut output = Tensor::zeros(&shape);
+
+        for idx in shape.iter().map(|&s| 0..s).multi_cartesian_product() {
+            let mut index = Vec::new();
+            for index_tensor in indices.iter() {
+                let index_tensor_idx = idx
+                    .iter()
+                    .skip(shape.len() - index_tensor.shape().len())
+                    .zip(index_tensor.shape().iter())
+                    .map(|(&i, &s)| i % s)
+                    .collect::<Vec<_>>();
+                index.push(index_tensor[&index_tensor_idx]);
+            }
+
+            output[&idx] = self[&index].clone();
+        }
+
         Ok(output)
     }
     pub fn generalized_contraction(
@@ -312,6 +331,17 @@ impl<T: Clone + Num> Tensor<T> {
             |x| x.reduce(|a, b| a + b).extract_scalar().unwrap(),
             |a, b| a * b,
         )
+    }
+
+    /// Concatenates a list of tensors of the same shape along a new axis
+    pub fn from_tensors(tensors: &[Tensor<T>]) -> Result<Tensor<T>> {
+        let item_shape = tensors.iter().next().unwrap().shape.clone();
+        if !tensors.iter().skip(1).all(|t| t.shape == item_shape) {
+            return Err(anyhow!("All tensors must have the same shape"));
+        }
+        let data = tensors.iter().flat_map(|t| t.data.clone()).collect();
+        let shape = [vec![tensors.len()], item_shape.clone()].concat();
+        Ok(Tensor::new(data, shape))
     }
     pub fn to_ndarray2(&self) -> Array2<T> {
         let shape = self.shape.clone();
@@ -1087,6 +1117,31 @@ mod tests {
         for (r, b_) in result.iter().zip(b.iter()) {
             assert_abs_diff_eq!(r, b_, epsilon = 1e-6);
         }
+        Ok(())
+    }
+
+    #[test]
+    fn test_multi_index() -> Result<()> {
+        let tensor = Tensor::from_vec(vec![1.0, 2.0, 3.0, 4.0], Some(vec![2, 2]));
+        let indices = vec![
+            Tensor::from_vec(vec![0, 1], Some(vec![2])),
+            Tensor::from_vec(vec![1], Some(vec![1, 1])),
+        ];
+        let result = tensor.multi_index(indices)?;
+        assert_eq!(result.to_vec(), vec![2.0, 4.0]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_from_tensors() -> Result<()> {
+        let tensors = vec![
+            Tensor::from_vec(vec![1.0, 2.0], Some(vec![2])),
+            Tensor::from_vec(vec![3.0, 4.0], Some(vec![2])),
+            Tensor::from_vec(vec![5.0, 6.0], Some(vec![2])),
+        ];
+        let result = Tensor::from_tensors(&tensors)?;
+        assert_eq!(result.shape(), &vec![3, 2]);
+        assert_eq!(result.to_vec(), vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
         Ok(())
     }
 }

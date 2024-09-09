@@ -69,7 +69,7 @@ mod tests {
         assert!(matches!(node.op, Operation::Number(..)));
 
         let (node, _) = parse_str_no_context("I [1,2,3]")?;
-        assert!(matches!(node.op, Operation::Array(..)));
+        assert!(matches!(node.op, Operation::Array));
 
         let (node, _) = parse_str_no_context("I I I I I 1")?;
         assert!(matches!(node.op, Operation::Number(..)));

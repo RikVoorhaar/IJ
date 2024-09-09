@@ -424,7 +424,7 @@ mod tests {
         assert_eq!(node.operands.len(), 2);
         assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
         assert_eq!(node.operands[0].output_type, IJType::Tensor(None));
-        assert_eq!(node.operands[1].op, Operation::Array("1".to_string()));
+        assert_eq!(node.operands[1].op, Operation::Array);
         assert_eq!(node.operands[1].output_type, IJType::Tensor(None));
         println!("{:?}", node);
         Ok(())
@@ -438,7 +438,7 @@ mod tests {
         assert_eq!(node.operands.len(), 2);
         assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
         assert_eq!(node.operands[0].output_type, IJType::Tensor(None));
-        assert_eq!(node.operands[1].op, Operation::Array("1".to_string()));
+        assert_eq!(node.operands[1].op, Operation::Array);
         assert_eq!(node.operands[1].output_type, IJType::Tensor(None));
         println!("{:?}", node);
         Ok(())

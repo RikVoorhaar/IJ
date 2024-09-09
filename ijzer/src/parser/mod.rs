@@ -78,6 +78,9 @@ use solve::Solve;
 mod diag;
 use diag::Diag;
 
+mod index;
+use index::Index;
+
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
@@ -132,6 +135,7 @@ pub fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node
         Token::SVD => Svd::next_node(op.clone(), rest, context),
         Token::QR => QR::next_node(op.clone(), rest, context),
         Token::Diag => Diag::next_node(op.clone(), rest, context),
+        Token::Index => Index::next_node(op.clone(), rest, context),
         _ => Err(SyntaxError::UnexpectedToken(op.clone()).into()),
     }
 }
@@ -274,7 +278,7 @@ mod tests {
         assert_eq!(first_operand.output_type, IJType::Tensor(None));
         let second_operand = &node.operands[1];
         assert_eq!(second_operand.output_type, IJType::Tensor(None));
-        assert_eq!(second_operand.op, Operation::Array("1".to_string()));
+        assert_eq!(second_operand.op, Operation::Array);
 
         let expected_var = Variable {
             typ: IJType::Tensor(None),
