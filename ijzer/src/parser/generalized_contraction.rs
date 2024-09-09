@@ -14,7 +14,7 @@ use std::rc::Rc;
 pub struct GeneralizedContraction;
 impl GeneralizedContraction {
     fn first_signature() -> FunctionSignature {
-        FunctionSignature::new(vec![IJType::Tensor(None)], IJType::Scalar(None))
+        FunctionSignature::new(vec![IJType::Tensor(None)], IJType::Number(None))
     }
     fn second_signature() -> FunctionSignature {
         FunctionSignature::number_function(2)

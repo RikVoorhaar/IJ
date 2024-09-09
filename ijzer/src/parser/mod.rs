@@ -289,18 +289,18 @@ mod tests {
     }
 
     #[test]
-    fn test_scalar_assignment() {
-        let result = parse_str_no_context("x: S = 1");
+    fn test_number_assignment() {
+        let result = parse_str_no_context("x: N = 1");
         assert!(result.is_ok());
         let (node, context) = result.unwrap();
         assert_eq!(node.op, Operation::Assign);
-        assert_eq!(node.input_types, vec![IJType::Scalar(None); 2]);
+        assert_eq!(node.input_types, vec![IJType::Number(None); 2]);
         assert_eq!(node.output_type, IJType::Void);
         let first_operand = &node.operands[0];
         assert_eq!(first_operand.op, Operation::Symbol("x".to_string()));
-        assert_eq!(first_operand.output_type, IJType::Scalar(None));
+        assert_eq!(first_operand.output_type, IJType::Number(None));
         let second_operand = &node.operands[1];
-        assert_eq!(second_operand.output_type, IJType::Scalar(None));
+        assert_eq!(second_operand.output_type, IJType::Number(None));
         assert_eq!(
             second_operand.op,
             Operation::Number(tokens::Number {
@@ -309,7 +309,7 @@ mod tests {
         );
 
         let expected_var = Variable {
-            typ: IJType::Scalar(None),
+            typ: IJType::Number(None),
             name: "x".to_string(),
         };
         let actual_var = context.symbols.get("x").unwrap();
@@ -376,7 +376,7 @@ mod tests {
         assert!(result.is_ok());
         let node = result.unwrap();
         assert_eq!(node.op, Operation::Function("x".to_string()));
-        assert_eq!(node.input_types, vec![IJType::Scalar(None)]);
+        assert_eq!(node.input_types, vec![IJType::Number(None)]);
         assert_eq!(node.output_type, IJType::Tensor(None));
     }
 
@@ -398,8 +398,8 @@ mod tests {
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
         assert_eq!(node.op, Operation::Negate);
-        assert_eq!(node.input_types, vec![IJType::Scalar(None)]);
-        assert_eq!(node.output_type, IJType::Scalar(None));
+        assert_eq!(node.input_types, vec![IJType::Number(None)]);
+        assert_eq!(node.output_type, IJType::Number(None));
     }
 
     #[test]
@@ -436,7 +436,7 @@ mod tests {
         let node = parse_str("f [1]", &mut context)?;
         assert_eq!(
             node.output_type,
-            IJType::Group(vec![IJType::Scalar(None), IJType::Tensor(None)])
+            IJType::Group(vec![IJType::Number(None), IJType::Tensor(None)])
         );
 
         let mut context = ASTContext::new();
@@ -446,12 +446,12 @@ mod tests {
         let node0 = &node.operands[0];
         assert_eq!(
             node0.output_type,
-            IJType::Group(vec![IJType::Scalar(None), IJType::Tensor(None)])
+            IJType::Group(vec![IJType::Number(None), IJType::Tensor(None)])
         );
         let node1 = &node.operands[1];
         assert_eq!(
             node1.output_type,
-            IJType::Group(vec![IJType::Scalar(None), IJType::Tensor(None)])
+            IJType::Group(vec![IJType::Number(None), IJType::Tensor(None)])
         );
 
         Ok(())

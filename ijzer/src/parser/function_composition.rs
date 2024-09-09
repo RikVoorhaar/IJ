@@ -483,7 +483,7 @@ mod tests {
         )?;
         let node2 = _create_function_node(
             vec![IJType::Tensor(None)],
-            IJType::Scalar(None),
+            IJType::Number(None),
             &mut context,
         )?;
         let result = chain.extend(node1);
@@ -519,16 +519,16 @@ mod tests {
         assert_eq!(
             node1.output_type,
             IJType::Function(FunctionSignature::new(
-                vec![IJType::Scalar(None)],
-                IJType::Scalar(None),
+                vec![IJType::Number(None)],
+                IJType::Number(None),
             ))
         );
         let node2 = operands[1].clone();
-        assert_eq!(node2.output_type, IJType::scalar_function(2));
+        assert_eq!(node2.output_type, IJType::number_function(2));
         let node3 = operands[2].clone();
-        assert_eq!(node3.output_type, IJType::Scalar(None));
+        assert_eq!(node3.output_type, IJType::Number(None));
         let node4 = operands[3].clone();
-        assert_eq!(node4.output_type, IJType::Scalar(None));
+        assert_eq!(node4.output_type, IJType::Number(None));
     }
 
     #[test]
@@ -544,12 +544,12 @@ mod tests {
         assert_eq!(
             node2.output_type,
             IJType::Function(FunctionSignature::new(
-                vec![IJType::Scalar(None), IJType::Tensor(None)],
+                vec![IJType::Number(None), IJType::Tensor(None)],
                 IJType::Tensor(None),
             ))
         );
         let node3 = operands[2].clone();
-        assert_eq!(node3.output_type, IJType::Scalar(None));
+        assert_eq!(node3.output_type, IJType::Number(None));
         let node4 = operands[3].clone();
         assert_eq!(node4.output_type, IJType::Tensor(None));
     }
@@ -581,33 +581,33 @@ mod tests {
         assert_eq!(
             node1.output_type,
             IJType::Function(FunctionSignature::new(
-                vec![IJType::Tensor(None), IJType::Scalar(None)],
+                vec![IJType::Tensor(None), IJType::Number(None)],
                 IJType::Tensor(None),
             ))
         );
         let node2 = operands[1].clone();
         assert_eq!(node2.output_type, IJType::Tensor(None));
         let node3 = operands[2].clone();
-        assert_eq!(node3.output_type, IJType::Scalar(None));
+        assert_eq!(node3.output_type, IJType::Number(None));
     }
 
     #[test]
     fn test_function_composition_parser_custom_function() {
         let mut context = ASTContext::new();
-        parse_str("var f: Fn(S,S->S)", &mut context).unwrap();
+        parse_str("var f: Fn(N,N->N)", &mut context).unwrap();
         let result = parse_str("@(-, f) 1 2", &mut context);
         assert!(result.is_ok());
         let composition_node = result.unwrap();
         let operands = composition_node.operands.clone();
         assert_eq!(operands.len(), 4);
         let node1 = operands[0].clone();
-        assert_eq!(node1.output_type, IJType::scalar_function(1));
+        assert_eq!(node1.output_type, IJType::number_function(1));
         let node2 = operands[1].clone();
-        assert_eq!(node2.output_type, IJType::scalar_function(2));
+        assert_eq!(node2.output_type, IJType::number_function(2));
         let node3 = operands[2].clone();
-        assert_eq!(node3.output_type, IJType::Scalar(None));
+        assert_eq!(node3.output_type, IJType::Number(None));
         let node4 = operands[3].clone();
-        assert_eq!(node4.output_type, IJType::Scalar(None));
+        assert_eq!(node4.output_type, IJType::Number(None));
     }
 
     #[test]
@@ -617,17 +617,17 @@ mod tests {
 
     #[test]
     fn test_function_composition_functional() -> Result<()> {
-        let (node, _) = parse_str_no_context("~@(+): Fn(S,S->S)")?;
+        let (node, _) = parse_str_no_context("~@(+): Fn(N,N->N)")?;
         assert_eq!(node.op, Operation::FunctionComposition(1));
 
-        let (node, _) = parse_str_no_context("~@(-,+): Fn(S,S->S)")?;
+        let (node, _) = parse_str_no_context("~@(-,+): Fn(N,N->N)")?;
         assert_eq!(node.op, Operation::FunctionComposition(2));
         Ok(())
     }
 
     #[test]
     fn test_function_composition_nested() -> Result<()> {
-        let (node, _) = parse_str_no_context("~@(@(-,-),+): Fn(S,S->S)")?;
+        let (node, _) = parse_str_no_context("~@(@(-,-),+): Fn(N,N->N)")?;
         assert_eq!(node.op, Operation::FunctionComposition(2));
         let child1 = node.operands[0].clone();
         assert_eq!(child1.op, Operation::FunctionComposition(2));
@@ -639,32 +639,32 @@ mod tests {
     #[test]
     fn test_function_composition_number_type() -> Result<()> {
         let mut context = ASTContext::new();
-        parse_str("var f: Fn(S<a>,S<b>->S<c>)", &mut context)?;
-        parse_str("var g: Fn(S<c>->S<d>)", &mut context)?;
+        parse_str("var f: Fn(N<a>,N<b>->N<c>)", &mut context)?;
+        parse_str("var g: Fn(N<c>->N<d>)", &mut context)?;
         let node = parse_str("@(g,f) 1 2", &mut context)?;
-        assert_eq!(node.output_type, IJType::Scalar(Some("d".to_string())));
+        assert_eq!(node.output_type, IJType::Number(Some("d".to_string())));
 
-        parse_str("var f: Fn(S<a>,S<b>->S<c>)", &mut context)?;
-        parse_str("var g: Fn(S->S)", &mut context)?;
+        parse_str("var f: Fn(N<a>,N<b>->N<c>)", &mut context)?;
+        parse_str("var g: Fn(N->N)", &mut context)?;
         let node = parse_str("@(g,f) 1 2", &mut context)?;
-        assert_eq!(node.output_type, IJType::Scalar(Some("c".to_string())));
+        assert_eq!(node.output_type, IJType::Number(Some("c".to_string())));
 
-        parse_str("var f: Fn(S<a>->S<a>)", &mut context)?;
-        parse_str("var g: Fn(S->S<a>)", &mut context)?;
+        parse_str("var f: Fn(N<a>->N<a>)", &mut context)?;
+        parse_str("var g: Fn(N->N<a>)", &mut context)?;
         let node = parse_str("@(g,f) 1", &mut context)?;
-        assert_eq!(node.output_type, IJType::Scalar(Some("a".to_string())));
+        assert_eq!(node.output_type, IJType::Number(Some("a".to_string())));
         let node = parse_str("@(f,g) 1", &mut context)?;
-        assert_eq!(node.output_type, IJType::Scalar(Some("a".to_string())));
+        assert_eq!(node.output_type, IJType::Number(Some("a".to_string())));
 
-        parse_str("var f: Fn(S<a>->S<b>)", &mut context)?;
-        parse_str("var g: Fn(S->S<a>)", &mut context)?;
+        parse_str("var f: Fn(N<a>->N<b>)", &mut context)?;
+        parse_str("var g: Fn(N->N<a>)", &mut context)?;
         let node = parse_str("@(f,g) 1", &mut context)?;
-        assert_eq!(node.output_type, IJType::Scalar(Some("b".to_string())));
+        assert_eq!(node.output_type, IJType::Number(Some("b".to_string())));
 
-        parse_str("var f: Fn(S<a>->S<b>)", &mut context)?;
-        parse_str("var g: Fn(S->S)", &mut context)?;
-        let node = parse_str("@(f,g) 1<a>", &mut context)?;
-        assert_eq!(node.output_type, IJType::Scalar(Some("b".to_string())));
+        parse_str("var f: Fn(N<a>->N<b>)", &mut context)?;
+        parse_str("var g: Fn(N->N<a>)", &mut context)?;
+        let node = parse_str("@(f,g) 1", &mut context)?;
+        assert_eq!(node.output_type, IJType::Number(Some("b".to_string())));
         let result = parse_str("@(f,g) 1<c>", &mut context);
         assert!(result.is_err());
         Ok(())
@@ -673,14 +673,14 @@ mod tests {
     #[test]
     fn test_function_composition_function_type() -> Result<()> {
         let mut context = ASTContext::new();
-        parse_str("var g: Fn(Fn(S<b>->S<c>)->S<d>)", &mut context)?;
-        parse_str("var f: Fn(S<a> -> Fn(S<b>->S<c>))", &mut context)?;
+        parse_str("var g: Fn(Fn(N<b>->N<c>)->N<d>)", &mut context)?;
+        parse_str("var f: Fn(N<a> -> Fn(N<b>->N<c>))", &mut context)?;
         let node = parse_str("@(g,f) 1<a>", &mut context)?;
-        assert_eq!(node.output_type, IJType::Scalar(Some("d".to_string())));
+        assert_eq!(node.output_type, IJType::Number(Some("d".to_string())));
 
         let mut context = ASTContext::new();
-        parse_str("var g: Fn(Fn(S->S)->S<d>)", &mut context)?;
-        parse_str("var f: Fn(S<a> -> Fn(S<b>->S<c>))", &mut context)?;
+        parse_str("var g: Fn(Fn(N->N)->N<d>)", &mut context)?;
+        parse_str("var f: Fn(N<a> -> Fn(N<b>->N<c>))", &mut context)?;
         let result = parse_str("@(g,f) 1<a>", &mut context);
         assert!(result.is_err());
 
@@ -690,14 +690,14 @@ mod tests {
     #[test]
     fn test_function_composition_inconsistent() -> Result<()> {
         let mut context = ASTContext::new();
-        parse_str("var g: Fn(S<a> -> S<b>)", &mut context)?;
-        parse_str("var f: Fn(S<b> -> S<c>)", &mut context)?;
+        parse_str("var g: Fn(N<a> -> N<b>)", &mut context)?;
+        parse_str("var f: Fn(N<b> -> N<c>)", &mut context)?;
         let result = parse_str("@(g,f) 1<b>", &mut context);
         assert!(result.is_err());
 
         let mut context = ASTContext::new();
-        parse_str("var g: Fn(S<b> -> S<a>)", &mut context)?;
-        parse_str("var f: Fn(S -> S)", &mut context)?;
+        parse_str("var g: Fn(N<b> -> N<a>)", &mut context)?;
+        parse_str("var f: Fn(N -> N)", &mut context)?;
         let result = parse_str("@(g,f) 1<a>", &mut context);
         assert!(result.is_err());
 
