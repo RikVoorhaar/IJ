@@ -278,7 +278,7 @@ mod tests {
         assert_eq!(first_operand.output_type, IJType::Tensor(None));
         let second_operand = &node.operands[1];
         assert_eq!(second_operand.output_type, IJType::Tensor(None));
-        assert_eq!(second_operand.op, Operation::Array("1".to_string()));
+        assert_eq!(second_operand.op, Operation::Array);
 
         let expected_var = Variable {
             typ: IJType::Tensor(None),
