@@ -956,7 +956,7 @@ impl CompileNode for GeneralizedContraction {
         let f_arg_annot =
             annotation_from_type(&f_node.output_type.extract_signature().unwrap().input[0])?;
         let f_stream_extract = quote! {
-            (|z: &#f_arg_annot| (#f_stream)(z.clone()).extract_scalar().unwrap())
+            (|z: &#f_arg_annot| (#f_stream)(z.clone()))
         };
         let g_stream = child_streams[1].clone();
         let g_node = &node.operands[1];
@@ -1238,19 +1238,14 @@ impl CompileNode for Index {
             .iter()
             .any(|n| n.output_type.type_match(&IJType::Void));
 
-        let tensor_t = annotation_from_type(&tensor_operand.output_type)?;
         match (all_numbers, contains_colon) {
             (true, _) => {
                 let index_operands_stream = index_operands
                     .iter()
                     .map(|n| child_streams.get(&n.id).unwrap().clone())
                     .collect::<Vec<TokenStream>>();
-                let index_operands_stream = index_operands_stream
-                    .iter()
-                    .map(|n| quote! {#n.extract_scalar().unwrap()})
-                    .collect::<Vec<TokenStream>>();
                 Ok(quote! {
-                    #tensor_t::scalar(#tensor_stream[&vec![#(#index_operands_stream),*]].clone())
+                    #tensor_stream[&vec![#(#index_operands_stream),*]].clone()
                 })
             }
             (false, true) => {
