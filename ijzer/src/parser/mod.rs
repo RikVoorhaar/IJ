@@ -371,7 +371,7 @@ mod tests {
     #[test]
     fn test_var_definition_and_use() {
         let mut context = ASTContext::new();
-        parse_str("var x: Fn(S->T)", &mut context).unwrap();
+        parse_str("var x: Fn(N->T)", &mut context).unwrap();
         let result = parse_str("x 1", &mut context);
         assert!(result.is_ok());
         let node = result.unwrap();
@@ -405,11 +405,11 @@ mod tests {
     #[test]
     fn test_semicolon_handling() {
         // Test with semicolon at the end - should pass
-        let result_with_semicolon = parse_str_no_context("var x: S;");
+        let result_with_semicolon = parse_str_no_context("var x: N;");
         assert!(result_with_semicolon.is_ok());
 
         // Test without semicolon at the end - should also pass and be equivalent
-        let result_without_semicolon = parse_str_no_context("var x: S");
+        let result_without_semicolon = parse_str_no_context("var x: N");
         assert!(result_without_semicolon.is_ok());
 
         // Compare the results to ensure they are equivalent
@@ -421,7 +421,7 @@ mod tests {
         );
 
         // Test with semicolon not at the end - should fail
-        let result_error = parse_str_no_context("var x: S; var y: T");
+        let result_error = parse_str_no_context("var x: N; var y: T");
         assert!(result_error.is_err());
         assert!(is_specific_syntax_error(
             &result_error.unwrap_err(),
@@ -432,7 +432,7 @@ mod tests {
     #[test]
     fn test_group_return_type() -> Result<()> {
         let mut context = ASTContext::new();
-        parse_str("var f: Fn(T->(S,T))", &mut context)?;
+        parse_str("var f: Fn(T->(N,T))", &mut context)?;
         let node = parse_str("f [1]", &mut context)?;
         assert_eq!(
             node.output_type,
@@ -440,7 +440,7 @@ mod tests {
         );
 
         let mut context = ASTContext::new();
-        parse_str("var f: Fn(T->(S,T))", &mut context)?;
+        parse_str("var f: Fn(T->(N,T))", &mut context)?;
         let node = parse_str("x = f[1]", &mut context)?;
         assert_eq!(node.op, Operation::Assign);
         let node0 = &node.operands[0];

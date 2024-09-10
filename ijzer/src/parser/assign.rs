@@ -586,7 +586,7 @@ mod tests {
 
     #[test]
     fn test_assign_simple_reuse_var_annotated() -> Result<()> {
-        let tokens = lexer("g($x:N) -> N = /+ + $x $x")?;
+        let tokens = lexer("g($x:T) -> N = /+ + $x $x")?;
         let mut context = ASTContext::from_tokens(tokens.clone());
         let node = parse_assign(&mut context)?;
         println!("{:?}", node);
@@ -629,7 +629,7 @@ mod tests {
 
     #[test]
     fn test_assign_functional_args() -> Result<()> {
-        let tokens = lexer("g($x:Fn(N,N->N)) -> S = /$x [1]")?;
+        let tokens = lexer("g($x:Fn(N,N->N)) -> N = /$x [1]")?;
         let mut context = ASTContext::from_tokens(tokens.clone());
         let node = parse_assign(&mut context)?;
         println!("{:?}", node);
