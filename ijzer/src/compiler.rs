@@ -1330,7 +1330,7 @@ mod tests {
     fn test_assign_tensor() {
         let input1 = "x: T<_> = [1]<_>";
         let input2 = "x = [1]<_>";
-        let expected = "let x : ijzer :: tensor :: Tensor :: < _ > = ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [ijzer :: tensor :: Tensor :: < _ > :: scalar (1) . extract_scalar () . unwrap ()] , None) ;";
+        let expected = "let x : ijzer :: tensor :: Tensor :: < _ > = ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1 as _] , None) ;";
         compiler_compare(input1, expected);
         compiler_compare(input2, expected);
     }
