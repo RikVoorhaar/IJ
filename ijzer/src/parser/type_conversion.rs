@@ -208,13 +208,13 @@ mod tests {
     #[test]
     fn test_list_conversions_to() {
         let types = list_conversions_to(&IJType::Number(None));
-        assert_eq!(types.len(), 3);
+        assert_eq!(types.len(), 2);
 
         let types = list_conversions_to(&IJType::Function(FunctionSignature::new(
             vec![IJType::Number(None)],
             IJType::Number(None),
         )));
-        assert_eq!(types.len(), 6);
+        assert_eq!(types.len(), 2);
 
         let types = list_conversions_to(&IJType::Function(FunctionSignature::new(
             vec![IJType::Tensor(None)],
@@ -223,19 +223,19 @@ mod tests {
                 IJType::Number(None),
             )),
         )));
-        assert_eq!(types.len(), 18);
+        assert_eq!(types.len(), 4);
     }
 
     #[test]
     fn test_list_conversions_from() {
         let types = list_conversions_from(&IJType::Number(None));
-        assert_eq!(types.len(), 2);
+        assert_eq!(types.len(), 1);
 
         let types = list_conversions_from(&IJType::Function(FunctionSignature::new(
             vec![IJType::Number(None)],
             IJType::Number(None),
         )));
-        assert_eq!(types.len(), 6);
+        assert_eq!(types.len(), 2);
 
         let types = list_conversions_from(&IJType::Function(FunctionSignature::new(
             vec![IJType::Tensor(None)],
@@ -244,7 +244,7 @@ mod tests {
                 IJType::Number(None),
             )),
         )));
-        assert_eq!(types.len(), 6);
+        assert_eq!(types.len(), 2);
     }
 
     #[test]
@@ -301,9 +301,9 @@ mod tests {
     #[test]
     fn test_type_conversion_node_function2() {
         let mut context = ASTContext::new();
-        let result = parse_str("var f: Fn(S->S)", &mut context);
+        let result = parse_str("var f: Fn(T->N)", &mut context);
         assert!(result.is_ok());
-        let maybe_node = parse_str("<-Fn(S->S) f 1", &mut context);
+        let maybe_node = parse_str("<-Fn(N->N) f 1", &mut context);
         assert!(maybe_node.is_ok());
         let node = maybe_node.unwrap();
         assert_eq!(node.op, Operation::Apply);
@@ -314,7 +314,7 @@ mod tests {
         let mut context = ASTContext::new();
         let result = parse_str("var f: Fn(T->T)", &mut context);
         assert!(result.is_ok());
-        let maybe_node = parse_str("<-Fn(S->T) f 1", &mut context);
+        let maybe_node = parse_str("<-Fn(N->T) f 1", &mut context);
         assert!(maybe_node.is_ok());
         let node = maybe_node.unwrap();
         assert_eq!(node.op, Operation::Apply);
@@ -326,14 +326,14 @@ mod tests {
         let mut context = ASTContext::new();
         let result = parse_str("var f: Fn(T->T)", &mut context);
         assert!(result.is_ok());
-        let maybe_node = parse_str("<-Fn(T->S) f [1]", &mut context);
+        let maybe_node = parse_str("<-Fn(T->N) f [1]", &mut context);
         assert!(maybe_node.is_err());
     }
 
     #[test]
     fn test_type_conversion_functional() {
         let mut context = ASTContext::new();
-        let result = parse_str("var f: Fn(S,S->S)", &mut context);
+        let result = parse_str("var f: Fn(T,T->N)", &mut context);
         assert!(result.is_ok());
         let maybe_node = parse_str("/<-Fn(N,N->N) f [1]", &mut context);
         assert!(maybe_node.is_ok());
