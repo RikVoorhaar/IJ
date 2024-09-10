@@ -71,17 +71,6 @@ fn _next_node_functional_binary(
             context,
         )?));
     }
-    if check_ok_needed_outputs(needed_outputs, &IJType::Number(None)) {
-        let output_type = IJType::Number(None);
-        let input_type = vec![IJType::Number(None), IJType::Number(None)];
-        nodes.push(Rc::new(Node::new(
-            operation.clone(),
-            vec![],
-            IJType::Function(FunctionSignature::new(input_type, output_type)),
-            vec![],
-            context,
-        )?));
-    }
     if check_ok_needed_outputs(needed_outputs, &IJType::Tensor(None)) {
         let output_type = IJType::Tensor(None);
         let input_types = vec![

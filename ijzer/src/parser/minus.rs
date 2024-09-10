@@ -120,22 +120,7 @@ impl ParseNodeFunctional for MinusOp {
                 context,
             )?));
         }
-        if check_ok_needed_outputs(needed_output, &IJType::Number(None)) {
-            nodes.push(Rc::new(Node::new(
-                Operation::Subtract,
-                vec![],
-                IJType::number_function(2),
-                vec![],
-                context,
-            )?));
-            nodes.push(Rc::new(Node::new(
-                Operation::Negate,
-                vec![],
-                IJType::number_function(1),
-                vec![],
-                context,
-            )?));
-        }
+
         if check_ok_needed_outputs(needed_output, &IJType::Tensor(None)) {
             let output_type = IJType::Tensor(None);
             let input_types = vec![
