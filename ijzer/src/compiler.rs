@@ -419,6 +419,101 @@ impl CompileNode for Assign {
     }
 }
 
+fn _compile_binary_op(
+    node: Rc<Node>,
+    child_streams: HashMap<usize, TokenStream>,
+    binary_op: impl Fn(TokenStream, TokenStream) -> TokenStream,
+) -> Result<TokenStream> {
+    let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
+
+    let res = match node.output_type.clone() {
+        IJType::Tensor(number_type) | IJType::Number(number_type) => {
+            if children.len() != 2 {
+                panic!("Expected 2 children for add, found {:?}", children.len());
+            }
+            let childstream1 = child_streams.get(&children[0]).unwrap();
+            let childstream2 = child_streams.get(&children[1]).unwrap();
+            let number_annot = annotation_from_type(&IJType::Number(number_type))?;
+            let operand1_type = node.operands[0].output_type.clone();
+            let operand2_type = node.operands[1].output_type.clone();
+
+            match (operand1_type, operand2_type) {
+                (IJType::Tensor(_), IJType::Tensor(_)) => {
+                    let binop_stream = binary_op(quote! {a}, quote! {b});
+                    quote! {
+                        #childstream1.apply_binary_op(&#childstream2, |a: #number_annot, b: #number_annot| #binop_stream).unwrap()
+                    }
+                }
+                (IJType::Tensor(_), IJType::Number(_)) => {
+                    let binop_stream = binary_op(quote! {x}, quote! {#childstream2});
+                    quote! {
+                        #childstream1.map(|x: #number_annot| #binop_stream)
+                    }
+                }
+                (IJType::Number(_), IJType::Tensor(_)) => {
+                    let binop_stream = binary_op(quote! {#childstream1}, quote! {x});
+                    quote! {
+                        #childstream2.map(|x: #number_annot| #binop_stream)
+                    }
+                }
+                (IJType::Number(_), IJType::Number(_)) => {
+                    binary_op(quote! {#childstream1}, quote! {#childstream2})
+                }
+                _ => unreachable!(),
+            }
+        }
+        IJType::Function(f) => {
+            let number_type = f.output.extract_number_type().unwrap_or_default();
+            let number_annot = annotation_from_type(&IJType::Number(number_type.clone()))?;
+            let tensor_annot = annotation_from_type(&IJType::Tensor(number_type))?;
+            let input_types = f.input.clone();
+            if input_types.len() != 2 {
+                panic!(
+                    "Expected 2 input types for add, found {:?}",
+                    input_types.len()
+                );
+            }
+            let (input1_type, input2_type) = (input_types[0].clone(), input_types[1].clone());
+            match (input1_type, input2_type) {
+                (IJType::Number(_), IJType::Number(_)) => {
+                    let binop_stream = binary_op(quote! {a}, quote! {b});
+                    quote! { |a: #number_annot, b: #number_annot| #binop_stream }
+                }
+                (IJType::Tensor(_), IJType::Tensor(_)) => {
+                    let binop_stream = binary_op(quote! {a}, quote! {b});
+                    quote! {
+                        |x1: #tensor_annot, x2: #tensor_annot|
+                        x1.apply_binary_op(&x2, |a: #number_annot, b: #number_annot| #binop_stream).unwrap()
+                    }
+                }
+                (IJType::Tensor(_), IJType::Number(_)) => {
+                    let binop_stream = binary_op(quote! {a}, quote! {y});
+                    quote! {
+                        |x: #tensor_annot, y: #number_annot|
+                        x.map(|a: #number_annot| #binop_stream)
+                    }
+                }
+                (IJType::Number(_), IJType::Tensor(_)) => {
+                    let binop_stream = binary_op(quote! {y}, quote! {a});
+                    quote! {
+                        |y: #number_annot, x: #tensor_annot|
+                        x.map(|a: #number_annot| #binop_stream)
+                    }
+                }
+                _ => panic!(
+                    "Found add node with unimplemented input types: {:?}",
+                    input_types
+                ),
+            }
+        }
+        _ => panic!(
+            "Found add node with unimplemented output type: {:?}",
+            node.output_type
+        ),
+    };
+    Ok(res)
+}
+
 struct Add;
 impl CompileNode for Add {
     fn compile(
@@ -426,75 +521,8 @@ impl CompileNode for Add {
         _compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
-        let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
-
-        let res = match node.output_type.clone() {
-            IJType::Tensor(number_type) => {
-                let number_annot = annotation_from_type(&IJType::Number(number_type))?;
-                if children.len() != 2 {
-                    panic!("Expected 2 children for add, found {:?}", children.len());
-                }
-                let operand1_type = node.operands[0].output_type.clone();
-
-                // If the first operand is not a tensor, then the second operand must be
-                // a tensor Since we can't call apply_binary_op on a number, we swap the
-                // operands if this is the case.
-                let (childstream1, childstream2) =
-                    if operand1_type.type_match(&IJType::Tensor(None)) {
-                        (
-                            child_streams.get(&children[0]).unwrap(),
-                            child_streams.get(&children[1]).unwrap(),
-                        )
-                    } else {
-                        (
-                            child_streams.get(&children[1]).unwrap(),
-                            child_streams.get(&children[0]).unwrap(),
-                        )
-                    };
-
-                quote! {
-                    #childstream1.apply_binary_op(&#childstream2, |a: #number_annot, b: #number_annot| a + b).unwrap()
-                }
-            }
-            IJType::Number(_) => {
-                if children.len() != 2 {
-                    panic!("Expected 2 children for add, found {:?}", children.len());
-                }
-
-                let childstream1 = child_streams.get(&children[0]).unwrap();
-                let childstream2 = child_streams.get(&children[1]).unwrap();
-
-                quote! {
-                    #childstream1 + #childstream2
-                }
-            }
-            IJType::Function(f) => {
-                let output_type = *f.output;
-                let number_type = output_type.extract_number_type().unwrap_or_default();
-                let number_annot = annotation_from_type(&IJType::Number(number_type.clone()))?;
-                let tensor_annot = annotation_from_type(&IJType::Tensor(number_type))?;
-                match output_type {
-                    IJType::Number(_) => {
-                        quote! { |a: #number_annot, b: #number_annot| a + b }
-                    }
-                    IJType::Tensor(_) => {
-                        quote! {
-                            |x1: #tensor_annot, x2: #tensor_annot|
-                            x1.apply_binary_op(&x2, |a: #number_annot, b: #number_annot| a + b).unwrap()
-                        }
-                    }
-                    _ => panic!(
-                        "Found add node with unimplemented output type: {:?}",
-                        node.output_type
-                    ),
-                }
-            }
-            _ => panic!(
-                "Found add node with unimplemented output type: {:?}",
-                node.output_type
-            ),
-        };
-        Ok(res)
+        let binary_op = |a: TokenStream, b: TokenStream| quote! {#a + #b};
+        _compile_binary_op(node, child_streams, binary_op)
     }
 }
 struct Subtract;
@@ -504,69 +532,8 @@ impl CompileNode for Subtract {
         _compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
-        if let Operation::Subtract = &node.op {
-            let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
-            let res = match node.output_type.clone() {
-                IJType::Tensor(_) => {
-                    let number_type = node.output_type.extract_number_type().unwrap_or_default();
-                    let number_annot = annotation_from_type(&IJType::Number(number_type.clone()))?;
-                    let (childstream1, childstream2) = if node.operands[0]
-                        .output_type
-                        .type_match(&IJType::Tensor(None))
-                    {
-                        (
-                            child_streams.get(&children[0]).unwrap(),
-                            child_streams.get(&children[1]).unwrap(),
-                        )
-                    } else {
-                        (
-                            child_streams.get(&children[1]).unwrap(),
-                            child_streams.get(&children[0]).unwrap(),
-                        )
-                    };
-
-                    quote! {
-                       #childstream1.apply_binary_op(&#childstream2, |a: #number_annot, b: #number_annot| a - b).unwrap()
-                    }
-                }
-                IJType::Number(_) => {
-                    let childstream1 = child_streams.get(&children[0]).unwrap();
-                    let childstream2 = child_streams.get(&children[1]).unwrap();
-
-                    quote! {
-                        #childstream1 - #childstream2
-                    }
-                }
-                IJType::Function(f) => {
-                    let output_type = *f.output;
-                    let number_type = output_type.extract_number_type().unwrap_or_default();
-                    let number_annot = annotation_from_type(&IJType::Number(number_type.clone()))?;
-                    let tensor_annot = annotation_from_type(&IJType::Tensor(number_type))?;
-                    match output_type {
-                        IJType::Number(_) => {
-                            quote! { |a: #number_annot, b: #number_annot| a - b }
-                        }
-                        IJType::Tensor(_) => {
-                            quote! {
-                                |x1: #tensor_annot, x2: #tensor_annot|
-                                x1.apply_binary_op(&x2, |a: #number_annot, b: #number_annot| a - b).unwrap()
-                            }
-                        }
-                        _ => panic!(
-                            "Found subtract node with unimplemented output type: {:?}",
-                            node.output_type
-                        ),
-                    }
-                }
-                _ => panic!(
-                    "Found subtract node with unimplemented output type: {:?}",
-                    node.output_type
-                ),
-            };
-            Ok(res)
-        } else {
-            panic!("Expected subtract node, found {:?}", node);
-        }
+        let binary_op = |a: TokenStream, b: TokenStream| quote! {#a - #b};
+        _compile_binary_op(node, child_streams, binary_op)
     }
 }
 struct Negate;
@@ -630,67 +597,8 @@ impl CompileNode for Multiply {
         _compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
-        if let Operation::Multiply = &node.op {
-            let children = node.operands.iter().map(|n| n.id).collect::<Vec<_>>();
-            let res = match node.output_type.clone() {
-                IJType::Tensor(number_type) => {
-                    let number_annot = annotation_from_type(&IJType::Number(number_type))?;
-                    let (childstream1, childstream2) = if node.operands[0]
-                        .output_type
-                        .type_match(&IJType::Tensor(None))
-                    {
-                        (
-                            child_streams.get(&children[0]).unwrap(),
-                            child_streams.get(&children[1]).unwrap(),
-                        )
-                    } else {
-                        (
-                            child_streams.get(&children[1]).unwrap(),
-                            child_streams.get(&children[0]).unwrap(),
-                        )
-                    };
-
-                    quote! {
-                        #childstream1.apply_binary_op(&#childstream2, |a: #number_annot, b: #number_annot| a * b).unwrap()
-                    }
-                }
-                IJType::Number(_) => {
-                    let childstream1 = child_streams.get(&children[0]).unwrap();
-                    let childstream2 = child_streams.get(&children[1]).unwrap();
-                    quote! {
-                        #childstream1 * #childstream2
-                    }
-                }
-                IJType::Function(f) => {
-                    let output_type = *f.output;
-                    let number_type = output_type.extract_number_type().unwrap_or_default();
-                    let number_annot = annotation_from_type(&IJType::Number(number_type.clone()))?;
-                    let tensor_annot = annotation_from_type(&IJType::Tensor(number_type))?;
-                    match output_type {
-                        IJType::Number(_) => {
-                            quote! { |a: #number_annot, b: #number_annot| a * b }
-                        }
-                        IJType::Tensor(_) => {
-                            quote! {
-                                |x1: #tensor_annot, x2: #tensor_annot|
-                                x1.apply_binary_op(&x2, |a: #number_annot, b: #number_annot| a * b).unwrap()
-                            }
-                        }
-                        _ => panic!(
-                            "Found multiply node with unimplemented output type: {:?}",
-                            node.output_type
-                        ),
-                    }
-                }
-                _ => panic!(
-                    "Found multiply node with unimplemented output type: {:?}",
-                    node.output_type
-                ),
-            };
-            Ok(res)
-        } else {
-            panic!("Expected multiply node, found {:?}", node);
-        }
+        let binary_op = |a: TokenStream, b: TokenStream| quote! {#a * #b};
+        _compile_binary_op(node, child_streams, binary_op)
     }
 }
 
@@ -1421,22 +1329,22 @@ mod tests {
     #[test]
     fn test_add() {
         compiler_compare("+ [1] [2]", "ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . apply_binary_op (& ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) , | a : _ , b : _ | a + b) . unwrap ()");
-        compiler_compare("+ [1] 2","ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . apply_binary_op (& 2, | a : _ , b : _ | a + b) . unwrap ()");
-        compiler_compare("+ 1 [2]","ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . apply_binary_op (& 1, | a : _ , b : _ | a + b) . unwrap ()");
+        compiler_compare("+ [1] 2","ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . map (| x : _ | x + 2)");
+        compiler_compare("+ 1 [2]","ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . map (| x : _ | 1 + x)");
         compiler_compare("+ 1 2", "1+2");
     }
     #[test]
     fn test_subtract() {
         compiler_compare("- [1] [2]", "ijzer::tensor::Tensor::<_>::from_vec(vec![1], None).apply_binary_op(&ijzer::tensor::Tensor::<_>::from_vec(vec![2], None), |a: _, b: _| a - b).unwrap()");
-        compiler_compare("- [1] 2","ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . apply_binary_op (& 2 , | a : _ , b : _ | a - b) . unwrap ()");
-        compiler_compare("- 1 [2]","ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . apply_binary_op (& 1 , | a : _ , b : _ | a - b) . unwrap ()");
+        compiler_compare("- [1] 2","ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . map (| x : _ | x - 2)");
+        compiler_compare("- 1 [2]","ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . map (| x : _ | 1-x)");
         compiler_compare("- 1 2", "1-2");
     }
     #[test]
     fn test_multiply() {
         compiler_compare("* [1] [2]", "ijzer::tensor::Tensor::<_>::from_vec(vec![1], None).apply_binary_op(&ijzer::tensor::Tensor::<_>::from_vec(vec![2], None), |a: _, b: _| a * b).unwrap()");
-        compiler_compare("* [1] 2","ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . apply_binary_op (& 2 , | a : _ , b : _ | a * b) . unwrap ()");
-        compiler_compare("* 1 [2]","ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . apply_binary_op (& 1 , | a : _ , b : _ | a * b) . unwrap ()");
+        compiler_compare("* [1] 2","ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . map (| x : _ | x * 2)");
+        compiler_compare("* 1 [2]","ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . map (| x : _ | 1 * x)");
         compiler_compare("* 1 2", "1*2");
     }
 
@@ -1512,7 +1420,8 @@ mod tests {
         compiler_compare(input, expected);
 
         let input = "var f: Fn(T->T); <-Fn(N->T) f 1";
-        let expected = "((| _2_1 : _ | ((f) (ijzer :: tensor :: Tensor :: < _ > :: scalar (_2_1))))) (1)";
+        let expected =
+            "((| _2_1 : _ | ((f) (ijzer :: tensor :: Tensor :: < _ > :: scalar (_2_1))))) (1)";
         compiler_compare(input, expected);
 
         let input = "var f: Fn(T->N); <-Fn(N->T) f 1";
