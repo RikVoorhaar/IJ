@@ -43,16 +43,6 @@ impl ParseNode for Symbol {
                     )?;
                     (node, rest)
                 }
-                IJType::Scalar(n) => (
-                    Node::new(
-                        Operation::Symbol(name.clone()),
-                        vec![],
-                        IJType::Scalar(n),
-                        vec![],
-                        context,
-                    )?,
-                    slice,
-                ),
                 IJType::Number(n) => (
                     Node::new(
                         Operation::Symbol(name.clone()),
@@ -132,17 +122,17 @@ mod tests {
         assert_eq!(node.output_type, IJType::Tensor(Some("a".to_string())));
 
         let mut context = ASTContext::new();
-        parse_str("var x: S<a>", &mut context)?;
+        parse_str("var x: N<a>", &mut context)?;
         let node = parse_str("x", &mut context)?;
-        assert_eq!(node.output_type, IJType::Scalar(Some("a".to_string())));
+        assert_eq!(node.output_type, IJType::Number(Some("a".to_string())));
 
         let mut context = ASTContext::new();
-        parse_str("var x: Fn(S<a>->T<a>)", &mut context)?;
+        parse_str("var x: Fn(N<a>->T<a>)", &mut context)?;
         let node = parse_str("~x", &mut context)?;
         assert_eq!(
             node.output_type,
             IJType::Function(FunctionSignature::new(
-                vec![IJType::Scalar(Some("a".to_string()))],
+                vec![IJType::Number(Some("a".to_string()))],
                 IJType::Tensor(Some("a".to_string())),
             ))
         );

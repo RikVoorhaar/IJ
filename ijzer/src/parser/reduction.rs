@@ -31,7 +31,7 @@ impl ParseNode for Reduction {
             Rc::new(Node::new(
                 Operation::Reduce,
                 vec![function.output_type.clone(), operand.output_type.clone()],
-                IJType::Scalar(output_number_type),
+                IJType::Number(output_number_type),
                 vec![function, operand],
                 context,
             )?),
@@ -46,7 +46,7 @@ impl ParseNodeFunctional for Reduction {
         context: &mut ASTContext,
         needed_outputs: Option<&[IJType]>,
     ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
-        let actual_outputs = IJType::Scalar(None);
+        let actual_outputs = IJType::Number(None);
         if !check_ok_needed_outputs(needed_outputs, &actual_outputs) {
             return Err(SyntaxError::FunctionSignatureMismatch(
                 format!("{:?}", needed_outputs),
@@ -67,7 +67,7 @@ impl ParseNodeFunctional for Reduction {
             vec![function.output_type.clone()],
             IJType::Function(FunctionSignature::new(
                 vec![IJType::Tensor(input_number_type)],
-                IJType::Scalar(output_number_type),
+                IJType::Number(output_number_type),
             )),
             vec![function],
             context,
@@ -92,7 +92,7 @@ mod tests {
             node.input_types,
             vec![IJType::number_function(2), IJType::Tensor(None)]
         );
-        assert_eq!(node.output_type, IJType::Scalar(None));
+        assert_eq!(node.output_type, IJType::Number(None));
     }
 
     #[test]
@@ -108,7 +108,7 @@ mod tests {
             node.input_types,
             vec![IJType::number_function(2), IJType::Tensor(None)]
         );
-        assert_eq!(node.output_type, IJType::Scalar(None));
+        assert_eq!(node.output_type, IJType::Number(None));
     }
 
     #[test]
@@ -118,7 +118,7 @@ mod tests {
             Token::Reduction,
             slice,
             &mut context,
-            Some(&[IJType::Scalar(None)]),
+            Some(&[IJType::Number(None)]),
         )?;
         println!("{:?}", result);
         Ok(())
@@ -130,13 +130,13 @@ mod tests {
         parse_str("var f: Fn(N<a>,N<a>->N<a>)", &mut context)?;
         let node = parse_str("/f [1,2]<a>", &mut context)?;
         assert_eq!(node.op, Operation::Reduce);
-        assert_eq!(node.output_type, IJType::Scalar(Some("a".to_string())));
+        assert_eq!(node.output_type, IJType::Number(Some("a".to_string())));
 
         let mut context = ASTContext::new();
         parse_str("var f: Fn(N<a>,N<a>->N<b>)", &mut context)?;
         let node = parse_str("/f [1,2]<a>", &mut context)?;
         assert_eq!(node.op, Operation::Reduce);
-        assert_eq!(node.output_type, IJType::Scalar(Some("b".to_string())));
+        assert_eq!(node.output_type, IJType::Number(Some("b".to_string())));
         Ok(())
     }
 
@@ -150,7 +150,7 @@ mod tests {
             node.output_type,
             IJType::Function(FunctionSignature::new(
                 vec![IJType::Tensor(Some("a".to_string()))],
-                IJType::Scalar(Some("a".to_string()))
+                IJType::Number(Some("a".to_string()))
             ))
         );
 
@@ -162,7 +162,7 @@ mod tests {
             node.output_type,
             IJType::Function(FunctionSignature::new(
                 vec![IJType::Tensor(Some("a".to_string()))],
-                IJType::Scalar(Some("b".to_string()))
+                IJType::Number(Some("b".to_string()))
             ))
         );
         Ok(())
@@ -172,7 +172,7 @@ mod tests {
     fn test_with_composition() -> Result<()> {
         let (node, _) = parse_str_no_context("@(/+, -, +) [1,2] [3,4]")?;
         assert_eq!(node.op, Operation::FunctionComposition(3));
-        assert_eq!(node.output_type, IJType::Scalar(None));
+        assert_eq!(node.output_type, IJType::Number(None));
         Ok(())
     }
 }

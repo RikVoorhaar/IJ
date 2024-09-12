@@ -118,7 +118,6 @@ fn infer_output_number_type(operands: &Vec<Rc<Node>>, output_type: IJType) -> Re
             }
             match output_type {
                 IJType::Tensor(None) => Ok(IJType::Tensor(number_type)),
-                IJType::Scalar(None) => Ok(IJType::Scalar(number_type)),
                 IJType::Number(None) => Ok(IJType::Number(number_type)),
                 _ => unreachable!(),
             }

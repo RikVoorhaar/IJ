@@ -32,6 +32,7 @@ pub enum Operation {
     Solve,
     Diag,
     Index,
+    AssignSymbol(String),
 }
 
 impl Debug for Operation {
@@ -65,6 +66,7 @@ impl Debug for Operation {
             Self::Solve => write!(f, r"\"),
             Self::Diag => write!(f, "diag"),
             Self::Index => write!(f, "<|"),
+            Self::AssignSymbol(s) => write!(f, "AssignSymbol({})", s),
         }
     }
 }

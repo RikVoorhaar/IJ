@@ -193,9 +193,6 @@ pub enum Token {
     #[token("Fn")]
     FunctionType,
 
-    #[token("S", priority = 3)]
-    Scalar,
-
     #[token("T", priority = 3)]
     Tensor,
 
@@ -275,7 +272,6 @@ impl Display for Token {
             Self::RSqBracket => write!(f, "]"),
             Self::Reduction => write!(f, "/"),
             Self::FunctionType => write!(f, "Fn"),
-            Self::Scalar => write!(f, "S"),
             Self::Tensor => write!(f, "T"),
             Self::NumberToken => write!(f, "N"),
             Self::TypeDeclaration => write!(f, ":"),

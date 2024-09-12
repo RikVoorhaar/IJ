@@ -21,7 +21,6 @@ impl ParseNode for Index {
 
         let next_token = context.get_token_at_index(rest.start)?;
         let rest = rest.move_start(1)?;
-        println!("next_token: {:?}", next_token);
         if !matches!(next_token, Token::LSqBracket) {
             return Err(context.add_context_to_syntax_error(
                 SyntaxError::ExpectedLSqBracketAfterIndex.into(),
@@ -53,7 +52,7 @@ impl ParseNode for Index {
             } else {
                 let (node, _) = gather_operands(
                     vec![
-                        vec![IJType::Scalar(Some("usize".to_string()))],
+                        vec![IJType::Number(Some("usize".to_string()))],
                         vec![IJType::Tensor(Some("usize".to_string()))],
                     ],
                     operand_slice,
@@ -64,7 +63,7 @@ impl ParseNode for Index {
         }
         let is_all_numbers = index_operands.iter().all(|n| {
             n.output_type
-                .type_match(&IJType::Scalar(Some("usize".to_string())))
+                .type_match(&IJType::Number(Some("usize".to_string())))
         });
         let contains_colon = index_operands
             .iter()
@@ -81,7 +80,7 @@ impl ParseNode for Index {
             Rc::new(Node::new(
                 Operation::Index,
                 all_operands.iter().map(|n| n.output_type.clone()).collect(),
-                IJType::Scalar(
+                IJType::Number(
                     tensor_operand
                         .output_type
                         .extract_number_type()
@@ -116,11 +115,11 @@ mod tests {
             node.input_types,
             vec![
                 IJType::Tensor(None),
-                IJType::Scalar(None),
-                IJType::Scalar(None)
+                IJType::Number(None),
+                IJType::Number(None)
             ]
         );
-        assert_eq!(node.output_type, IJType::Scalar(None));
+        assert_eq!(node.output_type, IJType::Number(None));
         Ok(())
     }
 
@@ -130,7 +129,7 @@ mod tests {
         assert_eq!(node.op, Operation::Index);
         assert_eq!(
             node.input_types,
-            vec![IJType::Tensor(None), IJType::Scalar(None), IJType::Void]
+            vec![IJType::Tensor(None), IJType::Number(None), IJType::Void]
         );
         assert_eq!(node.output_type, IJType::Tensor(None));
         Ok(())
@@ -144,7 +143,7 @@ mod tests {
             node.input_types,
             vec![
                 IJType::Tensor(None),
-                IJType::Scalar(None),
+                IJType::Number(None),
                 IJType::Tensor(None)
             ]
         );
@@ -167,11 +166,11 @@ mod tests {
             node.input_types,
             vec![
                 IJType::Tensor(Some("i64".to_string())),
-                IJType::Scalar(Some("usize".to_string())),
-                IJType::Scalar(Some("usize".to_string()))
+                IJType::Number(Some("usize".to_string())),
+                IJType::Number(Some("usize".to_string()))
             ]
         );
-        assert_eq!(node.output_type, IJType::Scalar(Some("i64".to_string())));
+        assert_eq!(node.output_type, IJType::Number(Some("i64".to_string())));
         Ok(())
     }
 }

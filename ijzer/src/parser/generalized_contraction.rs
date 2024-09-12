@@ -14,7 +14,7 @@ use std::rc::Rc;
 pub struct GeneralizedContraction;
 impl GeneralizedContraction {
     fn first_signature() -> FunctionSignature {
-        FunctionSignature::new(vec![IJType::Tensor(None)], IJType::Scalar(None))
+        FunctionSignature::new(vec![IJType::Tensor(None)], IJType::Number(None))
     }
     fn second_signature() -> FunctionSignature {
         FunctionSignature::number_function(2)
@@ -180,7 +180,7 @@ mod tests {
     #[test]
     fn test_generalized_contraction_functions() -> Result<()> {
         let mut context = ASTContext::new();
-        parse_str("var f: Fn(T->S)", &mut context)?;
+        parse_str("var f: Fn(T->N)", &mut context)?;
         parse_str("var g: Fn(N,N->N)", &mut context)?;
         let node = parse_str("~? f g", &mut context)?;
         assert_eq!(node.op, Operation::GeneralizedContraction);
@@ -197,21 +197,21 @@ mod tests {
     #[test]
     fn test_generalized_contraction_functions_number_type() -> Result<()> {
         let mut context = ASTContext::new();
-        parse_str("var f: Fn(T->S)", &mut context)?;
+        parse_str("var f: Fn(T->N)", &mut context)?;
         parse_str("var g: Fn(N<f64>,N<f64>->N<f64>)", &mut context)?;
         let node = parse_str("? f g [1] [2]", &mut context)?;
         assert_eq!(node.op, Operation::GeneralizedContraction);
         assert_eq!(node.output_type, IJType::Tensor(Some("f64".to_string())));
 
         let mut context = ASTContext::new();
-        parse_str("var f: Fn(T<a>->S<b>)", &mut context)?;
+        parse_str("var f: Fn(T<a>->N<b>)", &mut context)?;
         parse_str("var g: Fn(N<a>,N<a>->N<a>)", &mut context)?;
         let node = parse_str("? f g [1]<a> [2]<a>", &mut context)?;
         assert_eq!(node.op, Operation::GeneralizedContraction);
         assert_eq!(node.output_type, IJType::Tensor(Some("b".to_string())));
 
         let mut context = ASTContext::new();
-        parse_str("var f: Fn(T<a>->S<b>)", &mut context)?;
+        parse_str("var f: Fn(T<a>->N<b>)", &mut context)?;
         parse_str("var g: Fn(N,N->N)", &mut context)?;
         let node = parse_str("? f g [1]<a> [2]<a>", &mut context)?;
         assert_eq!(node.op, Operation::GeneralizedContraction);
@@ -222,7 +222,7 @@ mod tests {
     #[test]
     fn test_generalized_contraction_functional_number_type() -> Result<()> {
         let mut context = ASTContext::new();
-        parse_str("var f: Fn(T->S)", &mut context)?;
+        parse_str("var f: Fn(T->N)", &mut context)?;
         parse_str("var g: Fn(N<f64>,N<f64>->N<f64>)", &mut context)?;
         let node = parse_str("~? f g", &mut context)?;
         assert_eq!(node.op, Operation::GeneralizedContraction);
@@ -238,7 +238,7 @@ mod tests {
         );
 
         let mut context = ASTContext::new();
-        parse_str("var f: Fn(T<f64>->S<f32>)", &mut context)?;
+        parse_str("var f: Fn(T<f64>->N<f32>)", &mut context)?;
         parse_str("var g: Fn(N<f64>,N<f64>->N<f64>)", &mut context)?;
         let node = parse_str("~? f g", &mut context)?;
         assert_eq!(node.op, Operation::GeneralizedContraction);
@@ -254,7 +254,7 @@ mod tests {
         );
 
         let mut context = ASTContext::new();
-        parse_str("var f: Fn(T<a>->S<b>)", &mut context)?;
+        parse_str("var f: Fn(T<a>->N<b>)", &mut context)?;
         parse_str("var g: Fn(N,N->N)", &mut context)?;
         let node = parse_str("~? f g", &mut context)?;
         assert_eq!(node.op, Operation::GeneralizedContraction);

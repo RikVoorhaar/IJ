@@ -139,12 +139,12 @@ mod tests {
 
     #[test]
     fn test_variable_declaration_scalar() {
-        let result = parse_str_no_context("var b: S");
+        let result = parse_str_no_context("var b: N");
         assert!(result.is_ok());
         let (node, context) = result.unwrap();
         assert_eq!(node.op, Operation::Nothing);
         let expected_var = Variable {
-            typ: IJType::Scalar(None),
+            typ: IJType::Number(None),
             name: "b".to_string(),
         };
         let actual_var = context.symbols.get("b").unwrap();
@@ -167,13 +167,13 @@ mod tests {
 
     #[test]
     fn test_function_declaration_scalar_to_tensor() {
-        let result = parse_str_no_context("var scale: Fn(S -> T)");
+        let result = parse_str_no_context("var scale: Fn(N -> T)");
         assert!(result.is_ok());
         let (node, context) = result.unwrap();
         assert_eq!(node.op, Operation::Nothing);
         let expected_var = Variable {
             typ: IJType::Function(FunctionSignature::new(
-                vec![IJType::Scalar(None)],
+                vec![IJType::Number(None)],
                 IJType::Tensor(None),
             )),
             name: "scale".to_string(),

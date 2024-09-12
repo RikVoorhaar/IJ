@@ -185,9 +185,8 @@ impl<T: Clone + Num> Tensor<T> {
 
         Some(result)
     }
-    pub fn reduce(&self, f: impl Fn(T, T) -> T) -> Tensor<T> {
-        let result = self.data.iter().cloned().reduce(f).unwrap();
-        Tensor::scalar(result)
+    pub fn reduce(&self, f: impl Fn(T, T) -> T) -> T {
+        self.data.iter().cloned().reduce(f).unwrap()
     }
     pub fn sub_tensor(&self, indices: Vec<Option<usize>>) -> Result<Tensor<T>> {
         if indices.len() != self.shape.len() {
@@ -326,11 +325,7 @@ impl<T: Clone + Num> Tensor<T> {
         Ok(result)
     }
     pub fn dot(&self, other: &Tensor<T>) -> Result<Tensor<T>> {
-        self.generalized_contraction(
-            other,
-            |x| x.reduce(|a, b| a + b).extract_scalar().unwrap(),
-            |a, b| a * b,
-        )
+        self.generalized_contraction(other, |x| x.reduce(|a, b| a + b), |a, b| a * b)
     }
 
     /// Concatenates a list of tensors of the same shape along a new axis
@@ -825,14 +820,14 @@ mod tests {
     fn test_reduce_multiplication() {
         let tensor = Tensor::from_vec(vec![2, 3, 4], Some(vec![3]));
         let result = tensor.reduce(|a, b| a * b);
-        assert_eq!(result.to_vec(), vec![24]);
+        assert_eq!(result, 24);
     }
 
     #[test]
     fn test_reduce_summation() {
         let tensor = Tensor::from_vec(vec![1, 2, 3, 4], Some(vec![4]));
         let result = tensor.reduce(|a, b| a + b);
-        assert_eq!(result.to_vec(), vec![10]);
+        assert_eq!(result, 10);
     }
 
     #[test]
@@ -878,7 +873,7 @@ mod tests {
         let result = tensor1
             .generalized_contraction(
                 &tensor2,
-                |x| x.reduce(|a, b| a + b).extract_scalar().unwrap(),
+                |x| x.reduce(|a, b| a + b),
                 |a, b| a * b,
             )
             .unwrap();
@@ -892,7 +887,7 @@ mod tests {
         let result = tensor1
             .generalized_contraction(
                 &tensor2,
-                |x| x.reduce(|a, b| a + b).extract_scalar().unwrap(),
+                |x| x.reduce(|a, b| a + b),
                 |a, b| a * b,
             )
             .unwrap();
@@ -906,7 +901,7 @@ mod tests {
         let result = tensor1
             .generalized_contraction(
                 &tensor2,
-                |x| x.reduce(|a, b| a + b).extract_scalar().unwrap(),
+                |x| x.reduce(|a, b| a + b),
                 |a, b| a * b,
             )
             .unwrap();
@@ -920,7 +915,7 @@ mod tests {
         let result = tensor1
             .generalized_contraction(
                 &tensor2,
-                |x| x.reduce(|a, b| a + b).extract_scalar().unwrap(),
+                |x| x.reduce(|a, b| a + b),
                 |a, b| a * b,
             )
             .unwrap();
@@ -934,7 +929,7 @@ mod tests {
         let result = tensor1
             .generalized_contraction(
                 &tensor2,
-                |x| x.reduce(|a, b| a + b).extract_scalar().unwrap(),
+                |x| x.reduce(|a, b| a + b),
                 |a, b| a * b,
             )
             .unwrap();

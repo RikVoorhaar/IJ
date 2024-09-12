@@ -34,16 +34,16 @@ fn test_assign() {
     assert_eq!(y.to_vec(), x.to_vec());
 
     #[ijzer]
-    fn _test_assign_scalar() -> Tensor<i64> {
+    fn _test_assign_scalar() -> i64 {
         r#"
-        x: S = 1
+        x: N = 1
         x
         "#
     }
 
-    let x = Tensor::scalar(1);
+    let x = 1;
     let y = _test_assign_scalar();
-    assert_eq!(y.to_vec(), x.to_vec());
+    assert_eq!(y, x);
 }
 
 #[test]
@@ -144,7 +144,7 @@ fn test_return_function() {
 #[test]
 fn test_reduce() {
     #[ijzer]
-    fn _test_reduce(x: Tensor<f64>) -> Tensor<f64> {
+    fn _test_reduce(x: Tensor<f64>) -> f64 {
         r#"
         var x: T
         /+ x
@@ -152,12 +152,12 @@ fn test_reduce() {
     }
 
     let x = Tensor::from_vec(vec![1.0, 2.0], Some(vec![2]));
-    let expected = Tensor::from_vec(vec![3.0], Some(vec![1]));
+    let expected = 3.0;
     let y = _test_reduce(x.clone());
-    assert_eq!(y.to_vec(), expected.to_vec());
+    assert_eq!(y, expected);
 
     #[ijzer]
-    fn _test_reduce_2(x: Tensor<f64>, f: fn(f64, f64) -> f64) -> Tensor<f64> {
+    fn _test_reduce_2(x: Tensor<f64>, f: fn(f64, f64) -> f64) -> f64 {
         r#"
         var x: T
         var f: Fn(N,N->N)
@@ -166,38 +166,34 @@ fn test_reduce() {
     }
 
     let x = Tensor::from_vec(vec![1.0, 2.0, 3.0], Some(vec![3]));
-    let expected = Tensor::from_vec(vec![6.0], Some(vec![1]));
+    let expected = 6.0;
     let y = _test_reduce_2(x.clone(), |a, b| a * b);
-    assert_eq!(y.to_vec(), expected.to_vec());
+    assert_eq!(y, expected);
 }
 
 #[test]
 fn test_function_composition() {
     #[ijzer]
-    fn _test_function_composition() -> Tensor<i64> {
+    fn _test_function_composition() -> i64 {
         r#"
         @(/+,+) [1,2]<i64> [3,4]<i64>
         "#
     }
 
-    let expected = Tensor::from_vec(vec![10], Some(vec![1]));
     let y = _test_function_composition();
-    assert_eq!(y.to_vec(), expected.to_vec());
+    assert_eq!(y, 10);
 
     #[ijzer]
-    fn _test_external_function_composition(
-        f: fn(Tensor<i64>, Tensor<i64>) -> Tensor<i64>,
-    ) -> Tensor<i64> {
+    fn _test_external_function_composition(f: fn(Tensor<i64>, Tensor<i64>) -> Tensor<i64>) -> i64 {
         r#"
         var f: Fn(T,T->T)
         @(/+, f) [1,2] [3,4] 
         "#
     }
 
-    let expected = Tensor::from_vec(vec![11], Some(vec![1]));
     let y =
         _test_external_function_composition(|a, b| a.apply_binary_op(&b, |x, y| x * y).unwrap());
-    assert_eq!(y.to_vec(), expected.to_vec());
+    assert_eq!(y, 11);
 }
 
 #[test]
@@ -216,38 +212,43 @@ fn test_type_conversion() {
     assert_eq!(y.to_vec(), expected.to_vec());
 
     #[ijzer]
-    fn _test_type_conversion_func(f: fn(Tensor<i64>, Tensor<i64>) -> Tensor<i64>) -> Tensor<i64> {
+    fn _test_type_conversion_func(f: fn(Tensor<i64>, Tensor<i64>) -> i64) -> i64 {
         r#"
-        var f: Fn(S,S->S)
+        var f: Fn(T,T->N)
         /<-Fn(N,N->N) f [1,2,3,4,5]
         "#
     }
 
-    let f = |a: Tensor<i64>, b: Tensor<i64>| a.apply_binary_op(&b, |x, y| x * y).unwrap();
-    let expected = Tensor::from_vec(vec![120], Some(vec![1]));
+    let f = |a: Tensor<i64>, b: Tensor<i64>| {
+        a.apply_binary_op(&b, |x, y| x * y)
+            .unwrap()
+            .extract_scalar()
+            .unwrap()
+    };
+    let expected = 120;
     let y = _test_type_conversion_func(f);
-    assert_eq!(y.to_vec(), expected.to_vec());
+    assert_eq!(y, expected);
 }
 
 #[test]
 fn test_apply_higher_function() {
-    type TensorFun = Box<dyn Fn(Tensor<i64>) -> Tensor<i64>>;
+    type ScalarFun = Box<dyn Fn(i64) -> i64>;
     #[ijzer]
-    fn _test_apply(f: fn(Tensor<i64>) -> TensorFun) -> Tensor<i64> {
+    fn _test_apply(f: fn(i64) -> ScalarFun) -> i64 {
         r#"
-        var f: Fn(S-> Fn(S->S))
+        var f: Fn(N-> Fn(N->N))
         .(f 2) 4
         "#
     }
 
     /// Turns `x` into a function that multiplies by `x`
-    fn f(x: Tensor<i64>) -> TensorFun {
-        Box::new(move |y: Tensor<i64>| x.apply_binary_op(&y, |a, b| a * b).unwrap())
+    fn f(x: i64) -> ScalarFun {
+        Box::new(move |y: i64| x * y)
     }
 
-    let expected = Tensor::scalar(8);
+    let expected = 8;
     let y = _test_apply(f);
-    assert_eq!(y.to_vec(), expected.to_vec());
+    assert_eq!(y, expected);
 }
 
 #[test]
@@ -319,7 +320,7 @@ fn test_tensor_builder() {
 #[test]
 fn test_apply_unary() {
     #[ijzer]
-    fn _test_apply(x: Tensor<i64>) -> Tensor<i64> {
+    fn _test_apply(x: Tensor<i64>) -> i64 {
         r#"
         var x: T
         .~/+ x
@@ -327,9 +328,8 @@ fn test_apply_unary() {
     }
 
     let x = Tensor::from_vec(vec![1, 2, 3, 4], Some(vec![2, 2]));
-    let expected = Tensor::from_vec(vec![10], Some(vec![1]));
     let y = _test_apply(x.clone());
-    assert_eq!(y.to_vec(), expected.to_vec());
+    assert_eq!(y, 10);
 }
 
 #[test]
@@ -504,7 +504,7 @@ fn test_svd_diag_mul() -> Result<()> {
 #[test]
 fn test_indexing() {
     #[ijzer]
-    fn _test_indexing_scalar(x: Tensor<i64>) -> Tensor<i64> {
+    fn _test_indexing_scalar(x: Tensor<i64>) -> i64 {
         r#"
         var x: T<i64>
         <|x[0,0]
@@ -513,7 +513,7 @@ fn test_indexing() {
 
     let x = Tensor::from_vec(vec![1, 2, 3, 4], Some(vec![2, 2]));
     let y = _test_indexing_scalar(x.clone());
-    assert_eq!(y.to_vec(), vec![1]);
+    assert_eq!(y, 1);
 
     #[ijzer]
     fn _test_indexing_tensor(x: Tensor<i64>) -> Tensor<i64> {
@@ -529,7 +529,6 @@ fn test_indexing() {
     let y = _test_indexing_tensor(x.clone());
     assert_eq!(y.to_vec(), vec![1, 2]);
 
-
     #[ijzer]
     fn _test_indexing_sub_tensor(x: Tensor<i64>) -> Tensor<i64> {
         r#"
@@ -539,6 +538,40 @@ fn test_indexing() {
     }
 
     let x = Tensor::from_vec(vec![1, 2, 3, 4], Some(vec![2, 2]));
-    let y = _test_indexing_tensor(x.clone());
+    let y = _test_indexing_sub_tensor(x.clone());
     assert_eq!(y.to_vec(), vec![1, 2]);
+}
+
+#[test]
+fn test_array_nested() {
+    #[ijzer]
+    fn _test_array_nested(x: Tensor<i64>) -> Tensor<i64> {
+        r#"
+        var x: T<i64>
+        y = [x,x,x]
+        y
+        "#
+    }
+
+    let x = Tensor::from_vec(vec![1, 2, 3, 4], Some(vec![2, 2]));
+    let y = _test_array_nested(x.clone());
+    assert_eq!(y.shape(), &[3, 2, 2]);
+    assert_eq!(y.to_vec(), vec![1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4]);
+}
+
+#[test]
+fn test_add_array_scalar() {
+    #[ijzer]
+    fn _test_add_array_scalar(x: Tensor<i64>, y: i64) -> Tensor<i64> {
+        r#"
+        var x: T<i64>
+        var y: N<i64>
+        + x y
+        "#
+    }
+
+    let x = Tensor::from_vec(vec![1, 2, 3, 4], Some(vec![2, 2]));
+    let y = 1;
+    let z = _test_add_array_scalar(x, y);
+    assert_eq!(z.to_vec(), vec![2, 3, 4, 5]);
 }

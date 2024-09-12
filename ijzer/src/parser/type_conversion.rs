@@ -15,11 +15,7 @@ use std::rc::Rc;
 /// List all possible types a type can be converted to
 fn list_conversions_to(from: &IJType) -> Vec<IJType> {
     match from {
-        IJType::Number(n) | IJType::Scalar(n) => vec![
-            IJType::Number(n.clone()),
-            IJType::Scalar(n.clone()),
-            IJType::Tensor(n.clone()),
-        ],
+        IJType::Number(n) => vec![IJType::Number(n.clone()), IJType::Tensor(n.clone())],
         IJType::Function(signature) => {
             let input_conversions: Vec<Vec<IJType>> = signature
                 .input
@@ -45,14 +41,10 @@ fn list_conversions_to(from: &IJType) -> Vec<IJType> {
 /// list all possible conversions a type could have been converted from
 fn list_conversions_from(to: &IJType) -> Vec<IJType> {
     match to {
-        IJType::Number(n) | IJType::Scalar(n) => {
-            vec![IJType::Number(n.clone()), IJType::Scalar(n.clone())]
+        IJType::Number(n) => {
+            vec![IJType::Number(n.clone())]
         }
-        IJType::Tensor(n) => vec![
-            IJType::Tensor(n.clone()),
-            IJType::Number(n.clone()),
-            IJType::Scalar(n.clone()),
-        ],
+        IJType::Tensor(n) => vec![IJType::Tensor(n.clone()), IJType::Number(n.clone())],
         IJType::Function(signature) => {
             let input_conversions: Vec<Vec<IJType>> = signature
                 .input
@@ -123,7 +115,7 @@ impl ParseNode for TypeConversion {
         let rest = slice.move_start(type_end)?;
 
         match desired_type {
-            IJType::Scalar(_) | IJType::Tensor(_) | IJType::Number(_) => {
+            IJType::Tensor(_) | IJType::Number(_) => {
                 let (operand, rest) = next_node(rest, context)?;
                 let possible_conversions = list_conversions_from(&desired_type);
                 let current_type = operand.output_type.clone();
@@ -216,43 +208,43 @@ mod tests {
     #[test]
     fn test_list_conversions_to() {
         let types = list_conversions_to(&IJType::Number(None));
-        assert_eq!(types.len(), 3);
+        assert_eq!(types.len(), 2);
 
         let types = list_conversions_to(&IJType::Function(FunctionSignature::new(
             vec![IJType::Number(None)],
-            IJType::Scalar(None),
+            IJType::Number(None),
         )));
-        assert_eq!(types.len(), 6);
+        assert_eq!(types.len(), 2);
 
         let types = list_conversions_to(&IJType::Function(FunctionSignature::new(
             vec![IJType::Tensor(None)],
             IJType::Function(FunctionSignature::new(
                 vec![IJType::Number(None)],
-                IJType::Scalar(None),
+                IJType::Number(None),
             )),
         )));
-        assert_eq!(types.len(), 18);
+        assert_eq!(types.len(), 4);
     }
 
     #[test]
     fn test_list_conversions_from() {
         let types = list_conversions_from(&IJType::Number(None));
-        assert_eq!(types.len(), 2);
+        assert_eq!(types.len(), 1);
 
         let types = list_conversions_from(&IJType::Function(FunctionSignature::new(
             vec![IJType::Number(None)],
-            IJType::Scalar(None),
+            IJType::Number(None),
         )));
-        assert_eq!(types.len(), 6);
+        assert_eq!(types.len(), 2);
 
         let types = list_conversions_from(&IJType::Function(FunctionSignature::new(
             vec![IJType::Tensor(None)],
             IJType::Function(FunctionSignature::new(
                 vec![IJType::Number(None)],
-                IJType::Scalar(None),
+                IJType::Number(None),
             )),
         )));
-        assert_eq!(types.len(), 6);
+        assert_eq!(types.len(), 2);
     }
 
     #[test]
@@ -262,7 +254,7 @@ mod tests {
         let slice = context.full_slice();
         let desired_signature = FunctionSignature::new(
             vec![IJType::Number(None), IJType::Number(None)],
-            IJType::Scalar(None),
+            IJType::Number(None),
         );
         let maybe_nodes = type_conversion_functional_part(slice, &mut context, desired_signature);
         assert!(maybe_nodes.is_ok());
@@ -276,7 +268,7 @@ mod tests {
         let slice = context.full_slice();
         let desired_signature = FunctionSignature::new(
             vec![IJType::Tensor(None), IJType::Tensor(None)],
-            IJType::Scalar(None),
+            IJType::Number(None),
         );
         let maybe_nodes = type_conversion_functional_part(slice, &mut context, desired_signature);
         assert!(maybe_nodes.is_err());
@@ -294,13 +286,13 @@ mod tests {
         let (node, _) = result.unwrap();
         assert_eq!(node.op, Operation::TypeConversion);
 
-        let result = parse_str_no_context("<-S [1.0]");
+        let result = parse_str_no_context("<-N [1.0]");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_type_conversion_node_function1() {
-        let result = parse_str_no_context("<-Fn(S,S->T) + 1 1");
+        let result = parse_str_no_context("<-Fn(N,N->T) + 1 1");
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
         assert_eq!(node.op, Operation::Apply);
@@ -309,9 +301,9 @@ mod tests {
     #[test]
     fn test_type_conversion_node_function2() {
         let mut context = ASTContext::new();
-        let result = parse_str("var f: Fn(S->S)", &mut context);
+        let result = parse_str("var f: Fn(T->N)", &mut context);
         assert!(result.is_ok());
-        let maybe_node = parse_str("<-Fn(S->S) f 1", &mut context);
+        let maybe_node = parse_str("<-Fn(N->N) f 1", &mut context);
         assert!(maybe_node.is_ok());
         let node = maybe_node.unwrap();
         assert_eq!(node.op, Operation::Apply);
@@ -322,7 +314,7 @@ mod tests {
         let mut context = ASTContext::new();
         let result = parse_str("var f: Fn(T->T)", &mut context);
         assert!(result.is_ok());
-        let maybe_node = parse_str("<-Fn(S->T) f 1", &mut context);
+        let maybe_node = parse_str("<-Fn(N->T) f 1", &mut context);
         assert!(maybe_node.is_ok());
         let node = maybe_node.unwrap();
         assert_eq!(node.op, Operation::Apply);
@@ -334,14 +326,14 @@ mod tests {
         let mut context = ASTContext::new();
         let result = parse_str("var f: Fn(T->T)", &mut context);
         assert!(result.is_ok());
-        let maybe_node = parse_str("<-Fn(T->S) f [1]", &mut context);
+        let maybe_node = parse_str("<-Fn(T->N) f [1]", &mut context);
         assert!(maybe_node.is_err());
     }
 
     #[test]
     fn test_type_conversion_functional() {
         let mut context = ASTContext::new();
-        let result = parse_str("var f: Fn(S,S->S)", &mut context);
+        let result = parse_str("var f: Fn(T,T->N)", &mut context);
         assert!(result.is_ok());
         let maybe_node = parse_str("/<-Fn(N,N->N) f [1]", &mut context);
         assert!(maybe_node.is_ok());
@@ -353,19 +345,19 @@ mod tests {
     #[test]
     fn test_type_conversion_number_type() -> Result<()> {
         let mut context = ASTContext::new();
-        parse_str("var x: S<a>", &mut context)?;
+        parse_str("var x: N<a>", &mut context)?;
         let node = parse_str("<-N<a> x", &mut context)?;
         assert_eq!(node.op, Operation::TypeConversion);
         assert_eq!(node.output_type, IJType::Number(Some("a".to_string())));
 
         let mut context = ASTContext::new();
         parse_str("var x: N<a>", &mut context)?;
-        let node = parse_str("<-S<a> x", &mut context)?;
+        let node = parse_str("<-N<a> x", &mut context)?;
         assert_eq!(node.op, Operation::TypeConversion);
-        assert_eq!(node.output_type, IJType::Scalar(Some("a".to_string())));
+        assert_eq!(node.output_type, IJType::Number(Some("a".to_string())));
 
         let mut context = ASTContext::new();
-        parse_str("var x: Fn(S<a>->S<a>)", &mut context)?;
+        parse_str("var x: Fn(N<a>->N<a>)", &mut context)?;
         let node = parse_str("~<-Fn(N<a>->N<a>) x", &mut context)?;
         assert_eq!(node.op, Operation::TypeConversion);
         assert_eq!(

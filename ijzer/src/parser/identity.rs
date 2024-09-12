@@ -15,7 +15,7 @@ impl ParseNode for IdentityNode {
         context: &mut ASTContext,
     ) -> Result<(Rc<Node>, TokenSlice)> {
         let (operands, rest) = gather_operands(
-            vec![vec![IJType::Scalar(None)], vec![IJType::Tensor(None)]],
+            vec![vec![IJType::Number(None)], vec![IJType::Tensor(None)]],
             tokens,
             context,
         )?;
@@ -36,7 +36,7 @@ impl ParseNodeFunctional for IdentityNode {
         let slice = slice.move_start(1)?;
         let output_types = match needed_outputs {
             Some(outputs) => outputs,
-            None => &[IJType::Scalar(None), IJType::Tensor(None)],
+            None => &[IJType::Number(None), IJType::Tensor(None)],
         };
 
         let nodes = output_types
@@ -79,10 +79,10 @@ mod tests {
 
     #[test]
     fn test_identity_functional() -> Result<()> {
-        let (node, _) = parse_str_no_context("~I: Fn(S->S)")?;
+        let (node, _) = parse_str_no_context("~I: Fn(N->N)")?;
         assert_eq!(node.op, Operation::Identity);
         assert_eq!(node.input_types.len(), 0);
-        assert_eq!(node.output_type, IJType::scalar_function(1));
+        assert_eq!(node.output_type, IJType::number_function(1));
         let (node, _) = parse_str_no_context("~I: Fn(T->T)")?;
         assert_eq!(node.op, Operation::Identity);
         assert_eq!(node.input_types.len(), 0);
@@ -97,13 +97,13 @@ mod tests {
     #[test]
     fn test_identity_number_type() -> Result<()> {
         let (node, _) = parse_str_no_context("I 1<a>")?;
-        assert_eq!(node.output_type, IJType::Scalar(Some("a".to_string())));
+        assert_eq!(node.output_type, IJType::Number(Some("a".to_string())));
 
         let (node, _) = parse_str_no_context("I [1]<a>")?;
         assert_eq!(node.output_type, IJType::Tensor(Some("a".to_string())));
 
         let (node, _) = parse_str_no_context("I I I I I 1<a>")?;
-        assert_eq!(node.output_type, IJType::Scalar(Some("a".to_string())));
+        assert_eq!(node.output_type, IJType::Number(Some("a".to_string())));
 
         Ok(())
     }

@@ -274,7 +274,7 @@ mod tests {
         assert_eq!(node.input_types, vec![IJType::Tensor(None); 2]);
         assert_eq!(node.output_type, IJType::Void);
         let first_operand = &node.operands[0];
-        assert_eq!(first_operand.op, Operation::Symbol("x".to_string()));
+        assert_eq!(first_operand.op, Operation::AssignSymbol("x".to_string()));
         assert_eq!(first_operand.output_type, IJType::Tensor(None));
         let second_operand = &node.operands[1];
         assert_eq!(second_operand.output_type, IJType::Tensor(None));
@@ -289,18 +289,18 @@ mod tests {
     }
 
     #[test]
-    fn test_scalar_assignment() {
-        let result = parse_str_no_context("x: S = 1");
+    fn test_number_assignment() {
+        let result = parse_str_no_context("x: N = 1");
         assert!(result.is_ok());
         let (node, context) = result.unwrap();
         assert_eq!(node.op, Operation::Assign);
-        assert_eq!(node.input_types, vec![IJType::Scalar(None); 2]);
+        assert_eq!(node.input_types, vec![IJType::Number(None); 2]);
         assert_eq!(node.output_type, IJType::Void);
         let first_operand = &node.operands[0];
-        assert_eq!(first_operand.op, Operation::Symbol("x".to_string()));
-        assert_eq!(first_operand.output_type, IJType::Scalar(None));
+        assert_eq!(first_operand.op, Operation::AssignSymbol("x".to_string()));
+        assert_eq!(first_operand.output_type, IJType::Number(None));
         let second_operand = &node.operands[1];
-        assert_eq!(second_operand.output_type, IJType::Scalar(None));
+        assert_eq!(second_operand.output_type, IJType::Number(None));
         assert_eq!(
             second_operand.op,
             Operation::Number(tokens::Number {
@@ -309,7 +309,7 @@ mod tests {
         );
 
         let expected_var = Variable {
-            typ: IJType::Scalar(None),
+            typ: IJType::Number(None),
             name: "x".to_string(),
         };
         let actual_var = context.symbols.get("x").unwrap();
@@ -338,7 +338,7 @@ mod tests {
         );
         assert_eq!(node.output_type, IJType::Void);
         let first_operand = &node.operands[0];
-        assert_eq!(first_operand.op, Operation::Symbol("x".to_string()));
+        assert_eq!(first_operand.op, Operation::AssignSymbol("x".to_string()));
 
         assert_eq!(
             first_operand.output_type,
@@ -371,12 +371,12 @@ mod tests {
     #[test]
     fn test_var_definition_and_use() {
         let mut context = ASTContext::new();
-        parse_str("var x: Fn(S->T)", &mut context).unwrap();
+        parse_str("var x: Fn(N->T)", &mut context).unwrap();
         let result = parse_str("x 1", &mut context);
         assert!(result.is_ok());
         let node = result.unwrap();
         assert_eq!(node.op, Operation::Function("x".to_string()));
-        assert_eq!(node.input_types, vec![IJType::Scalar(None)]);
+        assert_eq!(node.input_types, vec![IJType::Number(None)]);
         assert_eq!(node.output_type, IJType::Tensor(None));
     }
 
@@ -398,18 +398,18 @@ mod tests {
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
         assert_eq!(node.op, Operation::Negate);
-        assert_eq!(node.input_types, vec![IJType::Scalar(None)]);
-        assert_eq!(node.output_type, IJType::Scalar(None));
+        assert_eq!(node.input_types, vec![IJType::Number(None)]);
+        assert_eq!(node.output_type, IJType::Number(None));
     }
 
     #[test]
     fn test_semicolon_handling() {
         // Test with semicolon at the end - should pass
-        let result_with_semicolon = parse_str_no_context("var x: S;");
+        let result_with_semicolon = parse_str_no_context("var x: N;");
         assert!(result_with_semicolon.is_ok());
 
         // Test without semicolon at the end - should also pass and be equivalent
-        let result_without_semicolon = parse_str_no_context("var x: S");
+        let result_without_semicolon = parse_str_no_context("var x: N");
         assert!(result_without_semicolon.is_ok());
 
         // Compare the results to ensure they are equivalent
@@ -421,7 +421,7 @@ mod tests {
         );
 
         // Test with semicolon not at the end - should fail
-        let result_error = parse_str_no_context("var x: S; var y: T");
+        let result_error = parse_str_no_context("var x: N; var y: T");
         assert!(result_error.is_err());
         assert!(is_specific_syntax_error(
             &result_error.unwrap_err(),
@@ -432,26 +432,26 @@ mod tests {
     #[test]
     fn test_group_return_type() -> Result<()> {
         let mut context = ASTContext::new();
-        parse_str("var f: Fn(T->(S,T))", &mut context)?;
+        parse_str("var f: Fn(T->(N,T))", &mut context)?;
         let node = parse_str("f [1]", &mut context)?;
         assert_eq!(
             node.output_type,
-            IJType::Group(vec![IJType::Scalar(None), IJType::Tensor(None)])
+            IJType::Group(vec![IJType::Number(None), IJType::Tensor(None)])
         );
 
         let mut context = ASTContext::new();
-        parse_str("var f: Fn(T->(S,T))", &mut context)?;
+        parse_str("var f: Fn(T->(N,T))", &mut context)?;
         let node = parse_str("x = f[1]", &mut context)?;
         assert_eq!(node.op, Operation::Assign);
         let node0 = &node.operands[0];
         assert_eq!(
             node0.output_type,
-            IJType::Group(vec![IJType::Scalar(None), IJType::Tensor(None)])
+            IJType::Group(vec![IJType::Number(None), IJType::Tensor(None)])
         );
         let node1 = &node.operands[1];
         assert_eq!(
             node1.output_type,
-            IJType::Group(vec![IJType::Scalar(None), IJType::Tensor(None)])
+            IJType::Group(vec![IJType::Number(None), IJType::Tensor(None)])
         );
 
         Ok(())

@@ -25,7 +25,7 @@ impl ParseNode for NumberNode {
                     Rc::new(Node::new(
                         node_op,
                         vec![],
-                        IJType::Scalar(Some(n.clone())),
+                        IJType::Number(Some(n.clone())),
                         vec![],
                         context,
                     )?),
@@ -36,7 +36,7 @@ impl ParseNode for NumberNode {
                 Rc::new(Node::new(
                     node_op,
                     vec![],
-                    IJType::Scalar(None),
+                    IJType::Number(None),
                     vec![],
                     context,
                 )?),
@@ -61,7 +61,7 @@ mod tests {
                 value: "1.0".to_string()
             })
         );
-        assert_eq!(node.output_type, IJType::Scalar(None));
+        assert_eq!(node.output_type, IJType::Number(None));
         let (node, _) = parse_str_no_context("1")?;
         assert_eq!(
             node.op,
@@ -69,7 +69,7 @@ mod tests {
                 value: "1".to_string()
             })
         );
-        assert_eq!(node.output_type, IJType::Scalar(None));
+        assert_eq!(node.output_type, IJType::Number(None));
         Ok(())
     }
 
@@ -82,7 +82,7 @@ mod tests {
                 value: "1.0".to_string()
             })
         );
-        assert_eq!(node.output_type, IJType::Scalar(Some("_".to_string())));
+        assert_eq!(node.output_type, IJType::Number(Some("_".to_string())));
         let (node, _) = parse_str_no_context("1.0<f64>")?;
         assert_eq!(
             node.op,
@@ -90,7 +90,7 @@ mod tests {
                 value: "1.0".to_string()
             })
         );
-        assert_eq!(node.output_type, IJType::Scalar(Some("f64".to_string())));
+        assert_eq!(node.output_type, IJType::Number(Some("f64".to_string())));
         let (node, _) = parse_str_no_context("1<i32>")?;
         assert_eq!(
             node.op,
@@ -98,7 +98,7 @@ mod tests {
                 value: "1".to_string()
             })
         );
-        assert_eq!(node.output_type, IJType::Scalar(Some("i32".to_string())));
+        assert_eq!(node.output_type, IJType::Number(Some("i32".to_string())));
         Ok(())
     }
 }

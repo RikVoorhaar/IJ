@@ -28,7 +28,7 @@ impl ParseNode for LSqBracket {
             .into_iter()
             .map(|s| {
                 let (operands, remainder) = gather_operands(
-                    vec![vec![IJType::Tensor(None)], vec![IJType::Scalar(None)]],
+                    vec![vec![IJType::Tensor(None)], vec![IJType::Number(None)]],
                     s,
                     context,
                 )?;
