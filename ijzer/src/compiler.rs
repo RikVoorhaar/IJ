@@ -1447,55 +1447,56 @@ mod tests {
         let expected = "f";
         compiler_compare(input, expected);
 
-        let input = "~+: Fn(S,S->S)";
-        let expected = "| x1 : ijzer :: tensor :: Tensor :: < _ > , x2 : ijzer :: tensor :: Tensor :: < _ > | x1 . apply_binary_op (& x2 , | a : _ , b : _ | a + b) . unwrap ()";
+        let input = "~+: Fn(N,N->N)";
+        let expected = "| a : _ , b: _ | a + b";
         compiler_compare(input, expected);
     }
 
     #[test]
     fn test_type_conversion_with_as_function() {
-        let input = "~(<-Fn(S,S->T) +)";
-        let expected = "(| _5_1 : ijzer :: tensor :: Tensor :: < _ > , _5_2 : ijzer :: tensor :: Tensor :: < _ > | ((| x1 : ijzer :: tensor :: Tensor :: < _ > , x2 : ijzer :: tensor :: Tensor :: < _ > | x1 . apply_binary_op (& x2 , | a : _ , b : _ | a + b) . unwrap ()) (_5_1 , _5_2)))";
+        let input = "~(<-Fn(N,N->T) +)";
+        let expected = "(| _4_1 : _ , _4_2 : _ | (ijzer :: tensor :: Tensor :: < _ > :: scalar ((| a : _ , b : _ | a + b) (_4_1 , _4_2))))";
         compiler_compare(input, expected);
     }
     #[test]
     fn test_function_composition_functional() {
-        let input = "~@(-,+):Fn(S,S->S)";
-        let expected = "| _13_1 : ijzer :: tensor :: Tensor :: < _ > , _13_2 : ijzer :: tensor :: Tensor :: < _ > | (| x : ijzer :: tensor :: Tensor :: < _ > | x . map (| a : _ | - a)) ((| x1 : ijzer :: tensor :: Tensor :: < _ > , x2 : ijzer :: tensor :: Tensor :: < _ > | x1 . apply_binary_op (& x2 , | a : _ , b : _ | a + b) . unwrap ()) (_13_1 , _13_2))";
+        let input = "~@(-,+):Fn(N,N->N)";
+        let expected =
+            "| _10_1 : _ , _10_2 : _ | (| a : _ | - a) ((| a : _ , b : _ | a + b) (_10_1 , _10_2))";
         compiler_compare(input, expected);
     }
 
     #[test]
     fn test_reduction_in_composition() {
-        let input = "~@(/+,+):Fn(T,T->S)";
-        let expected = "| _7_1 : ijzer :: tensor :: Tensor :: < _ > , _7_2 : ijzer :: tensor :: Tensor :: < _ > | (| _1 : ijzer :: tensor :: Tensor :: < _ > | _1 . reduce (| a : _ , b : _ | a + b)) ((| x1 : ijzer :: tensor :: Tensor :: < _ > , x2 : ijzer :: tensor :: Tensor :: < _ > | x1 . apply_binary_op (& x2 , | a : _ , b : _ | a + b) . unwrap ()) (_7_1 , _7_2))";
+        let input = "~@(/+,+):Fn(T,T->N)";
+        let expected = "| _6_1 : ijzer :: tensor :: Tensor :: < _ > , _6_2 : ijzer :: tensor :: Tensor :: < _ > | (| _1 : ijzer :: tensor :: Tensor :: < _ > | _1 . reduce (| a : _ , b : _ | a + b)) ((| x1 : ijzer :: tensor :: Tensor :: < _ > , x2 : ijzer :: tensor :: Tensor :: < _ > | x1 . apply_binary_op (& x2 , | a : _ , b : _ | a + b) . unwrap ()) (_6_1 , _6_2))";
         compiler_compare(input, expected);
     }
 
     #[test]
     fn test_apply() -> Result<()> {
-        let input = "var f: Fn(S,S->S); .~f 1 2";
-        let expected = "(f) (ijzer :: tensor :: Tensor :: < _ > :: scalar (1) , ijzer :: tensor :: Tensor :: < _ > :: scalar (2))";
+        let input = "var f: Fn(N,N->N); .~f 1 2";
+        let expected = "(f) (1,2)";
         compiler_compare(input, expected);
 
-        let input = "var f: Fn(S<f64>,S<f64>->S<f64>); .~f 1<f64> 2<f64>";
-        let expected = "(f) (ijzer :: tensor :: Tensor :: < f64 > :: scalar (1) , ijzer :: tensor :: Tensor :: < f64 > :: scalar (2))";
+        let input = "var f: Fn(N<f64>,N<f64>->N<f64>); .~f 1<f64> 2<f64>";
+        let expected = "(f) (1 as f64, 2 as f64)";
         compiler_compare(input, expected);
 
-        let input = "var f: Fn(S->Fn(S->S)); .(f 1) 2";
-        let expected = "(f (ijzer :: tensor :: Tensor :: < _ > :: scalar (1))) (ijzer :: tensor :: Tensor :: < _ > :: scalar (2))";
+        let input = "var f: Fn(N->Fn(N->N)); .(f 1) 2";
+        let expected = "(f (1)) (2)";
         compiler_compare(input, expected);
         Ok(())
     }
 
     #[test]
     fn test_lambda_variable_functional() -> Result<()> {
-        let input = "g($x:Fn(N,N->N)) -> S = /$x [1]";
+        let input = "g($x:Fn(N,N->N)) -> N = /$x [1]";
         let expected = "let g = { | _x : fn (_ , _) -> _ | ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . reduce (_x) } ;";
         compiler_compare(input, expected);
 
-        let input = "g($x:Fn(S->T), $y:Fn(T->S)) -> Fn(T->T) = ~@($x,$y)";
-        let expected = "let g = { | _x : fn (ijzer :: tensor :: Tensor :: < _ >) -> ijzer :: tensor :: Tensor :: < _ > , _y : fn (ijzer :: tensor :: Tensor :: < _ >) -> ijzer :: tensor :: Tensor :: < _ > | | _4_1 : ijzer :: tensor :: Tensor :: < _ > | (_x) ((_y) (_4_1)) } ;";
+        let input = "g($x:Fn(N->T), $y:Fn(T->N)) -> Fn(T->T) = ~@($x,$y)";
+        let expected = "let g = { | _x : fn (_) -> ijzer :: tensor :: Tensor :: < _ > , _y : fn (ijzer :: tensor :: Tensor :: < _ >) -> _ | | _4_1 : ijzer :: tensor :: Tensor :: < _ > | (_x) ((_y) (_4_1)) } ;";
         compiler_compare(input, expected);
 
         Ok(())
@@ -1504,7 +1505,7 @@ mod tests {
     #[test]
     fn test_generalized_contraction() -> Result<()> {
         let input = "?/+* [1] [2]";
-        let expected = "ijzer::tensor::Tensor::<_>::from_vec(vec![1],None).generalized_contraction(&ijzer::tensor::Tensor::<_>::from_vec(vec![2],None),(|z:&ijzer::tensor::Tensor::<_>|(|_1:ijzer::tensor::Tensor::<_>|_1.reduce(|a:_,b:_|a+b))(z.clone()).extract_scalar().unwrap()),|a:_,b:_|a*b).unwrap()";
+        let expected = "ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . generalized_contraction (& ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) , (| z : & ijzer :: tensor :: Tensor :: < _ > | (| _1 : ijzer :: tensor :: Tensor :: < _ > | _1 . reduce (| a : _ , b : _ | a + b)) (z . clone ())) , | a : _ , b : _ | a * b) . unwrap ()";
         compiler_compare(input, expected);
 
         Ok(())
@@ -1513,7 +1514,7 @@ mod tests {
     #[test]
     fn test_generalized_contraction_functional() -> Result<()> {
         let input = "~?/+*";
-        let expected = "| x : ijzer :: tensor :: Tensor :: < _ > , y : ijzer :: tensor :: Tensor :: < _ > | x . generalized_contraction (& y , (| z : & ijzer :: tensor :: Tensor :: < _ > | (| _1 : ijzer :: tensor :: Tensor :: < _ > | _1 . reduce (| a : _ , b : _ | a + b)) (z . clone ()) . extract_scalar () . unwrap ()) , | a : _ , b : _ | a * b) . unwrap ()";
+        let expected = "| x : ijzer :: tensor :: Tensor :: < _ > , y : ijzer :: tensor :: Tensor :: < _ > | x . generalized_contraction (& y , (| z : & ijzer :: tensor :: Tensor :: < _ > | (| _1 : ijzer :: tensor :: Tensor :: < _ > | _1 . reduce (| a : _ , b : _ | a + b)) (z . clone ())) , | a : _ , b : _ | a * b) . unwrap ()";
         compiler_compare(input, expected);
 
         Ok(())
@@ -1576,8 +1577,8 @@ mod tests {
 
     #[test]
     fn test_group_assign() -> Result<()> {
-        let input = "(x: S<a>, y: S) = (1<a>,2)";
-        let expected = "let (x , y) : (ijzer :: tensor :: Tensor :: < a > , ijzer :: tensor :: Tensor :: < _ >) = (ijzer :: tensor :: Tensor :: < a > :: scalar (1) , ijzer :: tensor :: Tensor :: < _ > :: scalar (2)) ;";
+        let input = "(x: N<a>, y: N) = (1<a>,2)";
+        let expected = "let (x , y) : (a, _) = (1 as a , 2) ;";
         compiler_compare(input, expected);
 
         let input = "var f: Fn(T->(T,T)); (x: T, y: T) = f [1]";
@@ -1656,11 +1657,11 @@ mod tests {
     #[test]
     fn test_multi_index() -> Result<()> {
         let input = r"var x: T; <| x [1,2]";
-        let expected = "ijzer::tensor::Tensor::<_>::scalar(x[&vec![ijzer::tensor::Tensor::<_>::scalar(1).extract_scalar().unwrap(),ijzer::tensor::Tensor::<_>::scalar(2).extract_scalar().unwrap()]].clone())";
+        let expected = "x [& vec ! [1 , 2]] . clone ()";
         compiler_compare(input, expected);
 
         let input = r"var x: T; <| x [1,:]";
-        let expected = "x.sub_tensor (vec ! [Some (ijzer :: tensor :: Tensor :: < _ > :: scalar (1) . extract_scalar () . unwrap ()) , None]).unwrap()";
+        let expected = "x.sub_tensor (vec ! [Some(1), None]).unwrap()";
         compiler_compare(input, expected);
 
         let input = r"var x: T; var s1: T; var s2: T; <| x [s1,s2]";

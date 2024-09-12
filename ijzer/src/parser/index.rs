@@ -21,7 +21,6 @@ impl ParseNode for Index {
 
         let next_token = context.get_token_at_index(rest.start)?;
         let rest = rest.move_start(1)?;
-        println!("next_token: {:?}", next_token);
         if !matches!(next_token, Token::LSqBracket) {
             return Err(context.add_context_to_syntax_error(
                 SyntaxError::ExpectedLSqBracketAfterIndex.into(),
