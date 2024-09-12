@@ -548,8 +548,7 @@ fn test_array_nested() {
     fn _test_array_nested(x: Tensor<i64>) -> Tensor<i64> {
         r#"
         var x: T<i64>
-        y = x
-        z = x
+        y = [x,x,x]
         y
         "#
     }
@@ -558,4 +557,21 @@ fn test_array_nested() {
     let y = _test_array_nested(x.clone());
     assert_eq!(y.shape(), &[3, 2, 2]);
     assert_eq!(y.to_vec(), vec![1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4]);
+}
+
+#[test]
+fn test_add_array_scalar() {
+    #[ijzer]
+    fn _test_add_array_scalar(x: Tensor<i64>, y: i64) -> Tensor<i64> {
+        r#"
+        var x: T<i64>
+        var y: N<i64>
+        + x y
+        "#
+    }
+
+    let x = Tensor::from_vec(vec![1, 2, 3, 4], Some(vec![2, 2]));
+    let y = 1;
+    let z = _test_add_array_scalar(x, y);
+    assert_eq!(z.to_vec(), vec![2, 3, 4, 5]);
 }
