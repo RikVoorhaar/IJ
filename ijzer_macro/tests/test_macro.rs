@@ -541,3 +541,21 @@ fn test_indexing() {
     let y = _test_indexing_sub_tensor(x.clone());
     assert_eq!(y.to_vec(), vec![1, 2]);
 }
+
+#[test]
+fn test_array_nested() {
+    #[ijzer]
+    fn _test_array_nested(x: Tensor<i64>) -> Tensor<i64> {
+        r#"
+        var x: T<i64>
+        y = x
+        z = x
+        y
+        "#
+    }
+
+    let x = Tensor::from_vec(vec![1, 2, 3, 4], Some(vec![2, 2]));
+    let y = _test_array_nested(x.clone());
+    assert_eq!(y.shape(), &[3, 2, 2]);
+    assert_eq!(y.to_vec(), vec![1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4]);
+}

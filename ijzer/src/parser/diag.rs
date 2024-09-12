@@ -84,7 +84,7 @@ mod tests {
         let (node, _) = parse_str_no_context("x = diag [1,2]")?;
         assert_eq!(node.op, Operation::Assign);
         let lhs = node.operands[0].clone();
-        assert_eq!(lhs.op, Operation::Symbol("x".to_string()));
+        assert_eq!(lhs.op, Operation::AssignSymbol("x".to_string()));
         let rhs = node.operands[1].clone();
         assert_eq!(rhs.op, Operation::Diag);
         Ok(())

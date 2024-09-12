@@ -209,7 +209,7 @@ pub fn parse_group_assign(
                 }
             }
             symbol_nodes.push(Rc::new(Node::new(
-                Operation::Symbol(lhs_name.clone()),
+                Operation::AssignSymbol(lhs_name.clone()),
                 vec![],
                 rhs_type.clone(),
                 vec![],
@@ -284,7 +284,7 @@ pub fn parse_assign(context: &mut ASTContext) -> Result<Rc<Node>> {
         }
     }
     let symbol_node = Rc::new(Node::new(
-        Operation::Symbol(symbol_name.clone()),
+        Operation::AssignSymbol(symbol_name.clone()),
         vec![],
         symbol_type.clone(),
         vec![],
@@ -422,7 +422,7 @@ mod tests {
         let node = parse_assign(&mut context)?;
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 2);
-        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
         assert_eq!(node.operands[0].output_type, IJType::Tensor(None));
         assert_eq!(node.operands[1].op, Operation::Array);
         assert_eq!(node.operands[1].output_type, IJType::Tensor(None));
@@ -436,7 +436,7 @@ mod tests {
         let node = parse_assign(&mut context)?;
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 2);
-        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
         assert_eq!(node.operands[0].output_type, IJType::Tensor(None));
         assert_eq!(node.operands[1].op, Operation::Array);
         assert_eq!(node.operands[1].output_type, IJType::Tensor(None));
@@ -451,7 +451,7 @@ mod tests {
         let node = parse_assign(&mut context)?;
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 2);
-        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
         assert_eq!(node.operands[0].output_type, IJType::Number(None));
         assert_eq!(node.operands[1].output_type, IJType::Number(None));
         Ok(())
@@ -482,7 +482,7 @@ mod tests {
         println!("{:?}", node);
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 3);
-        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
         assert_eq!(
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
@@ -503,7 +503,7 @@ mod tests {
         println!("{:?}", node);
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 3);
-        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
         assert_eq!(
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
@@ -523,7 +523,7 @@ mod tests {
         println!("{:?}", node);
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 3);
-        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
         assert_eq!(
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
@@ -550,7 +550,7 @@ mod tests {
         println!("{:?}", node);
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 3);
-        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
         assert_eq!(
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
@@ -571,7 +571,7 @@ mod tests {
         println!("{:?}", node);
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 3);
-        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
         assert_eq!(
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
@@ -592,7 +592,7 @@ mod tests {
         println!("{:?}", node);
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 3);
-        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
         assert_eq!(
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
@@ -613,7 +613,7 @@ mod tests {
         println!("{:?}", node);
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 4);
-        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
         assert_eq!(
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
@@ -635,7 +635,7 @@ mod tests {
         println!("{:?}", node);
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 3);
-        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
         assert_eq!(
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
@@ -665,7 +665,7 @@ mod tests {
         println!("{:?}", node);
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 4);
-        assert_eq!(node.operands[0].op, Operation::Symbol("g".to_string()));
+        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
         assert_eq!(
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(

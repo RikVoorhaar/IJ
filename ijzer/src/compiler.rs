@@ -184,6 +184,7 @@ impl CompilerContext {
             Operation::Solve => Solve::compile(node, self, child_streams)?,
             Operation::Diag => Diag::compile(node, self, child_streams)?,
             Operation::Index => Index::compile(node, self, child_streams)?,
+            Operation::AssignSymbol(_) => AssignSymbol::compile(node, self, child_streams)?,
             // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
@@ -293,7 +294,31 @@ impl CompileNode for Symbol {
     ) -> Result<TokenStream> {
         if let Operation::Symbol(symbol) = &node.op {
             let varname = Ident::new(symbol.as_str(), Span::call_site());
-            Ok(quote!(#varname))
+            match node.output_type {
+                IJType::Tensor(_) => Ok(quote! {
+                    #varname.clone()
+                }),
+                _ => Ok(quote! {
+                    #varname
+                }),
+            }
+        } else {
+            panic!("Expected symbol node, found {:?}", node);
+        }
+    }
+}
+struct AssignSymbol;
+impl CompileNode for AssignSymbol {
+    fn compile(
+        node: Rc<Node>,
+        _: &mut CompilerContext,
+        _: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        if let Operation::AssignSymbol(symbol) = &node.op {
+            let varname = Ident::new(symbol.as_str(), Span::call_site());
+            Ok(quote! {
+                #varname
+            })
         } else {
             panic!("Expected symbol node, found {:?}", node);
         }
@@ -1301,7 +1326,7 @@ mod tests {
         let input3 = "
         x = [1];
         y= + x x;";
-        let expexted = "let x : ijzer :: tensor :: Tensor :: < _ > = ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) ; let y : ijzer :: tensor :: Tensor :: < _ > = x . apply_binary_op (& x , | a : _ , b : _ | a + b) . unwrap () ;";
+        let expexted = "let x : ijzer :: tensor :: Tensor :: < _ > = ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) ; let y : ijzer :: tensor :: Tensor :: < _ > = x.clone() . apply_binary_op (& x.clone() , | a : _ , b : _ | a + b) . unwrap () ;";
         compiler_compare(input1, expexted);
         compiler_compare(input2, expexted);
         compiler_compare(input3, expexted);
@@ -1311,7 +1336,7 @@ mod tests {
     fn test_simple_function() {
         let input1 = "var y: T; f($x) -> T = + y $x";
         let input2 = "var y: T; f($x) = + y $x";
-        let expexted = "let f = { | _x: ijzer::tensor::Tensor::<_> | y.apply_binary_op(&_x, |a: _, b: _| a + b).unwrap() } ;";
+        let expexted = "let f = { | _x: ijzer::tensor::Tensor::<_> | y.clone().apply_binary_op(&_x, |a: _, b: _| a + b).unwrap() } ;";
         compiler_compare(input1, expexted);
         compiler_compare(input2, expexted);
     }
@@ -1354,7 +1379,7 @@ mod tests {
             "-[1]",
             "ijzer::tensor::Tensor::<_>::from_vec(vec![1], None).map(|a: _| -a)",
         );
-        compiler_compare("var x: T; -x", "x.map(|a: _| -a)");
+        compiler_compare("var x: T; -x", "x.clone().map(|a: _| -a)");
         compiler_compare("var x: N<f64>; -x", "-x");
     }
 
@@ -1531,11 +1556,11 @@ mod tests {
         compiler_compare(input, expected);
 
         let input = "var x: T<usize>; randu<f32> x";
-        let expected = "ijzer::tensor::Tensor::<f32>::randu(x.to_vec().as_slice())";
+        let expected = "ijzer::tensor::Tensor::<f32>::randu(x.clone().to_vec().as_slice())";
         compiler_compare(input, expected);
 
         let input = "var x: T<usize>; randn<f32> x";
-        let expected = "ijzer::tensor::Tensor::<f32>::randn(x.to_vec().as_slice())";
+        let expected = "ijzer::tensor::Tensor::<f32>::randn(x.clone().to_vec().as_slice())";
         compiler_compare(input, expected);
 
         let input = "eye<f32> [3,3]<usize>";
@@ -1543,7 +1568,7 @@ mod tests {
         compiler_compare(input, expected);
 
         let input = "var x: T<usize>; .~eye x";
-        let expected = "(|_x: ijzer::tensor::Tensor::<_>| ijzer::tensor::Tensor::<_>::eye(_x.to_vec().as_slice()))(x)";
+        let expected = "(|_x: ijzer::tensor::Tensor::<_>| ijzer::tensor::Tensor::<_>::eye(_x.to_vec().as_slice()))(x.clone())";
         compiler_compare(input, expected);
 
         Ok(())
@@ -1552,11 +1577,11 @@ mod tests {
     #[test]
     fn test_transpose() -> Result<()> {
         let input = "var x: T<f64>; |x";
-        let expected = "x.transpose()";
+        let expected = "x.clone().transpose()";
         compiler_compare(input, expected);
 
         let input = "var x: T<f64>; .~|x";
-        let expected = "(|_x: ijzer::tensor::Tensor::<_>| _x.transpose())(x)";
+        let expected = "(|_x: ijzer::tensor::Tensor::<_>| _x.transpose())(x.clone())";
         compiler_compare(input, expected);
 
         Ok(())
@@ -1565,11 +1590,11 @@ mod tests {
     #[test]
     fn test_shape() -> Result<()> {
         let input = "var x: T; %x";
-        let expected = "ijzer::tensor::Tensor::<usize>::from_vec(x.shape().to_vec(), None)";
+        let expected = "ijzer::tensor::Tensor::<usize>::from_vec(x.clone().shape().to_vec(), None)";
         compiler_compare(input, expected);
 
         let input = "var x: T;.~%x";
-        let expected = "(|_x: ijzer::tensor::Tensor::<_>| ijzer::tensor::Tensor::<usize>::from_vec(_x.shape().to_vec(), None))(x)";
+        let expected = "(|_x: ijzer::tensor::Tensor::<_>| ijzer::tensor::Tensor::<usize>::from_vec(_x.shape().to_vec(), None))(x.clone())";
         compiler_compare(input, expected);
 
         Ok(())
@@ -1590,7 +1615,7 @@ mod tests {
     #[test]
     fn test_solve() -> Result<()> {
         let input = r"var x: T; var y: T; \ x y";
-        let expected = "x.solve(&y).unwrap()";
+        let expected = "x.clone().solve(&y.clone()).unwrap()";
         compiler_compare(input, expected);
 
         let input = r"~\";
@@ -1598,7 +1623,7 @@ mod tests {
         compiler_compare(input, expected);
 
         let input = r"var x: T; var y: T; z = \ x y";
-        let expected = "let z: ijzer :: tensor :: Tensor :: < _ > = x.solve(&y).unwrap();";
+        let expected = "let z: ijzer :: tensor :: Tensor :: < _ > = x.clone().solve(&y.clone()).unwrap();";
         compiler_compare(input, expected);
         Ok(())
     }
@@ -1606,7 +1631,7 @@ mod tests {
     #[test]
     fn test_qr() -> Result<()> {
         let input = r"var x: T; qr x";
-        let expected = "x.qr().unwrap()";
+        let expected = "x.clone().qr().unwrap()";
         compiler_compare(input, expected);
 
         let input = r"~qr ";
@@ -1614,7 +1639,7 @@ mod tests {
         compiler_compare(input, expected);
 
         let input = r"var x: T; (q,r) = qr x";
-        let expected = "let (q , r) : (ijzer :: tensor :: Tensor :: < _ > , ijzer :: tensor :: Tensor :: < _ >) = x.qr () . unwrap () ;";
+        let expected = "let (q , r) : (ijzer :: tensor :: Tensor :: < _ > , ijzer :: tensor :: Tensor :: < _ >) = x.clone().qr () . unwrap () ;";
         compiler_compare(input, expected);
         Ok(())
     }
@@ -1622,7 +1647,7 @@ mod tests {
     #[test]
     fn test_svd() -> Result<()> {
         let input = r"var x: T; svd x";
-        let expected = "x.svd().unwrap()";
+        let expected = "x.clone().svd().unwrap()";
         compiler_compare(input, expected);
 
         let input = r"~svd";
@@ -1630,7 +1655,7 @@ mod tests {
         compiler_compare(input, expected);
 
         let input = r"var x: T; (u,s,v) = svd x";
-        let expected = "let (u , s , v) : (ijzer :: tensor :: Tensor :: < _ > , ijzer :: tensor :: Tensor :: < _ > , ijzer :: tensor :: Tensor :: < _ >) = x.svd () . unwrap () ;";
+        let expected = "let (u , s , v) : (ijzer :: tensor :: Tensor :: < _ > , ijzer :: tensor :: Tensor :: < _ > , ijzer :: tensor :: Tensor :: < _ >) = x.clone().svd () . unwrap () ;";
         compiler_compare(input, expected);
         Ok(())
     }
@@ -1638,7 +1663,7 @@ mod tests {
     #[test]
     fn test_diag() -> Result<()> {
         let input = r"var x: T; diag x";
-        let expected = "ijzer::tensor::Tensor::<_>::diag(&x)";
+        let expected = "ijzer::tensor::Tensor::<_>::diag(&x.clone())";
         compiler_compare(input, expected);
 
         let input = r"~diag";
@@ -1648,7 +1673,7 @@ mod tests {
 
         let input = r"var x: T; y = diag x";
         let expected =
-            "let y: ijzer :: tensor :: Tensor :: < _ > = ijzer::tensor::Tensor::<_>::diag(&x);";
+            "let y: ijzer :: tensor :: Tensor :: < _ > = ijzer::tensor::Tensor::<_>::diag(&x.clone());";
         compiler_compare(input, expected);
 
         Ok(())
@@ -1657,15 +1682,15 @@ mod tests {
     #[test]
     fn test_multi_index() -> Result<()> {
         let input = r"var x: T; <| x [1,2]";
-        let expected = "x [& vec ! [1 , 2]] . clone ()";
+        let expected = "x.clone() [& vec ! [1 , 2]] . clone ()";
         compiler_compare(input, expected);
 
         let input = r"var x: T; <| x [1,:]";
-        let expected = "x.sub_tensor (vec ! [Some(1), None]).unwrap()";
+        let expected = "x.clone().sub_tensor (vec ! [Some(1), None]).unwrap()";
         compiler_compare(input, expected);
 
         let input = r"var x: T; var s1: T; var s2: T; <| x [s1,s2]";
-        let expected = "x.multi_index (vec ! [s1 , s2]).unwrap()";
+        let expected = "x.clone().multi_index (vec ! [s1.clone() , s2.clone()]).unwrap()";
         compiler_compare(input, expected);
 
         Ok(())

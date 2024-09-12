@@ -274,7 +274,7 @@ mod tests {
         assert_eq!(node.input_types, vec![IJType::Tensor(None); 2]);
         assert_eq!(node.output_type, IJType::Void);
         let first_operand = &node.operands[0];
-        assert_eq!(first_operand.op, Operation::Symbol("x".to_string()));
+        assert_eq!(first_operand.op, Operation::AssignSymbol("x".to_string()));
         assert_eq!(first_operand.output_type, IJType::Tensor(None));
         let second_operand = &node.operands[1];
         assert_eq!(second_operand.output_type, IJType::Tensor(None));
@@ -297,7 +297,7 @@ mod tests {
         assert_eq!(node.input_types, vec![IJType::Number(None); 2]);
         assert_eq!(node.output_type, IJType::Void);
         let first_operand = &node.operands[0];
-        assert_eq!(first_operand.op, Operation::Symbol("x".to_string()));
+        assert_eq!(first_operand.op, Operation::AssignSymbol("x".to_string()));
         assert_eq!(first_operand.output_type, IJType::Number(None));
         let second_operand = &node.operands[1];
         assert_eq!(second_operand.output_type, IJType::Number(None));
@@ -338,7 +338,7 @@ mod tests {
         );
         assert_eq!(node.output_type, IJType::Void);
         let first_operand = &node.operands[0];
-        assert_eq!(first_operand.op, Operation::Symbol("x".to_string()));
+        assert_eq!(first_operand.op, Operation::AssignSymbol("x".to_string()));
 
         assert_eq!(
             first_operand.output_type,
