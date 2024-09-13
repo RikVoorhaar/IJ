@@ -165,14 +165,12 @@ impl CompilerContext {
             Operation::Negate => Negate::compile(node, self, child_streams)?,
             Operation::Array => Array::compile(node, self, child_streams)?,
             Operation::Reduce => Reduce::compile(node, self, child_streams)?,
-            Operation::Scalar => NotImplemented::compile(node, self, child_streams)?,
             Operation::LambdaVariable(_) => LambdaVariable::compile(node, self, child_streams)?,
             Operation::FunctionComposition(_) => {
                 FunctionComposition::compile(node, self, child_streams)?
             }
             Operation::Apply => Apply::compile(node, self, child_streams)?,
             Operation::TypeConversion => TypeConversion::compile(node, self, child_streams)?,
-            Operation::AsFunction => AsFunction::compile(node, self, child_streams)?,
             Operation::GeneralizedContraction => {
                 GeneralizedContraction::compile(node, self, child_streams)?
             }
@@ -786,19 +784,19 @@ impl CompileNode for Nothing {
     }
 }
 
-struct NotImplemented;
-impl CompileNode for NotImplemented {
-    fn compile(
-        node: Rc<Node>,
-        _compiler: &mut CompilerContext,
-        _: HashMap<usize, TokenStream>,
-    ) -> Result<TokenStream> {
-        let error_msg = format!("Compilation for operation '{:?}' not implemented", node.op);
-        Ok(quote! {
-            panic!(#error_msg);
-        })
-    }
-}
+// struct NotImplemented;
+// impl CompileNode for NotImplemented {
+//     fn compile(
+//         node: Rc<Node>,
+//         _compiler: &mut CompilerContext,
+//         _: HashMap<usize, TokenStream>,
+//     ) -> Result<TokenStream> {
+//         let error_msg = format!("Compilation for operation '{:?}' not implemented", node.op);
+//         Ok(quote! {
+//             panic!(#error_msg);
+//         })
+//     }
+// }
 
 /// Apply nodes have as first argument a function, and the other arguments are the operands to apply the function to.
 struct Apply;
@@ -900,23 +898,6 @@ impl CompileNode for TypeConversion {
     }
 }
 
-struct AsFunction;
-impl CompileNode for AsFunction {
-    fn compile(
-        node: Rc<Node>,
-        _compiler: &mut CompilerContext,
-        child_streams: HashMap<usize, TokenStream>,
-    ) -> Result<TokenStream> {
-        if node.operands.len() != 1 {
-            panic!(
-                "Expected 1 operand for AsFunction, found {}",
-                node.operands.len()
-            );
-        }
-        let child_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
-        Ok(child_stream)
-    }
-}
 
 struct GeneralizedContraction;
 impl CompileNode for GeneralizedContraction {
@@ -1691,6 +1672,50 @@ mod tests {
 
         let input = r"var x: T; var s1: T; var s2: T; <| x [s1,s2]";
         let expected = "x.clone().multi_index (vec ! [s1.clone() , s2.clone()]).unwrap()";
+        compiler_compare(input, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_identity() -> Result<()> {
+        let input = r"var x: T; I x";
+        let expected = "x.clone()";
+        compiler_compare(input, expected);
+
+        let input = r"~I:Fn(T->T)";
+        let expected = "| _1 | _1";
+        compiler_compare(input, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_array_from_arrays() -> Result<()> {
+        let input = r"var x: T; var y: T; [x,y]";
+        let expected = "ijzer::tensor::Tensor::<_>::from_tensors(&[x.clone(), y.clone()]).unwrap()";
+        compiler_compare(input, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_binop_functional() -> Result<()> {
+        let input = r"~+:Fn(T,N->T)";
+        let expected = "| x : ijzer :: tensor :: Tensor :: < _ > , y : _ | x.map(|a: _| a + y)";
+        compiler_compare(input, expected);
+
+        let input = r"~-:Fn(N,T->T)";
+        let expected = "| y : _ , x : ijzer :: tensor :: Tensor :: < _ > | x.map(|a: _| y-a)";
+        compiler_compare(input, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_single_group_unpacking() -> Result<()> {
+        let input = r"var x: T; (x)";
+        let expected = "x.clone()";
         compiler_compare(input, expected);
 
         Ok(())

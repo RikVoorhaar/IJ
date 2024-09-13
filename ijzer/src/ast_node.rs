@@ -85,11 +85,6 @@ impl TokenSlice {
         Ok(out)
     }
 
-    pub fn move_end_saturating(&self, new_length: usize) -> Self {
-        let new_end = (self.start + new_length).min(self.max);
-        TokenSlice::new(self.start, new_end, self.max)
-    }
-
     /// Returns the length of the slice.
     pub fn len(&self) -> usize {
         self.end - self.start
