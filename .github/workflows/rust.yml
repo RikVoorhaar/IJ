@@ -1,45 +1,67 @@
 name: Rust
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    push:
+        branches: ["main"]
+    pull_request:
+        branches: ["main"]
 
 env:
-  CARGO_TERM_COLOR: always
+    CARGO_TERM_COLOR: always
+    CARGO_TARGET_DIR: ./target
 
 jobs:
-  build:
+    build:
+        runs-on: ubuntu-latest
 
-    runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - name: Cache cargo registry
+              uses: actions/cache@v3
+              with:
+                  path: ~/.cargo/registry
+                  key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-cargo-registry-
 
-    steps:
-    - uses: actions/checkout@v4
-    - name: Install Rust
-      run: rustup update stable
-    - name: Install cargo-llvm-cov
-      uses: taiki-e/install-action@cargo-llvm-cov
-    - name: Build ijzer
-      run: cargo build --verbose
-      working-directory: ./ijzer
-    - name: Run tests ijzer
-      run: cargo test --verbose
-      working-directory: ./ijzer
-    - name: Generate code coverage
-      run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
-      working-directory: ./ijzer
-    - name: Build macro
-      run: cargo build --verbose
-      working-directory: ./ijzer_macro
-    - name: Run tests macros
-      run: cargo test --verbose
-      working-directory: ./ijzer_macro
+            - name: Cache cargo index
+              uses: actions/cache@v3
+              with:
+                  path: ~/.cargo/git
+                  key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-cargo-index-
 
+            - name: Cache build
+              uses: actions/cache@v3
+              with:
+                  path: /tmp/target
+                  key: ${{ runner.os }}-build-${{ hashFiles('**/Cargo.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-build-
+            - name: Install Rust
+              run: rustup update stable
+            - name: Install cargo-llvm-cov
+              uses: taiki-e/install-action@cargo-llvm-cov
+            - name: Build ijzer
+              run: cargo build --verbose
+              working-directory: ./ijzer
+            - name: Run tests ijzer
+              run: cargo test --verbose
+              working-directory: ./ijzer
+            - name: Generate code coverage
+              run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+              working-directory: ./ijzer
+            - name: Build macro
+              run: cargo build --verbose
+              working-directory: ./ijzer_macro
+            - name: Run tests macros
+              run: cargo test --verbose
+              working-directory: ./ijzer_macro
 
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
-        files: ./ijzer/lcov.info
-        fail_ci_if_error: true
+            - name: Upload coverage to Codecov
+              uses: codecov/codecov-action@v3
+              with:
+                  token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
+                  files: ./ijzer/lcov.info
+                  fail_ci_if_error: true
