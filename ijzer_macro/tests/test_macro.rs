@@ -575,3 +575,32 @@ fn test_add_array_scalar() {
     let z = _test_add_array_scalar(x, y);
     assert_eq!(z.to_vec(), vec![2, 3, 4, 5]);
 }
+
+#[test]
+fn test_reshape() {
+    #[ijzer]
+    fn _test_reshape(x: Tensor<i64>) -> Tensor<i64> {
+        r#"
+        var x: T<i64>
+        >% x [2,3]
+        "#
+    }
+
+    let x = Tensor::from_vec(vec![1, 2, 3, 4, 5, 6], None);
+    let y = _test_reshape(x.clone());
+    assert_eq!(y.shape(), &[2, 3]);
+    assert_eq!(y.to_vec(), vec![1, 2, 3, 4, 5, 6]);
+
+    #[ijzer]
+    fn _test_reshape_functional(x: Tensor<i64>) -> Tensor<i64> {
+        r#"
+        var x: T<i64>
+        .~>% x [2,3]
+        "#
+    }
+
+    let x = Tensor::from_vec(vec![1, 2, 3, 4, 5, 6], None);
+    let y = _test_reshape_functional(x.clone());
+    assert_eq!(y.shape(), &[2, 3]);
+    assert_eq!(y.to_vec(), vec![1, 2, 3, 4, 5, 6]);
+}

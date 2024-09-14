@@ -249,6 +249,9 @@ pub enum Token {
 
     #[token("<|")]
     Index,
+
+    #[token(">%")]
+    Reshape,
 }
 
 impl Display for Token {
@@ -292,6 +295,7 @@ impl Display for Token {
             Self::Solve => write!(f, r"\"),
             Self::Diag => write!(f, "diag"),
             Self::Index => write!(f, ">"),
+            Self::Reshape => write!(f, ">%"),
         }
     }
 }
