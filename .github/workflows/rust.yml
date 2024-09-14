@@ -8,7 +8,7 @@ on:
 
 env:
     CARGO_TERM_COLOR: always
-    CARGO_TARGET_DIR: /temp/target
+    CARGO_TARGET_DIR: ${{ github.workspace }}/target
 
 jobs:
     build:
@@ -35,7 +35,7 @@ jobs:
             - name: Cache build
               uses: actions/cache@v3
               with:
-                  path: /tmp/target
+                  path: ${{ github.workspace }}/target
                   key: ${{ runner.os }}-build-${{ hashFiles('**/Cargo.lock') }}
                   restore-keys: |
                       ${{ runner.os }}-build-
