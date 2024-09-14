@@ -183,6 +183,7 @@ impl CompilerContext {
             Operation::Diag => Diag::compile(node, self, child_streams)?,
             Operation::Index => Index::compile(node, self, child_streams)?,
             Operation::AssignSymbol(_) => AssignSymbol::compile(node, self, child_streams)?,
+            Operation::Reshape => Reshape::compile(node, self, child_streams)?,
             // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
@@ -898,7 +899,6 @@ impl CompileNode for TypeConversion {
     }
 }
 
-
 struct GeneralizedContraction;
 impl CompileNode for GeneralizedContraction {
     fn compile(
@@ -1233,6 +1233,45 @@ impl CompileNode for Index {
                     #tensor_stream.multi_index(vec![#(#index_operands_streams),*]).unwrap()
                 })
             }
+        }
+    }
+}
+
+struct Reshape;
+impl CompileNode for Reshape {
+    fn compile(
+        node: Rc<Node>,
+        compiler: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        match node.output_type.clone() {
+            IJType::Tensor(_) => {
+                let tensor_operand = node.operands[0].clone();
+                let tensor_stream = child_streams.get(&tensor_operand.id).unwrap().clone();
+
+                let shape_operand = node.operands[1].clone();
+                let shape_stream = child_streams.get(&shape_operand.id).unwrap().clone();
+
+                let ident = compiler.get_varname(node.id);
+                Ok(quote! {
+                    { let #ident = #tensor_stream; #ident.reshape(&#shape_stream.to_vec()).unwrap(); #ident }
+                })
+            }
+            IJType::Function(signature) => {
+                let input_types = signature.input.clone();
+                let input_1_annot = annotation_from_type(&input_types[0])?;
+                let input_2_annot = annotation_from_type(&input_types[1])?;
+
+                let ident = compiler.get_varname(node.id);
+                Ok(quote! {
+                    |_x: #input_1_annot, _s: #input_2_annot| {
+                        let #ident = _x.clone();
+                        #ident.reshape(&_s.to_vec()).unwrap();
+                        #ident
+                    }
+                })
+            }
+            _ => unreachable!(),
         }
     }
 }
@@ -1604,7 +1643,8 @@ mod tests {
         compiler_compare(input, expected);
 
         let input = r"var x: T; var y: T; z = \ x y";
-        let expected = "let z: ijzer :: tensor :: Tensor :: < _ > = x.clone().solve(&y.clone()).unwrap();";
+        let expected =
+            "let z: ijzer :: tensor :: Tensor :: < _ > = x.clone().solve(&y.clone()).unwrap();";
         compiler_compare(input, expected);
         Ok(())
     }
@@ -1716,6 +1756,19 @@ mod tests {
     fn test_single_group_unpacking() -> Result<()> {
         let input = r"var x: T; (x)";
         let expected = "x.clone()";
+        compiler_compare(input, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_reshape() -> Result<()> {
+        let input = r"var x: T; var s: T<usize>; >% x s";
+        let expected = "{ let _4 = x . clone () ; _4 . reshape (& s . clone () . to_vec ()) . unwrap () ; _4 }";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var s: T<usize>; .~>% x s";
+        let expected = "(| _x : ijzer :: tensor :: Tensor :: < _ > , _s : ijzer :: tensor :: Tensor :: < usize > | { let _2 = _x.clone() ; _2 . reshape (& _s . to_vec ()) . unwrap () ; _2 }) (x . clone () , s . clone ())";
         compiler_compare(input, expected);
 
         Ok(())

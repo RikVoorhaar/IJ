@@ -31,6 +31,7 @@ pub enum Operation {
     Diag,
     Index,
     AssignSymbol(String),
+    Reshape,
 }
 
 impl Debug for Operation {
@@ -63,6 +64,7 @@ impl Debug for Operation {
             Self::Diag => write!(f, "diag"),
             Self::Index => write!(f, "<|"),
             Self::AssignSymbol(s) => write!(f, "AssignSymbol({})", s),
+            Self::Reshape => write!(f, "Reshape"),
         }
     }
 }
