@@ -1254,7 +1254,7 @@ impl CompileNode for Reshape {
 
                 let ident = compiler.get_varname(node.id);
                 Ok(quote! {
-                    { let #ident = #tensor_stream; #ident.reshape(&#shape_stream.to_vec()).unwrap(); #ident }
+                    { let mut #ident = #tensor_stream; #ident.reshape(&#shape_stream.to_vec()).unwrap(); #ident }
                 })
             }
             IJType::Function(signature) => {
@@ -1265,7 +1265,7 @@ impl CompileNode for Reshape {
                 let ident = compiler.get_varname(node.id);
                 Ok(quote! {
                     |_x: #input_1_annot, _s: #input_2_annot| {
-                        let #ident = _x.clone();
+                        let mut #ident = _x.clone();
                         #ident.reshape(&_s.to_vec()).unwrap();
                         #ident
                     }
@@ -1764,11 +1764,11 @@ mod tests {
     #[test]
     fn test_reshape() -> Result<()> {
         let input = r"var x: T; var s: T<usize>; >% x s";
-        let expected = "{ let _4 = x . clone () ; _4 . reshape (& s . clone () . to_vec ()) . unwrap () ; _4 }";
+        let expected = "{ let mut _4 = x . clone () ; _4 . reshape (& s . clone () . to_vec ()) . unwrap () ; _4 }";
         compiler_compare(input, expected);
 
         let input = r"var x: T; var s: T<usize>; .~>% x s";
-        let expected = "(| _x : ijzer :: tensor :: Tensor :: < _ > , _s : ijzer :: tensor :: Tensor :: < usize > | { let _2 = _x.clone() ; _2 . reshape (& _s . to_vec ()) . unwrap () ; _2 }) (x . clone () , s . clone ())";
+        let expected = "(| _x : ijzer :: tensor :: Tensor :: < _ > , _s : ijzer :: tensor :: Tensor :: < usize > | { let mut _2 = _x.clone() ; _2 . reshape (& _s . to_vec ()) . unwrap () ; _2 }) (x . clone () , s . clone ())";
         compiler_compare(input, expected);
 
         Ok(())
