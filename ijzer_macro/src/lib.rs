@@ -1,5 +1,5 @@
 extern crate proc_macro;
-use ijzer::compile;
+use ijzer_lib::compile;
 use proc_macro::TokenStream;
 use quote::quote;
 use regex::Regex;

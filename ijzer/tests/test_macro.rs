@@ -1,8 +1,6 @@
-// extern crate ijzer_macro;
 use anyhow::Result;
 use approx::assert_abs_diff_eq;
-use ijzer::tensor::Tensor;
-use ijzer_macro::ijzer;
+use ijzer::prelude::*;
 
 #[test]
 fn test_identity() {

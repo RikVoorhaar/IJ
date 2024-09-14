@@ -5,16 +5,8 @@ edition = "2021"
 
 
 [dependencies]
+ijzer_macro = { path = "../ijzer_macro" }
+ijzer_lib = { path = "../ijzer_lib" }
+num-traits = "0.2.18"
 anyhow = "1.0.86"
 approx = "0.5.1"
-itertools = "0.13.0"
-logos = "0.14.0"
-ndarray = "0.15"
-ndarray-linalg = { version = "0.16.0", features = ["openblas-static"] }
-num-traits = "0.2.18"
-proc-macro2 = "1.0.78"
-quote = "1.0.35"
-rand = "0.8.5"
-rand_distr = "0.4.3"
-syn = "2.0.51"
-thiserror = "1.0.56"

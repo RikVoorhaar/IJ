@@ -1,5 +1,5 @@
 use anyhow::Result;
-use ijzer::tensor::Tensor;
+use ijzer_lib::tensor::Tensor;
 use ijzer_macro::ijzer;
 
 
