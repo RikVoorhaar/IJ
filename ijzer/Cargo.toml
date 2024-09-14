@@ -1,0 +1,12 @@
+[package]
+name = "ijzer"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+ijzer_macro = { path = "../ijzer_macro" }
+ijzer_lib = { path = "../ijzer_lib" }
+num-traits = "0.2.18"
+anyhow = "1.0.86"
+approx = "0.5.1"

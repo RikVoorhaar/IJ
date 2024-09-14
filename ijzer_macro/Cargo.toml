@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ijzer = { path = "../ijzer" }
+ijzer_lib = { path = "../ijzer_lib" }
 proc-macro2 = "1.0.78"
 quote = "1.0.35"
 regex = "1.10.3"

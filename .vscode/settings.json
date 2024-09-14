@@ -1,8 +1,8 @@
 {
     "rust-analyzer.linkedProjects": [
         "./ijzer_macro/Cargo.toml",
-        "./ijzer_examples/Cargo.toml",
-        "./ijzer_examples/Cargo.toml"
+        "./ijzer_lib/Cargo.toml",
+        "./ijzer/Cargo.toml"
     ],
     "rust-analyzer.checkOnSave": true
 }
