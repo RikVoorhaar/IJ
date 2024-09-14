@@ -166,7 +166,7 @@ pub enum Token {
     #[token(",")]
     Comma,
 
-    #[regex("[a-zA-Z][a-zA-Z0-9]*", |lex| lex.slice().parse().ok())]
+    #[regex("[a-zA-Z][a-zA-Z0-9]*", |lex| lex.slice().parse().ok(), priority = 0)]
     Symbol(SymbolToken),
 
     #[regex("\\$[a-zA-Z0-9]+", |lex| lex.slice().trim_start_matches('$').parse().ok())]
@@ -252,6 +252,12 @@ pub enum Token {
 
     #[token(">%")]
     Reshape,
+
+    #[regex(r"(abs|acos|asin|atan|ceil|cos|cosh|exp|floor|ln|log2|log10|round|sin|sinh|sqrt|tan|tanh)", |lex| Some(lex.slice().to_string()))]
+    UnaryFunction(String),
+
+    #[regex(r"(max|min|\^)", |lex| Some(lex.slice().to_string()), priority = 1)]
+    BinaryFunction(String),
 }
 
 impl Display for Token {
@@ -296,6 +302,8 @@ impl Display for Token {
             Self::Diag => write!(f, "diag"),
             Self::Index => write!(f, ">"),
             Self::Reshape => write!(f, ">%"),
+            Self::UnaryFunction(s) => write!(f, "{}", s),
+            Self::BinaryFunction(s) => write!(f, "{}", s),
         }
     }
 }
@@ -356,6 +364,24 @@ mod tests {
         assert!(tokens.iter().all(|t| matches!(t, Token::TensorBuilder(_))));
         println!("{:?}", tokens);
         assert_eq!(tokens.len(), 5);
+    }
+
+    #[test]
+    fn test_unary_functions() {
+        let input = "abs acos asin atan ceil cos cosh exp floor ln log2 log10 round sin sinh sqrt tan tanh";
+        let tokens = lexer(input).unwrap();
+        assert!(tokens.iter().all(|t| matches!(t, Token::UnaryFunction(_))));
+        println!("{:?}", tokens);
+        assert_eq!(tokens.len(), 18);
+    }
+
+    #[test]
+    fn test_binary_functions() {
+        let input = "max min ^";
+        let tokens = lexer(input).unwrap();
+        assert!(tokens.iter().all(|t| matches!(t, Token::BinaryFunction(_))));
+        println!("{:?}", tokens);
+        assert_eq!(tokens.len(), 3);
     }
 
     #[test]

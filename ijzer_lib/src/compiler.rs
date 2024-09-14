@@ -184,7 +184,7 @@ impl CompilerContext {
             Operation::Index => Index::compile(node, self, child_streams)?,
             Operation::AssignSymbol(_) => AssignSymbol::compile(node, self, child_streams)?,
             Operation::Reshape => Reshape::compile(node, self, child_streams)?,
-            // _ => NotImplemented::compile(node, self, child_streams)?,
+            _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
         Ok(stream)
@@ -785,19 +785,20 @@ impl CompileNode for Nothing {
     }
 }
 
-// struct NotImplemented;
-// impl CompileNode for NotImplemented {
-//     fn compile(
-//         node: Rc<Node>,
-//         _compiler: &mut CompilerContext,
-//         _: HashMap<usize, TokenStream>,
-//     ) -> Result<TokenStream> {
-//         let error_msg = format!("Compilation for operation '{:?}' not implemented", node.op);
-//         Ok(quote! {
-//             panic!(#error_msg);
-//         })
-//     }
-// }
+#[allow(dead_code)]
+struct NotImplemented;
+impl CompileNode for NotImplemented {
+    fn compile(
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
+        _: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        let error_msg = format!("Compilation for operation '{:?}' not implemented", node.op);
+        Ok(quote! {
+            panic!(#error_msg);
+        })
+    }
+}
 
 /// Apply nodes have as first argument a function, and the other arguments are the operands to apply the function to.
 struct Apply;

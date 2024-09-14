@@ -32,6 +32,8 @@ pub enum Operation {
     Index,
     AssignSymbol(String),
     Reshape,
+    UnaryFunction(String),
+    BinaryFunction(String),
 }
 
 impl Debug for Operation {
@@ -65,6 +67,8 @@ impl Debug for Operation {
             Self::Index => write!(f, "<|"),
             Self::AssignSymbol(s) => write!(f, "AssignSymbol({})", s),
             Self::Reshape => write!(f, "Reshape"),
+            Self::UnaryFunction(s) => write!(f, "UnaryFunction({})", s),
+            Self::BinaryFunction(s) => write!(f, "BinaryFunction({})", s),
         }
     }
 }

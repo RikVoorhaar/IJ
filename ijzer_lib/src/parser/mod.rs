@@ -84,6 +84,9 @@ use index::Index;
 mod reshape;
 use reshape::Reshape;
 
+mod unary_function;
+use unary_function::UnaryFunction;
+
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
@@ -140,6 +143,7 @@ pub fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node
         Token::Diag => Diag::next_node(op.clone(), rest, context),
         Token::Index => Index::next_node(op.clone(), rest, context),
         Token::Reshape => Reshape::next_node(op.clone(), rest, context),
+        Token::UnaryFunction(_) => UnaryFunction::next_node(op.clone(), rest, context),
         _ => Err(SyntaxError::UnexpectedToken(op.clone()).into()),
     }
 }
@@ -225,10 +229,18 @@ fn next_node_functional(
         }
         Token::SVD => Svd::next_node_functional_impl(Token::SVD, slice, context, needed_outputs)?,
         Token::QR => QR::next_node_functional_impl(Token::QR, slice, context, needed_outputs)?,
-        Token::Diag => Diag::next_node_functional_impl(Token::Diag, slice, context, needed_outputs)?,
+        Token::Diag => {
+            Diag::next_node_functional_impl(Token::Diag, slice, context, needed_outputs)?
+        }
         Token::Reshape => {
             Reshape::next_node_functional_impl(Token::Reshape, slice, context, needed_outputs)?
         }
+        Token::UnaryFunction(name) => UnaryFunction::next_node_functional_impl(
+            Token::UnaryFunction(name.clone()),
+            slice,
+            context,
+            needed_outputs,
+        )?,
         _ => {
             return Err(SyntaxError::SliceCannotBeParsedAsFunction(
                 context.token_slice_to_string(slice),
