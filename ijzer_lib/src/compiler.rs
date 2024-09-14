@@ -27,7 +27,7 @@ pub fn annotation_from_type(var_type: &IJType) -> Result<TokenStream> {
     )?;
     let res = match var_type {
         IJType::Number(_) => quote!(#number_type_annot),
-        IJType::Tensor(_) => quote!(ijzer::tensor::Tensor::<#number_type_annot>),
+        IJType::Tensor(_) => quote!(ijzer_lib::tensor::Tensor::<#number_type_annot>),
         IJType::Function(signature) => {
             let input_types = signature
                 .input
@@ -1033,14 +1033,14 @@ impl CompileNode for Shape {
             1 => {
                 let child_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
                 Ok(quote! {
-                    ijzer::tensor::Tensor::<usize>::from_vec(#child_stream.shape().to_vec(), None)
+                    ijzer_lib::tensor::Tensor::<usize>::from_vec(#child_stream.shape().to_vec(), None)
                 })
             }
             0 => {
                 let tensor_type = node.output_type.extract_signature().unwrap().input[0].clone();
                 let tensor_t = annotation_from_type(&tensor_type)?;
                 Ok(quote! {
-                    |_x: #tensor_t| ijzer::tensor::Tensor::<usize>::from_vec(_x.shape().to_vec(), None)
+                    |_x: #tensor_t| ijzer_lib::tensor::Tensor::<usize>::from_vec(_x.shape().to_vec(), None)
                 })
             }
             _ => {
@@ -1323,7 +1323,7 @@ mod tests {
     fn test_assign_tensor() {
         let input1 = "x: T<_> = [1]<_>";
         let input2 = "x = [1]<_>";
-        let expected = "let x : ijzer :: tensor :: Tensor :: < _ > = ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1 ] , None) ;";
+        let expected = "let x : ijzer_lib:: tensor :: Tensor :: < _ > = ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1 ] , None) ;";
         compiler_compare(input1, expected);
         compiler_compare(input2, expected);
     }
@@ -1346,7 +1346,7 @@ mod tests {
         let input3 = "
         x = [1];
         y= + x x;";
-        let expexted = "let x : ijzer :: tensor :: Tensor :: < _ > = ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) ; let y : ijzer :: tensor :: Tensor :: < _ > = x.clone() . apply_binary_op (& x.clone() , | a : _ , b : _ | a + b) . unwrap () ;";
+        let expexted = "let x : ijzer_lib:: tensor :: Tensor :: < _ > = ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) ; let y : ijzer_lib:: tensor :: Tensor :: < _ > = x.clone() . apply_binary_op (& x.clone() , | a : _ , b : _ | a + b) . unwrap () ;";
         compiler_compare(input1, expexted);
         compiler_compare(input2, expexted);
         compiler_compare(input3, expexted);
@@ -1356,7 +1356,7 @@ mod tests {
     fn test_simple_function() {
         let input1 = "var y: T; f($x) -> T = + y $x";
         let input2 = "var y: T; f($x) = + y $x";
-        let expexted = "let f = { | _x: ijzer::tensor::Tensor::<_> | y.clone().apply_binary_op(&_x, |a: _, b: _| a + b).unwrap() } ;";
+        let expexted = "let f = { | _x: ijzer_lib::tensor::Tensor::<_> | y.clone().apply_binary_op(&_x, |a: _, b: _| a + b).unwrap() } ;";
         compiler_compare(input1, expexted);
         compiler_compare(input2, expexted);
     }
@@ -1373,23 +1373,23 @@ mod tests {
 
     #[test]
     fn test_add() {
-        compiler_compare("+ [1] [2]", "ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . apply_binary_op (& ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) , | a : _ , b : _ | a + b) . unwrap ()");
-        compiler_compare("+ [1] 2","ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . map (| x : _ | x + 2)");
-        compiler_compare("+ 1 [2]","ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . map (| x : _ | 1 + x)");
+        compiler_compare("+ [1] [2]", "ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . apply_binary_op (& ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) , | a : _ , b : _ | a + b) . unwrap ()");
+        compiler_compare("+ [1] 2","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . map (| x : _ | x + 2)");
+        compiler_compare("+ 1 [2]","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . map (| x : _ | 1 + x)");
         compiler_compare("+ 1 2", "1+2");
     }
     #[test]
     fn test_subtract() {
-        compiler_compare("- [1] [2]", "ijzer::tensor::Tensor::<_>::from_vec(vec![1], None).apply_binary_op(&ijzer::tensor::Tensor::<_>::from_vec(vec![2], None), |a: _, b: _| a - b).unwrap()");
-        compiler_compare("- [1] 2","ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . map (| x : _ | x - 2)");
-        compiler_compare("- 1 [2]","ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . map (| x : _ | 1-x)");
+        compiler_compare("- [1] [2]", "ijzer_lib::tensor::Tensor::<_>::from_vec(vec![1], None).apply_binary_op(&ijzer_lib::tensor::Tensor::<_>::from_vec(vec![2], None), |a: _, b: _| a - b).unwrap()");
+        compiler_compare("- [1] 2","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . map (| x : _ | x - 2)");
+        compiler_compare("- 1 [2]","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . map (| x : _ | 1-x)");
         compiler_compare("- 1 2", "1-2");
     }
     #[test]
     fn test_multiply() {
-        compiler_compare("* [1] [2]", "ijzer::tensor::Tensor::<_>::from_vec(vec![1], None).apply_binary_op(&ijzer::tensor::Tensor::<_>::from_vec(vec![2], None), |a: _, b: _| a * b).unwrap()");
-        compiler_compare("* [1] 2","ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . map (| x : _ | x * 2)");
-        compiler_compare("* 1 [2]","ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . map (| x : _ | 1 * x)");
+        compiler_compare("* [1] [2]", "ijzer_lib::tensor::Tensor::<_>::from_vec(vec![1], None).apply_binary_op(&ijzer_lib::tensor::Tensor::<_>::from_vec(vec![2], None), |a: _, b: _| a * b).unwrap()");
+        compiler_compare("* [1] 2","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . map (| x : _ | x * 2)");
+        compiler_compare("* 1 [2]","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . map (| x : _ | 1 * x)");
         compiler_compare("* 1 2", "1*2");
     }
 
@@ -1397,7 +1397,7 @@ mod tests {
     fn test_negate() {
         compiler_compare(
             "-[1]",
-            "ijzer::tensor::Tensor::<_>::from_vec(vec![1], None).map(|a: _| -a)",
+            "ijzer_lib::tensor::Tensor::<_>::from_vec(vec![1], None).map(|a: _| -a)",
         );
         compiler_compare("var x: T; -x", "x.clone().map(|a: _| -a)");
         compiler_compare("var x: N<f64>; -x", "-x");
@@ -1407,30 +1407,30 @@ mod tests {
     fn test_reduction() {
         compiler_compare(
             "var f: Fn(N,N->N); /f [1,2]",
-            "ijzer::tensor::Tensor::<_>::from_vec(vec![1,2], None).reduce(f)",
+            "ijzer_lib::tensor::Tensor::<_>::from_vec(vec![1,2], None).reduce(f)",
         );
         compiler_compare(
             "/+ [1,2]",
-            "ijzer::tensor::Tensor::<_>::from_vec(vec![1,2], None).reduce(|a: _, b: _| a + b)",
+            "ijzer_lib::tensor::Tensor::<_>::from_vec(vec![1,2], None).reduce(|a: _, b: _| a + b)",
         );
 
         compiler_compare(
             "/+ [1,2]<f64>",
-            "ijzer::tensor::Tensor::<f64>::from_vec(vec![1,2], None).reduce(|a: _, b: _| a + b)",
+            "ijzer_lib::tensor::Tensor::<f64>::from_vec(vec![1,2], None).reduce(|a: _, b: _| a + b)",
         );
     }
 
     #[test]
     fn test_lambda_variable() {
         let expected1 =
-            "let f = { | _x: ijzer::tensor::Tensor::<_>| _x . apply_binary_op (& _x , | a: _ , b: _ | a + b) . unwrap () } ;";
+            "let f = { | _x: ijzer_lib::tensor::Tensor::<_>| _x . apply_binary_op (& _x , | a: _ , b: _ | a + b) . unwrap () } ;";
         compiler_compare("f($x) = + $x $x", expected1);
 
         let expected2 =
-            "let f = { | _x: ijzer::tensor::Tensor::<_> , _y: ijzer::tensor::Tensor::<_> | _x . apply_binary_op (& _y , | a: _ , b: _ | a + b) . unwrap () } ;";
+            "let f = { | _x: ijzer_lib::tensor::Tensor::<_> , _y: ijzer_lib::tensor::Tensor::<_> | _x . apply_binary_op (& _y , | a: _ , b: _ | a + b) . unwrap () } ;";
         compiler_compare("f($x, $y) = + $x $y", expected2);
 
-        let expected3 = "let h = { | _x: ijzer::tensor::Tensor::<_> | k (_x , ijzer::tensor::Tensor::<_>::from_vec(vec![1,2], None)) } ;";
+        let expected3 = "let h = { | _x: ijzer_lib::tensor::Tensor::<_> | k (_x , ijzer_lib::tensor::Tensor::<_>::from_vec(vec![1,2], None)) } ;";
         compiler_compare("var k: Fn(T,T->T); h($x) = k $x [1,2]", expected3);
     }
 
@@ -1445,7 +1445,7 @@ mod tests {
         compiler_compare(input, expected);
 
         let input = "var f: Fn(T->T); @(f,-) [1]";
-        let expected = "(| _10_1 : ijzer :: tensor :: Tensor :: < _ > | (f) ((| x : ijzer :: tensor :: Tensor :: < _ > | x . map (| a : _ | - a)) (_10_1))) (ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None))";
+        let expected = "(| _10_1 : ijzer_lib:: tensor :: Tensor :: < _ > | (f) ((| x : ijzer_lib:: tensor :: Tensor :: < _ > | x . map (| a : _ | - a)) (_10_1))) (ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None))";
         compiler_compare(input, expected);
     }
 
@@ -1461,16 +1461,16 @@ mod tests {
     #[test]
     fn test_type_conversion() {
         let input = "var x: N; <-T x";
-        let expected = "ijzer :: tensor :: Tensor :: < _ > :: scalar (x)";
+        let expected = "ijzer_lib:: tensor :: Tensor :: < _ > :: scalar (x)";
         compiler_compare(input, expected);
 
         let input = "var f: Fn(T->T); <-Fn(N->T) f 1";
         let expected =
-            "((| _2_1 : _ | ((f) (ijzer :: tensor :: Tensor :: < _ > :: scalar (_2_1))))) (1)";
+            "((| _2_1 : _ | ((f) (ijzer_lib:: tensor :: Tensor :: < _ > :: scalar (_2_1))))) (1)";
         compiler_compare(input, expected);
 
         let input = "var f: Fn(T->N); <-Fn(N->T) f 1";
-        let expected = "((| _2_1 : _ | (ijzer :: tensor :: Tensor :: < _ > :: scalar ((f) (ijzer :: tensor :: Tensor :: < _ > :: scalar (_2_1)))))) (1)";
+        let expected = "((| _2_1 : _ | (ijzer_lib:: tensor :: Tensor :: < _ > :: scalar ((f) (ijzer_lib:: tensor :: Tensor :: < _ > :: scalar (_2_1)))))) (1)";
         compiler_compare(input, expected);
 
         let input = "var x: N; <-N x";
@@ -1500,7 +1500,7 @@ mod tests {
     #[test]
     fn test_type_conversion_with_as_function() {
         let input = "~(<-Fn(N,N->T) +)";
-        let expected = "(| _4_1 : _ , _4_2 : _ | (ijzer :: tensor :: Tensor :: < _ > :: scalar ((| a : _ , b : _ | a + b) (_4_1 , _4_2))))";
+        let expected = "(| _4_1 : _ , _4_2 : _ | (ijzer_lib:: tensor :: Tensor :: < _ > :: scalar ((| a : _ , b : _ | a + b) (_4_1 , _4_2))))";
         compiler_compare(input, expected);
     }
     #[test]
@@ -1514,7 +1514,7 @@ mod tests {
     #[test]
     fn test_reduction_in_composition() {
         let input = "~@(/+,+):Fn(T,T->N)";
-        let expected = "| _6_1 : ijzer :: tensor :: Tensor :: < _ > , _6_2 : ijzer :: tensor :: Tensor :: < _ > | (| _1 : ijzer :: tensor :: Tensor :: < _ > | _1 . reduce (| a : _ , b : _ | a + b)) ((| x1 : ijzer :: tensor :: Tensor :: < _ > , x2 : ijzer :: tensor :: Tensor :: < _ > | x1 . apply_binary_op (& x2 , | a : _ , b : _ | a + b) . unwrap ()) (_6_1 , _6_2))";
+        let expected = "| _6_1 : ijzer_lib:: tensor :: Tensor :: < _ > , _6_2 : ijzer_lib:: tensor :: Tensor :: < _ > | (| _1 : ijzer_lib:: tensor :: Tensor :: < _ > | _1 . reduce (| a : _ , b : _ | a + b)) ((| x1 : ijzer_lib:: tensor :: Tensor :: < _ > , x2 : ijzer_lib:: tensor :: Tensor :: < _ > | x1 . apply_binary_op (& x2 , | a : _ , b : _ | a + b) . unwrap ()) (_6_1 , _6_2))";
         compiler_compare(input, expected);
     }
 
@@ -1537,11 +1537,11 @@ mod tests {
     #[test]
     fn test_lambda_variable_functional() -> Result<()> {
         let input = "g($x:Fn(N,N->N)) -> N = /$x [1]";
-        let expected = "let g = { | _x : fn (_ , _) -> _ | ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . reduce (_x) } ;";
+        let expected = "let g = { | _x : fn (_ , _) -> _ | ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . reduce (_x) } ;";
         compiler_compare(input, expected);
 
         let input = "g($x:Fn(N->T), $y:Fn(T->N)) -> Fn(T->T) = ~@($x,$y)";
-        let expected = "let g = { | _x : fn (_) -> ijzer :: tensor :: Tensor :: < _ > , _y : fn (ijzer :: tensor :: Tensor :: < _ >) -> _ | | _4_1 : ijzer :: tensor :: Tensor :: < _ > | (_x) ((_y) (_4_1)) } ;";
+        let expected = "let g = { | _x : fn (_) -> ijzer_lib:: tensor :: Tensor :: < _ > , _y : fn (ijzer_lib:: tensor :: Tensor :: < _ >) -> _ | | _4_1 : ijzer_lib:: tensor :: Tensor :: < _ > | (_x) ((_y) (_4_1)) } ;";
         compiler_compare(input, expected);
 
         Ok(())
@@ -1550,7 +1550,7 @@ mod tests {
     #[test]
     fn test_generalized_contraction() -> Result<()> {
         let input = "?/+* [1] [2]";
-        let expected = "ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . generalized_contraction (& ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) , (| z : & ijzer :: tensor :: Tensor :: < _ > | (| _1 : ijzer :: tensor :: Tensor :: < _ > | _1 . reduce (| a : _ , b : _ | a + b)) (z . clone ())) , | a : _ , b : _ | a * b) . unwrap ()";
+        let expected = "ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . generalized_contraction (& ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) , (| z : & ijzer_lib:: tensor :: Tensor :: < _ > | (| _1 : ijzer_lib:: tensor :: Tensor :: < _ > | _1 . reduce (| a : _ , b : _ | a + b)) (z . clone ())) , | a : _ , b : _ | a * b) . unwrap ()";
         compiler_compare(input, expected);
 
         Ok(())
@@ -1559,7 +1559,7 @@ mod tests {
     #[test]
     fn test_generalized_contraction_functional() -> Result<()> {
         let input = "~?/+*";
-        let expected = "| x : ijzer :: tensor :: Tensor :: < _ > , y : ijzer :: tensor :: Tensor :: < _ > | x . generalized_contraction (& y , (| z : & ijzer :: tensor :: Tensor :: < _ > | (| _1 : ijzer :: tensor :: Tensor :: < _ > | _1 . reduce (| a : _ , b : _ | a + b)) (z . clone ())) , | a : _ , b : _ | a * b) . unwrap ()";
+        let expected = "| x : ijzer_lib:: tensor :: Tensor :: < _ > , y : ijzer_lib:: tensor :: Tensor :: < _ > | x . generalized_contraction (& y , (| z : & ijzer_lib:: tensor :: Tensor :: < _ > | (| _1 : ijzer_lib:: tensor :: Tensor :: < _ > | _1 . reduce (| a : _ , b : _ | a + b)) (z . clone ())) , | a : _ , b : _ | a * b) . unwrap ()";
         compiler_compare(input, expected);
 
         Ok(())
@@ -1568,27 +1568,27 @@ mod tests {
     #[test]
     fn test_tensor_builder() -> Result<()> {
         let input = "zeros [1,2]";
-        let expected = "ijzer::tensor::Tensor::<_>::zeros(ijzer::tensor::Tensor::<_>::from_vec(vec![1,2],None).to_vec().as_slice())";
+        let expected = "ijzer_lib::tensor::Tensor::<_>::zeros(ijzer_lib::tensor::Tensor::<_>::from_vec(vec![1,2],None).to_vec().as_slice())";
         compiler_compare(input, expected);
 
         let input = "ones<f64> [1]";
-        let expected = "ijzer::tensor::Tensor::<f64>::ones(ijzer::tensor::Tensor::<_>::from_vec(vec![1],None).to_vec().as_slice())";
+        let expected = "ijzer_lib::tensor::Tensor::<f64>::ones(ijzer_lib::tensor::Tensor::<_>::from_vec(vec![1],None).to_vec().as_slice())";
         compiler_compare(input, expected);
 
         let input = "var x: T<usize>; randu<f32> x";
-        let expected = "ijzer::tensor::Tensor::<f32>::randu(x.clone().to_vec().as_slice())";
+        let expected = "ijzer_lib::tensor::Tensor::<f32>::randu(x.clone().to_vec().as_slice())";
         compiler_compare(input, expected);
 
         let input = "var x: T<usize>; randn<f32> x";
-        let expected = "ijzer::tensor::Tensor::<f32>::randn(x.clone().to_vec().as_slice())";
+        let expected = "ijzer_lib::tensor::Tensor::<f32>::randn(x.clone().to_vec().as_slice())";
         compiler_compare(input, expected);
 
         let input = "eye<f32> [3,3]<usize>";
-        let expected = "ijzer::tensor::Tensor::<f32>::eye(ijzer::tensor::Tensor::<usize>::from_vec(vec![3,3],None).to_vec().as_slice())";
+        let expected = "ijzer_lib::tensor::Tensor::<f32>::eye(ijzer_lib::tensor::Tensor::<usize>::from_vec(vec![3,3],None).to_vec().as_slice())";
         compiler_compare(input, expected);
 
         let input = "var x: T<usize>; .~eye x";
-        let expected = "(|_x: ijzer::tensor::Tensor::<_>| ijzer::tensor::Tensor::<_>::eye(_x.to_vec().as_slice()))(x.clone())";
+        let expected = "(|_x: ijzer_lib::tensor::Tensor::<_>| ijzer_lib::tensor::Tensor::<_>::eye(_x.to_vec().as_slice()))(x.clone())";
         compiler_compare(input, expected);
 
         Ok(())
@@ -1601,7 +1601,7 @@ mod tests {
         compiler_compare(input, expected);
 
         let input = "var x: T<f64>; .~|x";
-        let expected = "(|_x: ijzer::tensor::Tensor::<_>| _x.transpose())(x.clone())";
+        let expected = "(|_x: ijzer_lib::tensor::Tensor::<_>| _x.transpose())(x.clone())";
         compiler_compare(input, expected);
 
         Ok(())
@@ -1610,11 +1610,11 @@ mod tests {
     #[test]
     fn test_shape() -> Result<()> {
         let input = "var x: T; %x";
-        let expected = "ijzer::tensor::Tensor::<usize>::from_vec(x.clone().shape().to_vec(), None)";
+        let expected = "ijzer_lib::tensor::Tensor::<usize>::from_vec(x.clone().shape().to_vec(), None)";
         compiler_compare(input, expected);
 
         let input = "var x: T;.~%x";
-        let expected = "(|_x: ijzer::tensor::Tensor::<_>| ijzer::tensor::Tensor::<usize>::from_vec(_x.shape().to_vec(), None))(x.clone())";
+        let expected = "(|_x: ijzer_lib::tensor::Tensor::<_>| ijzer_lib::tensor::Tensor::<usize>::from_vec(_x.shape().to_vec(), None))(x.clone())";
         compiler_compare(input, expected);
 
         Ok(())
@@ -1627,7 +1627,7 @@ mod tests {
         compiler_compare(input, expected);
 
         let input = "var f: Fn(T->(T,T)); (x: T, y: T) = f [1]";
-        let expected = "let (x , y) : (ijzer :: tensor :: Tensor :: < _ > , ijzer :: tensor :: Tensor :: < _ >) = f (ijzer :: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None)) ;";
+        let expected = "let (x , y) : (ijzer_lib:: tensor :: Tensor :: < _ > , ijzer_lib:: tensor :: Tensor :: < _ >) = f (ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None)) ;";
         compiler_compare(input, expected);
         Ok(())
     }
@@ -1639,12 +1639,12 @@ mod tests {
         compiler_compare(input, expected);
 
         let input = r"~\";
-        let expected = "| _x: ijzer :: tensor :: Tensor :: < _ > , _y: ijzer :: tensor :: Tensor :: < _ > | _x.solve(&_y).unwrap()";
+        let expected = "| _x: ijzer_lib:: tensor :: Tensor :: < _ > , _y: ijzer_lib:: tensor :: Tensor :: < _ > | _x.solve(&_y).unwrap()";
         compiler_compare(input, expected);
 
         let input = r"var x: T; var y: T; z = \ x y";
         let expected =
-            "let z: ijzer :: tensor :: Tensor :: < _ > = x.clone().solve(&y.clone()).unwrap();";
+            "let z: ijzer_lib:: tensor :: Tensor :: < _ > = x.clone().solve(&y.clone()).unwrap();";
         compiler_compare(input, expected);
         Ok(())
     }
@@ -1656,11 +1656,11 @@ mod tests {
         compiler_compare(input, expected);
 
         let input = r"~qr ";
-        let expected = "| _x: ijzer :: tensor :: Tensor :: < _ > | _x.qr().unwrap()";
+        let expected = "| _x: ijzer_lib:: tensor :: Tensor :: < _ > | _x.qr().unwrap()";
         compiler_compare(input, expected);
 
         let input = r"var x: T; (q,r) = qr x";
-        let expected = "let (q , r) : (ijzer :: tensor :: Tensor :: < _ > , ijzer :: tensor :: Tensor :: < _ >) = x.clone().qr () . unwrap () ;";
+        let expected = "let (q , r) : (ijzer_lib:: tensor :: Tensor :: < _ > , ijzer_lib:: tensor :: Tensor :: < _ >) = x.clone().qr () . unwrap () ;";
         compiler_compare(input, expected);
         Ok(())
     }
@@ -1672,11 +1672,11 @@ mod tests {
         compiler_compare(input, expected);
 
         let input = r"~svd";
-        let expected = "| _x: ijzer :: tensor :: Tensor :: < _ > | _x.svd().unwrap()";
+        let expected = "| _x: ijzer_lib:: tensor :: Tensor :: < _ > | _x.svd().unwrap()";
         compiler_compare(input, expected);
 
         let input = r"var x: T; (u,s,v) = svd x";
-        let expected = "let (u , s , v) : (ijzer :: tensor :: Tensor :: < _ > , ijzer :: tensor :: Tensor :: < _ > , ijzer :: tensor :: Tensor :: < _ >) = x.clone().svd () . unwrap () ;";
+        let expected = "let (u , s , v) : (ijzer_lib:: tensor :: Tensor :: < _ > , ijzer_lib:: tensor :: Tensor :: < _ > , ijzer_lib:: tensor :: Tensor :: < _ >) = x.clone().svd () . unwrap () ;";
         compiler_compare(input, expected);
         Ok(())
     }
@@ -1684,17 +1684,17 @@ mod tests {
     #[test]
     fn test_diag() -> Result<()> {
         let input = r"var x: T; diag x";
-        let expected = "ijzer::tensor::Tensor::<_>::diag(&x.clone())";
+        let expected = "ijzer_lib::tensor::Tensor::<_>::diag(&x.clone())";
         compiler_compare(input, expected);
 
         let input = r"~diag";
         let expected =
-            "| _x: ijzer :: tensor :: Tensor :: < _ > | ijzer::tensor::Tensor::<_>::diag(&_x)";
+            "| _x: ijzer_lib:: tensor :: Tensor :: < _ > | ijzer_lib::tensor::Tensor::<_>::diag(&_x)";
         compiler_compare(input, expected);
 
         let input = r"var x: T; y = diag x";
         let expected =
-            "let y: ijzer :: tensor :: Tensor :: < _ > = ijzer::tensor::Tensor::<_>::diag(&x.clone());";
+            "let y: ijzer_lib:: tensor :: Tensor :: < _ > = ijzer_lib::tensor::Tensor::<_>::diag(&x.clone());";
         compiler_compare(input, expected);
 
         Ok(())
@@ -1733,7 +1733,7 @@ mod tests {
     #[test]
     fn test_array_from_arrays() -> Result<()> {
         let input = r"var x: T; var y: T; [x,y]";
-        let expected = "ijzer::tensor::Tensor::<_>::from_tensors(&[x.clone(), y.clone()]).unwrap()";
+        let expected = "ijzer_lib::tensor::Tensor::<_>::from_tensors(&[x.clone(), y.clone()]).unwrap()";
         compiler_compare(input, expected);
 
         Ok(())
@@ -1742,11 +1742,11 @@ mod tests {
     #[test]
     fn test_binop_functional() -> Result<()> {
         let input = r"~+:Fn(T,N->T)";
-        let expected = "| x : ijzer :: tensor :: Tensor :: < _ > , y : _ | x.map(|a: _| a + y)";
+        let expected = "| x : ijzer_lib:: tensor :: Tensor :: < _ > , y : _ | x.map(|a: _| a + y)";
         compiler_compare(input, expected);
 
         let input = r"~-:Fn(N,T->T)";
-        let expected = "| y : _ , x : ijzer :: tensor :: Tensor :: < _ > | x.map(|a: _| y-a)";
+        let expected = "| y : _ , x : ijzer_lib:: tensor :: Tensor :: < _ > | x.map(|a: _| y-a)";
         compiler_compare(input, expected);
 
         Ok(())
@@ -1768,7 +1768,7 @@ mod tests {
         compiler_compare(input, expected);
 
         let input = r"var x: T; var s: T<usize>; .~>% x s";
-        let expected = "(| _x : ijzer :: tensor :: Tensor :: < _ > , _s : ijzer :: tensor :: Tensor :: < usize > | { let mut _2 = _x.clone() ; _2 . reshape (& _s . to_vec ()) . unwrap () ; _2 }) (x . clone () , s . clone ())";
+        let expected = "(| _x : ijzer_lib:: tensor :: Tensor :: < _ > , _s : ijzer_lib:: tensor :: Tensor :: < usize > | { let mut _2 = _x.clone() ; _2 . reshape (& _s . to_vec ()) . unwrap () ; _2 }) (x . clone () , s . clone ())";
         compiler_compare(input, expected);
 
         Ok(())
