@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use crate::function_enums::TensorBuilderEnum;
 pub use logos::Logos;
 use std::{
     fmt::{Debug, Display},
@@ -226,8 +227,8 @@ pub enum Token {
     #[regex(r"<\w+>", |lex| lex.slice().trim_start_matches('<').trim_end_matches('>').parse().ok())]
     NumberType(String),
 
-    #[regex(r"(eye|randu|randn|zeros|ones)", |lex| Some(lex.slice().to_string()))]
-    TensorBuilder(String),
+    #[regex(r"(eye|randu|randn|zeros|ones)", |lex| TensorBuilderEnum::try_from(lex.slice().to_string()).unwrap())]
+    TensorBuilder(TensorBuilderEnum),
 
     #[token("|")]
     Transpose,
@@ -368,7 +369,8 @@ mod tests {
 
     #[test]
     fn test_unary_functions() {
-        let input = "abs acos asin atan ceil cos cosh exp floor ln log2 log10 round sin sinh sqrt tan tanh";
+        let input =
+            "abs acos asin atan ceil cos cosh exp floor ln log2 log10 round sin sinh sqrt tan tanh";
         let tokens = lexer(input).unwrap();
         assert!(tokens.iter().all(|t| matches!(t, Token::UnaryFunction(_))));
         println!("{:?}", tokens);

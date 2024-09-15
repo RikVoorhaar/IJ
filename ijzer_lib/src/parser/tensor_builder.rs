@@ -90,23 +90,24 @@ impl ParseNodeFunctional for TensorBuilder {
 mod tests {
     use super::*;
     use crate::parser::parse_str_no_context;
+    use crate::function_enums::TensorBuilderEnum;
 
     #[test]
     fn test_tensor_builder() -> Result<()> {
         let (node, _) = parse_str_no_context("randu [3]")?;
-        assert_eq!(node.op, Operation::TensorBuilder("randu".to_string()));
+        assert_eq!(node.op, Operation::TensorBuilder(TensorBuilderEnum::Randu));
         assert_eq!(node.output_type, IJType::Tensor(None));
 
         let (node, _) = parse_str_no_context("randu<f64> [3]")?;
-        assert_eq!(node.op, Operation::TensorBuilder("randu".to_string()));
+        assert_eq!(node.op, Operation::TensorBuilder(TensorBuilderEnum::Randu));
         assert_eq!(node.output_type, IJType::Tensor(Some("f64".to_string())));
 
         let (node, _) = parse_str_no_context("randu<f64> [3]<usize>")?;
-        assert_eq!(node.op, Operation::TensorBuilder("randu".to_string()));
+        assert_eq!(node.op, Operation::TensorBuilder(TensorBuilderEnum::Randu));
         assert_eq!(node.output_type, IJType::Tensor(Some("f64".to_string())));
 
         let (node, _) = parse_str_no_context("randu [3]<usize>")?;
-        assert_eq!(node.op, Operation::TensorBuilder("randu".to_string()));
+        assert_eq!(node.op, Operation::TensorBuilder(TensorBuilderEnum::Randu));
         assert_eq!(node.output_type, IJType::Tensor(None));
 
         Ok(())
@@ -115,7 +116,7 @@ mod tests {
     #[test]
     fn test_tensor_builder_functional() -> Result<()> {
         let (node, _) = parse_str_no_context("~randu<f64>")?;
-        assert_eq!(node.op, Operation::TensorBuilder("randu".to_string()));
+        assert_eq!(node.op, Operation::TensorBuilder(TensorBuilderEnum::Randu));
         assert_eq!(
             node.output_type,
             IJType::Function(FunctionSignature::new(
@@ -125,7 +126,7 @@ mod tests {
         );
 
         let (node, _) = parse_str_no_context("~randu")?;
-        assert_eq!(node.op, Operation::TensorBuilder("randu".to_string()));
+        assert_eq!(node.op, Operation::TensorBuilder(TensorBuilderEnum::Randu));
         assert_eq!(
             node.output_type,
             IJType::Function(FunctionSignature::new(

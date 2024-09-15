@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use crate::function_enums::TensorBuilderEnum;
 
 use crate::tokens::Number;
 
@@ -22,7 +23,7 @@ pub enum Operation {
     LambdaVariable(String),
     Apply,
     GeneralizedContraction,
-    TensorBuilder(String),
+    TensorBuilder(TensorBuilderEnum),
     Transpose,
     Shape,
     QR,

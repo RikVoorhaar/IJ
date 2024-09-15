@@ -954,10 +954,10 @@ impl CompileNode for TensorBuilder {
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::TensorBuilder(builder_name) = &node.op {
-            let builder_name_stream = syn::parse_str::<proc_macro2::TokenStream>(builder_name)
+            let builder_name_stream = syn::parse_str::<proc_macro2::TokenStream>(&builder_name.to_string())
                 .map_err(|_| {
                     syn::Error::new_spanned(
-                        builder_name,
+                        builder_name.to_string(),
                         "Failed to parse builder name into a Rust TokenStream",
                     )
                 })?;

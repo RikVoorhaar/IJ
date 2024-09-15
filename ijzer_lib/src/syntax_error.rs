@@ -161,4 +161,7 @@ pub enum SyntaxError {
 
     #[error("Cannot mix tensor and colon in indexing")]
     CannotMixTensorAndColon,
+
+    #[error("Invalid enum variant: {0}")]
+    InvalidEnumVariant(String),
 }
