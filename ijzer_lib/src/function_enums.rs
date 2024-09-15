@@ -118,3 +118,34 @@ impl fmt::Display for UnaryMathFunctionEnum {
         }
     }
 }
+
+#[derive(Debug, PartialEq, Eq,  Clone)]
+pub enum BinaryMathFunctionEnum {
+    Max,
+    Min,
+    Pow,
+}
+
+impl TryFrom<String> for BinaryMathFunctionEnum {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self> {
+        let variant = match value.as_str() {
+            "max" => BinaryMathFunctionEnum::Max,
+            "min" => BinaryMathFunctionEnum::Min,
+            "^" => BinaryMathFunctionEnum::Pow,
+            _ => return Err(syntax_error::SyntaxError::InvalidEnumVariant(value).into()),
+        };
+        Ok(variant)
+    }
+}
+
+impl fmt::Display for BinaryMathFunctionEnum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BinaryMathFunctionEnum::Max => write!(f, "max"),
+            BinaryMathFunctionEnum::Min => write!(f, "min"),
+            BinaryMathFunctionEnum::Pow => write!(f, "^"),
+        }
+    }
+}

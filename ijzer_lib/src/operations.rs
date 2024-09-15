@@ -1,5 +1,5 @@
 use std::fmt::Debug;
-use crate::function_enums::{TensorBuilderEnum, UnaryMathFunctionEnum};
+use crate::function_enums::{TensorBuilderEnum, UnaryMathFunctionEnum, BinaryMathFunctionEnum};
 
 use crate::tokens::Number;
 
@@ -34,7 +34,7 @@ pub enum Operation {
     AssignSymbol(String),
     Reshape,
     UnaryFunction(UnaryMathFunctionEnum),
-    BinaryFunction(String),
+    BinaryFunction(BinaryMathFunctionEnum),
 }
 
 impl Debug for Operation {
