@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use crate::function_enums::TensorBuilderEnum;
+use crate::function_enums::{TensorBuilderEnum, UnaryMathFunctionEnum};
 pub use logos::Logos;
 use std::{
     fmt::{Debug, Display},
@@ -254,8 +254,8 @@ pub enum Token {
     #[token(">%")]
     Reshape,
 
-    #[regex(r"(abs|acos|asin|atan|ceil|cos|cosh|exp|floor|ln|log2|log10|round|sin|sinh|sqrt|tan|tanh)", |lex| Some(lex.slice().to_string()))]
-    UnaryFunction(String),
+    #[regex(r"(abs|acos|asin|atan|ceil|cos|cosh|exp|floor|ln|log2|log10|round|sin|sinh|sqrt|tan|tanh)", |lex| UnaryMathFunctionEnum::try_from(lex.slice().to_string()).unwrap())]
+    UnaryFunction(UnaryMathFunctionEnum),
 
     #[regex(r"(max|min|\^)", |lex| Some(lex.slice().to_string()), priority = 1)]
     BinaryFunction(String),
