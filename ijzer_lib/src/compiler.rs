@@ -184,6 +184,7 @@ impl CompilerContext {
             Operation::Index => Index::compile(node, self, child_streams)?,
             Operation::AssignSymbol(_) => AssignSymbol::compile(node, self, child_streams)?,
             Operation::Reshape => Reshape::compile(node, self, child_streams)?,
+            Operation::UnaryFunction(_) => UnaryFunction::compile(node, self, child_streams)?,
             _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
@@ -954,13 +955,15 @@ impl CompileNode for TensorBuilder {
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::TensorBuilder(builder_name) = &node.op {
-            let builder_name_stream = syn::parse_str::<proc_macro2::TokenStream>(&builder_name.to_string())
-                .map_err(|_| {
-                    syn::Error::new_spanned(
-                        builder_name.to_string(),
-                        "Failed to parse builder name into a Rust TokenStream",
-                    )
-                })?;
+            let builder_name_stream = syn::parse_str::<proc_macro2::TokenStream>(
+                &builder_name.to_string(),
+            )
+            .map_err(|_| {
+                syn::Error::new_spanned(
+                    builder_name.to_string(),
+                    "Failed to parse builder name into a Rust TokenStream",
+                )
+            })?;
 
             match node.operands.len() {
                 1 => {
@@ -1273,6 +1276,64 @@ impl CompileNode for Reshape {
                 })
             }
             _ => unreachable!(),
+        }
+    }
+}
+
+struct UnaryFunction;
+impl CompileNode for UnaryFunction {
+    fn compile(
+        node: Rc<Node>,
+        compiler: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        if let Operation::UnaryFunction(function_name) = &node.op {
+            let function_name_stream = syn::parse_str::<proc_macro2::TokenStream>(
+                &function_name.to_string(),
+            )
+            .map_err(|_| {
+                syn::Error::new_spanned(
+                    function_name.to_string(),
+                    "Failed to parse function name into a Rust TokenStream",
+                )
+            })?;
+
+            match node.output_type.clone() {
+                IJType::Tensor(_) => {
+                    let child_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
+                    Ok(quote! {
+                        #child_stream.map(|_x| _x.#function_name_stream())
+                    })
+                }
+                IJType::Number(_) => {
+                    let child_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
+                    Ok(quote! {
+                        #child_stream.#function_name_stream()
+                    })
+                }
+                IJType::Function(signature) => {
+                    match *signature.output.clone() {
+                        IJType::Tensor(_) => {
+                            let input_type = signature.input[0].clone();
+                            let input_annot = annotation_from_type(&input_type)?;
+                            Ok(quote! {
+                                |_x: #input_annot| _x.map(|_y| _y.#function_name_stream())
+                            })
+                        }
+                        IJType::Number(_) => {
+                            let input_type = signature.input[0].clone();
+                            let input_annot = annotation_from_type(&input_type)?;
+                            Ok(quote! {
+                                |_x: #input_annot| _x.#function_name_stream()
+                            })
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+                _ => unreachable!(),
+            }
+        } else {
+            unreachable!()
         }
     }
 }
@@ -1611,7 +1672,8 @@ mod tests {
     #[test]
     fn test_shape() -> Result<()> {
         let input = "var x: T; %x";
-        let expected = "ijzer_lib::tensor::Tensor::<usize>::from_vec(x.clone().shape().to_vec(), None)";
+        let expected =
+            "ijzer_lib::tensor::Tensor::<usize>::from_vec(x.clone().shape().to_vec(), None)";
         compiler_compare(input, expected);
 
         let input = "var x: T;.~%x";
@@ -1734,7 +1796,8 @@ mod tests {
     #[test]
     fn test_array_from_arrays() -> Result<()> {
         let input = r"var x: T; var y: T; [x,y]";
-        let expected = "ijzer_lib::tensor::Tensor::<_>::from_tensors(&[x.clone(), y.clone()]).unwrap()";
+        let expected =
+            "ijzer_lib::tensor::Tensor::<_>::from_tensors(&[x.clone(), y.clone()]).unwrap()";
         compiler_compare(input, expected);
 
         Ok(())
@@ -1770,6 +1833,27 @@ mod tests {
 
         let input = r"var x: T; var s: T<usize>; .~>% x s";
         let expected = "(| _x : ijzer_lib:: tensor :: Tensor :: < _ > , _s : ijzer_lib:: tensor :: Tensor :: < usize > | { let mut _2 = _x.clone() ; _2 . reshape (& _s . to_vec ()) . unwrap () ; _2 }) (x . clone () , s . clone ())";
+        compiler_compare(input, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_unary_functional() -> Result<()> {
+        let input = r"var x: T; sin x";
+        let expected = "x.clone().map(|_x| _x.sin())";
+        compiler_compare(input, expected);
+
+        let input = r"var x: N; sin x";
+        let expected = "x.sin()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; .~sin: Fn(T->T) x";
+        let expected = "(| _x : ijzer_lib :: tensor :: Tensor :: < _ > | _x . map (| _y | _y . sin ())) (x . clone ())";
+        compiler_compare(input, expected);
+
+        let input = r"var x: N; .~sin: Fn(N->N) x";
+        let expected = "(| _x : _ | _x . sin ()) (x)";
         compiler_compare(input, expected);
 
         Ok(())
