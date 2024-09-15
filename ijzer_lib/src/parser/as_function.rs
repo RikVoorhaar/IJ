@@ -32,7 +32,7 @@ impl AsFunction {
 
             let node = nodes
                 .iter()
-                .find(|n| n.output_type == fn_type)
+                .find(|n| n.output_type.type_match_function(&fn_type).unwrap_or(false))
                 .ok_or_else(|| {
                     SyntaxError::TypeError(
                         fn_type.to_string(),
@@ -44,7 +44,16 @@ impl AsFunction {
                     )
                 })?;
 
-            return Ok((vec![node.clone()], rest));
+            return Ok((
+                vec![Rc::new(Node::new_skip_number_inference(
+                    node.op.clone(),
+                    node.input_types.clone(),
+                    fn_type,
+                    node.operands.clone(),
+                    context,
+                )?)],
+                rest,
+            ));
         }
 
         Ok((nodes, rest))

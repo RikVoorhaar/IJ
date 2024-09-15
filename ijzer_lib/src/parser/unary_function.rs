@@ -87,17 +87,23 @@ impl ParseNodeFunctional for UnaryFunction {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::function_enums::UnaryMathFunctionEnum;
     use crate::parser::parse_str_no_context;
-use crate::function_enums::UnaryMathFunctionEnum;
 
     #[test]
     fn test_unary_function() -> Result<()> {
         let (node, _) = parse_str_no_context("sin 1.0")?;
-        assert_eq!(node.op, Operation::UnaryFunction(UnaryMathFunctionEnum::Sin));
+        assert_eq!(
+            node.op,
+            Operation::UnaryFunction(UnaryMathFunctionEnum::Sin)
+        );
         assert_eq!(node.operands.len(), 1);
 
         let (node, _) = parse_str_no_context("sin cos 1.0")?;
-        assert_eq!(node.op, Operation::UnaryFunction(UnaryMathFunctionEnum::Sin));
+        assert_eq!(
+            node.op,
+            Operation::UnaryFunction(UnaryMathFunctionEnum::Sin)
+        );
         assert_eq!(node.operands.len(), 1);
         Ok(())
     }
@@ -105,7 +111,10 @@ use crate::function_enums::UnaryMathFunctionEnum;
     #[test]
     fn test_unary_function_functional() -> Result<()> {
         let (node, _) = parse_str_no_context("~sin: Fn(T->T)")?;
-        assert_eq!(node.op, Operation::UnaryFunction(UnaryMathFunctionEnum::Sin));
+        assert_eq!(
+            node.op,
+            Operation::UnaryFunction(UnaryMathFunctionEnum::Sin)
+        );
         assert_eq!(
             node.output_type,
             IJType::Function(FunctionSignature::new(
@@ -115,7 +124,10 @@ use crate::function_enums::UnaryMathFunctionEnum;
         );
 
         let (node, _) = parse_str_no_context("~exp: Fn(N->N)")?;
-        assert_eq!(node.op, Operation::UnaryFunction(UnaryMathFunctionEnum::Exp));
+        assert_eq!(
+            node.op,
+            Operation::UnaryFunction(UnaryMathFunctionEnum::Exp)
+        );
         assert_eq!(
             node.output_type,
             IJType::Function(FunctionSignature::new(
@@ -131,6 +143,24 @@ use crate::function_enums::UnaryMathFunctionEnum;
         let (node, _) = parse_str_no_context("@(ln, sin, cos) [1]")?;
         assert_eq!(node.op, Operation::FunctionComposition(3));
         assert_eq!(node.output_type, IJType::Tensor(None));
+
+        Ok(())
+    }
+    #[test]
+
+    fn test_unary_function_specific_type() -> Result<()> {
+        let (node, _) = parse_str_no_context("~sin: Fn(N<f64>->N<f64>)")?;
+        assert_eq!(
+            node.op,
+            Operation::UnaryFunction(UnaryMathFunctionEnum::Sin)
+        );
+        assert_eq!(
+            node.output_type,
+            IJType::Function(FunctionSignature::new(
+                vec![IJType::Number(Some("f64".to_string()))],
+                IJType::Number(Some("f64".to_string()))
+            ))
+        );
 
         Ok(())
     }

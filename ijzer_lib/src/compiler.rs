@@ -1569,14 +1569,14 @@ mod tests {
     fn test_function_composition_functional() {
         let input = "~@(-,+):Fn(N,N->N)";
         let expected =
-            "| _10_1 : _ , _10_2 : _ | (| a : _ | - a) ((| a : _ , b : _ | a + b) (_10_1 , _10_2))";
+            "| _14_1 : _ , _14_2 : _ | (| a : _ | - a) ((| a : _ , b : _ | a + b) (_14_1 , _14_2))";
         compiler_compare(input, expected);
     }
 
     #[test]
     fn test_reduction_in_composition() {
         let input = "~@(/+,+):Fn(T,T->N)";
-        let expected = "| _6_1 : ijzer_lib:: tensor :: Tensor :: < _ > , _6_2 : ijzer_lib:: tensor :: Tensor :: < _ > | (| _1 : ijzer_lib:: tensor :: Tensor :: < _ > | _1 . reduce (| a : _ , b : _ | a + b)) ((| x1 : ijzer_lib:: tensor :: Tensor :: < _ > , x2 : ijzer_lib:: tensor :: Tensor :: < _ > | x1 . apply_binary_op (& x2 , | a : _ , b : _ | a + b) . unwrap ()) (_6_1 , _6_2))";
+        let expected = "| _9_1 : ijzer_lib:: tensor :: Tensor :: < _ > , _9_2 : ijzer_lib:: tensor :: Tensor :: < _ > | (| _1 : ijzer_lib:: tensor :: Tensor :: < _ > | _1 . reduce (| a : _ , b : _ | a + b)) ((| x1 : ijzer_lib:: tensor :: Tensor :: < _ > , x2 : ijzer_lib:: tensor :: Tensor :: < _ > | x1 . apply_binary_op (& x2 , | a : _ , b : _ | a + b) . unwrap ()) (_9_1 , _9_2))";
         compiler_compare(input, expected);
     }
 
@@ -1787,7 +1787,7 @@ mod tests {
         compiler_compare(input, expected);
 
         let input = r"~I:Fn(T->T)";
-        let expected = "| _1 | _1";
+        let expected = "| _2 | _2";
         compiler_compare(input, expected);
 
         Ok(())
