@@ -3,7 +3,7 @@ use anyhow::Result;
 use std::convert::TryFrom;
 use std::fmt;
 
-#[derive(Debug, PartialEq, Eq,  Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum TensorBuilderEnum {
     Eye,
     Randu,
@@ -40,10 +40,7 @@ impl fmt::Display for TensorBuilderEnum {
     }
 }
 
-
-
-
-#[derive(Debug, PartialEq, Eq,  Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum UnaryMathFunctionEnum {
     Abs,
     Acos,
@@ -119,7 +116,7 @@ impl fmt::Display for UnaryMathFunctionEnum {
     }
 }
 
-#[derive(Debug, PartialEq, Eq,  Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BinaryMathFunctionEnum {
     Max,
     Min,

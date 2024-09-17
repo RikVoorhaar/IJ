@@ -6,6 +6,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 
 use crate::ast_node::{LineHasSemicolon, Node};
+use crate::function_enums::BinaryMathFunctionEnum;
 use crate::operations::Operation;
 use crate::types::IJType;
 
@@ -183,6 +184,7 @@ impl CompilerContext {
             Operation::AssignSymbol(_) => AssignSymbol::compile(node, self, child_streams)?,
             Operation::Reshape => Reshape::compile(node, self, child_streams)?,
             Operation::UnaryFunction(_) => UnaryFunction::compile(node, self, child_streams)?,
+            Operation::BinaryFunction(_) => BinaryOperation::compile(node, self, child_streams)?,
             _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
@@ -537,14 +539,37 @@ fn _compile_binary_op(
     Ok(res)
 }
 
-struct Add;
-impl CompileNode for Add {
+struct BinaryOperation;
+impl CompileNode for BinaryOperation {
     fn compile(
         node: Rc<Node>,
         _compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
-        let binary_op = |a: TokenStream, b: TokenStream| quote! {#a + #b};
+        let function = match node.op.clone() {
+            Operation::BinaryFunction(function) => function,
+            _ => unreachable!("Expected binary operation node, found {:?}", node.op),
+        };
+        let binary_op = match function {
+            BinaryMathFunctionEnum::Add => |a: TokenStream, b: TokenStream| quote! {#a + #b},
+            BinaryMathFunctionEnum::Multiply => |a: TokenStream, b: TokenStream| quote! {#a * #b},
+            BinaryMathFunctionEnum::Div => |a: TokenStream, b: TokenStream| quote! {#a / #b},
+            BinaryMathFunctionEnum::Power => |a: TokenStream, b: TokenStream| quote! {#a.pow(#b)},
+            BinaryMathFunctionEnum::Max => |a: TokenStream, b: TokenStream| quote! {#a.max(#b)},
+            BinaryMathFunctionEnum::Min => |a: TokenStream, b: TokenStream| quote! {#a.min(#b)},
+            BinaryMathFunctionEnum::Equals => |a: TokenStream, b: TokenStream| quote! {#a == #b},
+            BinaryMathFunctionEnum::NotEquals => |a: TokenStream, b: TokenStream| quote! {#a != #b},
+            BinaryMathFunctionEnum::GreaterThan => {
+                |a: TokenStream, b: TokenStream| quote! {#a > #b}
+            }
+            BinaryMathFunctionEnum::LessThan => |a: TokenStream, b: TokenStream| quote! {#a < #b},
+            BinaryMathFunctionEnum::GreaterThanOrEqual => {
+                |a: TokenStream, b: TokenStream| quote! {#a >= #b}
+            }
+            BinaryMathFunctionEnum::LessThanOrEqual => {
+                |a: TokenStream, b: TokenStream| quote! {#a <= #b}
+            }
+        };
         _compile_binary_op(node, child_streams, binary_op)
     }
 }
@@ -1309,25 +1334,23 @@ impl CompileNode for UnaryFunction {
                         #child_stream.#function_name_stream()
                     })
                 }
-                IJType::Function(signature) => {
-                    match *signature.output.clone() {
-                        IJType::Tensor(_) => {
-                            let input_type = signature.input[0].clone();
-                            let input_annot = annotation_from_type(&input_type)?;
-                            Ok(quote! {
-                                |_x: #input_annot| _x.map(|_y| _y.#function_name_stream())
-                            })
-                        }
-                        IJType::Number(_) => {
-                            let input_type = signature.input[0].clone();
-                            let input_annot = annotation_from_type(&input_type)?;
-                            Ok(quote! {
-                                |_x: #input_annot| _x.#function_name_stream()
-                            })
-                        }
-                        _ => unreachable!(),
+                IJType::Function(signature) => match *signature.output.clone() {
+                    IJType::Tensor(_) => {
+                        let input_type = signature.input[0].clone();
+                        let input_annot = annotation_from_type(&input_type)?;
+                        Ok(quote! {
+                            |_x: #input_annot| _x.map(|_y| _y.#function_name_stream())
+                        })
                     }
-                }
+                    IJType::Number(_) => {
+                        let input_type = signature.input[0].clone();
+                        let input_annot = annotation_from_type(&input_type)?;
+                        Ok(quote! {
+                            |_x: #input_annot| _x.#function_name_stream()
+                        })
+                    }
+                    _ => unreachable!(),
+                },
                 _ => unreachable!(),
             }
         } else {

@@ -1,7 +1,6 @@
 use super::{check_ok_needed_outputs, gather_operands, ParseNode, ParseNodeFunctional};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};
-use crate::function_enums::BinaryMathFunctionEnum;
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
@@ -138,6 +137,7 @@ impl ParseNode for BinaryOp {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::function_enums::BinaryMathFunctionEnum;
     use crate::parser::parse_str_no_context;
 
     #[test]
@@ -145,7 +145,10 @@ mod tests {
         let result = parse_str_no_context("+ [1] [2]");
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::BinaryFunction(BinaryMathFunctionEnum::Add));
+        assert_eq!(
+            node.op,
+            Operation::BinaryFunction(BinaryMathFunctionEnum::Add)
+        );
         assert_eq!(
             node.input_types,
             vec![IJType::Tensor(None), IJType::Tensor(None)]
@@ -158,7 +161,10 @@ mod tests {
         let result = parse_str_no_context("+ [1] 2");
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::BinaryFunction(BinaryMathFunctionEnum::Add));
+        assert_eq!(
+            node.op,
+            Operation::BinaryFunction(BinaryMathFunctionEnum::Add)
+        );
         assert_eq!(
             node.input_types,
             vec![IJType::Tensor(None), IJType::Number(None)]
@@ -171,7 +177,10 @@ mod tests {
         let result = parse_str_no_context("+ 1 2");
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::BinaryFunction(BinaryMathFunctionEnum::Add));
+        assert_eq!(
+            node.op,
+            Operation::BinaryFunction(BinaryMathFunctionEnum::Add)
+        );
         assert_eq!(
             node.input_types,
             vec![IJType::Number(None), IJType::Number(None)]
@@ -184,7 +193,10 @@ mod tests {
         let result = parse_str_no_context("* [1] [2]");
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::BinaryFunction(BinaryMathFunctionEnum::Multiply));
+        assert_eq!(
+            node.op,
+            Operation::BinaryFunction(BinaryMathFunctionEnum::Multiply)
+        );
         assert_eq!(
             node.input_types,
             vec![IJType::Tensor(None), IJType::Tensor(None)]
@@ -197,7 +209,10 @@ mod tests {
         let result = parse_str_no_context("* [1] 2");
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::BinaryFunction(BinaryMathFunctionEnum::Multiply));
+        assert_eq!(
+            node.op,
+            Operation::BinaryFunction(BinaryMathFunctionEnum::Multiply)
+        );
         assert_eq!(
             node.input_types,
             vec![IJType::Tensor(None), IJType::Number(None)]
@@ -210,7 +225,10 @@ mod tests {
         let result = parse_str_no_context("* 1 2");
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::BinaryFunction(BinaryMathFunctionEnum::Multiply));
+        assert_eq!(
+            node.op,
+            Operation::BinaryFunction(BinaryMathFunctionEnum::Multiply)
+        );
         assert_eq!(
             node.input_types,
             vec![IJType::Number(None), IJType::Number(None)]
