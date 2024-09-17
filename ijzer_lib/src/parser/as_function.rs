@@ -101,6 +101,7 @@ impl ParseNodeFunctional for AsFunction {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::function_enums::BinaryMathFunctionEnum;
     use crate::operations::Operation;
     use crate::parser::{parse_str, parse_str_no_context};
     use crate::types::FunctionSignature;
@@ -140,7 +141,10 @@ mod tests {
     fn test_as_function_declaration() -> Result<()> {
         let (node, _) = parse_str_no_context("~+:Fn(N,N->N)")?;
 
-        assert_eq!(node.op, Operation::Add);
+        assert_eq!(
+            node.op,
+            Operation::BinaryFunction(BinaryMathFunctionEnum::Add)
+        );
         assert_eq!(node.output_type, IJType::number_function(2));
         Ok(())
     }
@@ -171,7 +175,10 @@ mod tests {
     fn test_as_function_double() -> Result<()> {
         let (node, _) = parse_str_no_context("~~+:Fn(N,N->N)")?;
 
-        assert_eq!(node.op, Operation::Add);
+        assert_eq!(
+            node.op,
+            Operation::BinaryFunction(BinaryMathFunctionEnum::Add)
+        );
         assert_eq!(node.output_type, IJType::number_function(2));
         Ok(())
     }

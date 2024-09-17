@@ -278,6 +278,7 @@ mod tests {
     use crate::ast_node::Variable;
     use crate::tokens;
     use crate::types::FunctionSignature;
+    use crate::function_enums::BinaryMathFunctionEnum;
 
     #[test]
     fn test_tensor_assignment() {
@@ -359,7 +360,7 @@ mod tests {
             IJType::Function(expected_signature.clone())
         );
         let second_operand = &node.operands[1];
-        assert_eq!(second_operand.op, Operation::Add);
+        assert_eq!(second_operand.op, Operation::BinaryFunction(BinaryMathFunctionEnum::Add));
         assert_eq!(second_operand.output_type, IJType::Tensor(None));
 
         let expected_var = Variable {

@@ -68,9 +68,10 @@ impl ParseNodeFunctional for LParen {
 
         let (operand_variants, rest) = next_node_functional(slice, context, needed_outputs)?;
         if !rest.is_empty() {
-            return Err(
-                SyntaxError::GroupReturnsMultipleFunctions(context.token_slice_to_string(rest)).into(),
-            );
+            return Err(SyntaxError::GroupReturnsMultipleFunctions(
+                context.token_slice_to_string(rest),
+            )
+            .into());
         }
         Ok((operand_variants, remainder))
     }
@@ -81,6 +82,7 @@ mod tests {
     use std::str::FromStr;
 
     use super::*;
+    use crate::function_enums::BinaryMathFunctionEnum;
     use crate::parser::parse_str_no_context;
     use crate::tokens::Number;
     use anyhow::Error;
@@ -118,7 +120,7 @@ mod tests {
         assert!(result.is_err());
         Ok(())
     }
-    
+
     #[test]
     fn test_group_with_comma() -> Result<(), Error> {
         let (node, _) = parse_str_no_context("(1, 2)")?;
@@ -134,15 +136,24 @@ mod tests {
     #[test]
     fn test_add_group() -> Result<(), Error> {
         let (node, _) = parse_str_no_context("+(1, 2)")?;
-        assert_eq!(node.op, Operation::Add);
+        assert_eq!(
+            node.op,
+            Operation::BinaryFunction(BinaryMathFunctionEnum::Add)
+        );
         assert_eq!(node.operands.len(), 2);
 
         let (node, _) = parse_str_no_context("+(1 2)")?;
-        assert_eq!(node.op, Operation::Add);
+        assert_eq!(
+            node.op,
+            Operation::BinaryFunction(BinaryMathFunctionEnum::Add)
+        );
         assert_eq!(node.operands.len(), 2);
 
         let (node, _) = parse_str_no_context("+([1] [1])")?;
-        assert_eq!(node.op, Operation::Add);
+        assert_eq!(
+            node.op,
+            Operation::BinaryFunction(BinaryMathFunctionEnum::Add)
+        );
         assert_eq!(node.operands.len(), 2);
         Ok(())
     }

@@ -157,8 +157,6 @@ impl CompilerContext {
             Operation::Function(_) => Function::compile(node, self, child_streams)?,
             Operation::Group => Group::compile(node, self, child_streams)?,
             Operation::Assign => Assign::compile(node, self, child_streams)?,
-            Operation::Add => Add::compile(node, self, child_streams)?,
-            Operation::Multiply => Multiply::compile(node, self, child_streams)?,
             Operation::Identity => Identity::compile(node, self, child_streams)?,
             Operation::Nothing => Nothing::compile(node, self, child_streams)?,
             Operation::Subtract => Subtract::compile(node, self, child_streams)?,
