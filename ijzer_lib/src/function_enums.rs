@@ -123,7 +123,16 @@ impl fmt::Display for UnaryMathFunctionEnum {
 pub enum BinaryMathFunctionEnum {
     Max,
     Min,
-    Pow,
+    Power,
+    Add,
+    Multiply,
+    Div,
+    Equals,
+    NotEquals,
+    GreaterThan,
+    LessThan,
+    GreaterThanOrEqual,
+    LessThanOrEqual,
 }
 
 impl TryFrom<String> for BinaryMathFunctionEnum {
@@ -133,7 +142,16 @@ impl TryFrom<String> for BinaryMathFunctionEnum {
         let variant = match value.as_str() {
             "max" => BinaryMathFunctionEnum::Max,
             "min" => BinaryMathFunctionEnum::Min,
-            "^" => BinaryMathFunctionEnum::Pow,
+            "^" => BinaryMathFunctionEnum::Power,
+            "+" => BinaryMathFunctionEnum::Add,
+            "*" => BinaryMathFunctionEnum::Multiply,
+            "//" => BinaryMathFunctionEnum::Div,
+            "==" => BinaryMathFunctionEnum::Equals,
+            "!=" => BinaryMathFunctionEnum::NotEquals,
+            ">." => BinaryMathFunctionEnum::GreaterThan,
+            "<." => BinaryMathFunctionEnum::LessThan,
+            ">=" => BinaryMathFunctionEnum::GreaterThanOrEqual,
+            "<=" => BinaryMathFunctionEnum::LessThanOrEqual,
             _ => return Err(syntax_error::SyntaxError::InvalidEnumVariant(value).into()),
         };
         Ok(variant)
@@ -145,7 +163,16 @@ impl fmt::Display for BinaryMathFunctionEnum {
         match self {
             BinaryMathFunctionEnum::Max => write!(f, "max"),
             BinaryMathFunctionEnum::Min => write!(f, "min"),
-            BinaryMathFunctionEnum::Pow => write!(f, "^"),
+            BinaryMathFunctionEnum::Power => write!(f, "^"),
+            BinaryMathFunctionEnum::Add => write!(f, "+"),
+            BinaryMathFunctionEnum::Multiply => write!(f, "*"),
+            BinaryMathFunctionEnum::Div => write!(f, "//"),
+            BinaryMathFunctionEnum::Equals => write!(f, "=="),
+            BinaryMathFunctionEnum::NotEquals => write!(f, "!="),
+            BinaryMathFunctionEnum::GreaterThan => write!(f, ">."),
+            BinaryMathFunctionEnum::LessThan => write!(f, "<."),
+            BinaryMathFunctionEnum::GreaterThanOrEqual => write!(f, ">="),
+            BinaryMathFunctionEnum::LessThanOrEqual => write!(f, "<="),
         }
     }
 }

@@ -1,6 +1,7 @@
-use super::{check_ok_needed_outputs, gather_operands, ParseNodeFunctional};
+use super::{check_ok_needed_outputs, gather_operands, ParseNode, ParseNodeFunctional};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};
+use crate::function_enums::BinaryMathFunctionEnum;
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;
@@ -98,28 +99,42 @@ fn _next_node_functional_binary(
     Ok((nodes, rest))
 }
 
-pub struct Add;
-impl ParseNodeFunctional for Add {
+pub struct BinaryOp;
+impl ParseNodeFunctional for BinaryOp {
     fn next_node_functional_impl(
-        _op: Token,
+        op: Token,
         slice: TokenSlice,
         context: &mut ASTContext,
         needed_outputs: Option<&[IJType]>,
     ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
-        _next_node_functional_binary(Operation::Add, slice, context, needed_outputs)
+        let function = match op {
+            Token::BinaryFunction(f) => f,
+            _ => unreachable!(
+                "BinaryOp::next_node_functional_impl called with non-binary function token"
+            ),
+        };
+        _next_node_functional_binary(
+            Operation::BinaryFunction(function),
+            slice,
+            context,
+            needed_outputs,
+        )
     }
 }
-pub struct Multiply;
-impl ParseNodeFunctional for Multiply {
-    fn next_node_functional_impl(
-        _op: Token,
+impl ParseNode for BinaryOp {
+    fn next_node(
+        op: Token,
         slice: TokenSlice,
         context: &mut ASTContext,
-        needed_outputs: Option<&[IJType]>,
-    ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
-        _next_node_functional_binary(Operation::Multiply, slice, context, needed_outputs)
+    ) -> Result<(Rc<Node>, TokenSlice)> {
+        let function = match op {
+            Token::BinaryFunction(f) => f,
+            _ => unreachable!("BinaryOp::next_node called with non-binary function token"),
+        };
+        next_node_simple_binary_op(Operation::BinaryFunction(function), slice, context)
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -130,7 +145,7 @@ mod tests {
         let result = parse_str_no_context("+ [1] [2]");
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Add);
+        assert_eq!(node.op, Operation::BinaryFunction(BinaryMathFunctionEnum::Add));
         assert_eq!(
             node.input_types,
             vec![IJType::Tensor(None), IJType::Tensor(None)]
@@ -143,7 +158,7 @@ mod tests {
         let result = parse_str_no_context("+ [1] 2");
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Add);
+        assert_eq!(node.op, Operation::BinaryFunction(BinaryMathFunctionEnum::Add));
         assert_eq!(
             node.input_types,
             vec![IJType::Tensor(None), IJType::Number(None)]
@@ -156,7 +171,7 @@ mod tests {
         let result = parse_str_no_context("+ 1 2");
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Add);
+        assert_eq!(node.op, Operation::BinaryFunction(BinaryMathFunctionEnum::Add));
         assert_eq!(
             node.input_types,
             vec![IJType::Number(None), IJType::Number(None)]
@@ -169,7 +184,7 @@ mod tests {
         let result = parse_str_no_context("* [1] [2]");
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Multiply);
+        assert_eq!(node.op, Operation::BinaryFunction(BinaryMathFunctionEnum::Multiply));
         assert_eq!(
             node.input_types,
             vec![IJType::Tensor(None), IJType::Tensor(None)]
@@ -182,7 +197,7 @@ mod tests {
         let result = parse_str_no_context("* [1] 2");
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Multiply);
+        assert_eq!(node.op, Operation::BinaryFunction(BinaryMathFunctionEnum::Multiply));
         assert_eq!(
             node.input_types,
             vec![IJType::Tensor(None), IJType::Number(None)]
@@ -195,7 +210,7 @@ mod tests {
         let result = parse_str_no_context("* 1 2");
         assert!(result.is_ok());
         let (node, _) = result.unwrap();
-        assert_eq!(node.op, Operation::Multiply);
+        assert_eq!(node.op, Operation::BinaryFunction(BinaryMathFunctionEnum::Multiply));
         assert_eq!(
             node.input_types,
             vec![IJType::Number(None), IJType::Number(None)]

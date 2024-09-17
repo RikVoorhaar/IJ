@@ -1284,7 +1284,7 @@ struct UnaryFunction;
 impl CompileNode for UnaryFunction {
     fn compile(
         node: Rc<Node>,
-        compiler: &mut CompilerContext,
+        _compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::UnaryFunction(function_name) = &node.op {

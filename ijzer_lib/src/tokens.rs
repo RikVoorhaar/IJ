@@ -140,12 +140,6 @@ pub enum Token {
     #[token("\n")]
     Newline,
 
-    #[token("+")]
-    Plus,
-
-    #[token("*")]
-    Multiplication,
-
     #[token("-")]
     Minus,
 
@@ -257,7 +251,7 @@ pub enum Token {
     #[regex(r"(abs|acos|asin|atan|ceil|cos|cosh|exp|floor|ln|log2|log10|round|sin|sinh|sqrt|tan|tanh)", |lex| UnaryMathFunctionEnum::try_from(lex.slice().to_string()).unwrap())]
     UnaryFunction(UnaryMathFunctionEnum),
 
-    #[regex(r"(max|min|\^)", |lex| BinaryMathFunctionEnum::try_from(lex.slice().to_string()).unwrap())]
+    #[regex(r"(max|min|\^|\+|\*|//|==|!=|>.|<.|>=|<=)", |lex| BinaryMathFunctionEnum::try_from(lex.slice().to_string()).unwrap())]
     BinaryFunction(BinaryMathFunctionEnum),
 }
 
@@ -265,8 +259,6 @@ impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Newline => write!(f, "\\n"),
-            Self::Plus => write!(f, "+"),
-            Self::Multiplication => write!(f, "*"),
             Self::Minus => write!(f, "-"),
             Self::Number(n) => write!(f, "{}", n),
             Self::LParen => write!(f, "("),

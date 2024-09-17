@@ -14,7 +14,7 @@ use utils::{
 };
 
 mod binary_op;
-use binary_op::{next_node_simple_binary_op, Add, Multiply};
+use binary_op::BinaryOp;
 
 mod parenthesis;
 use parenthesis::LParen;
@@ -117,8 +117,7 @@ pub fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node
     let op = context.get_token_at_index(slice.start)?;
     let rest = slice.move_start(1)?;
     match op {
-        Token::Plus => next_node_simple_binary_op(Operation::Add, rest, context),
-        Token::Multiplication => next_node_simple_binary_op(Operation::Multiply, rest, context),
+        Token::BinaryFunction(_) => BinaryOp::next_node(op.clone(), rest, context),
         Token::Number(_) => NumberNode::next_node(op.clone(), rest, context),
         Token::Minus => MinusOp::next_node(op.clone(), rest, context),
         Token::LParen => LParen::next_node(op.clone(), rest, context),
@@ -157,16 +156,12 @@ fn next_node_functional(
 ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
     let token = context.get_token_at_index(slice.start)?;
     let (nodes, rest) = match token {
+        Token::BinaryFunction(_) => {
+            BinaryOp::next_node_functional_impl(token.clone(), slice, context, needed_outputs)?
+        }
         Token::Reduction => {
             Reduction::next_node_functional_impl(Token::Reduction, slice, context, needed_outputs)?
         }
-        Token::Plus => Add::next_node_functional_impl(Token::Plus, slice, context, needed_outputs)?,
-        Token::Multiplication => Multiply::next_node_functional_impl(
-            Token::Multiplication,
-            slice,
-            context,
-            needed_outputs,
-        )?,
         Token::Symbol(_) => {
             Symbol::next_node_functional_impl(token.clone(), slice, context, needed_outputs)?
         }
