@@ -391,11 +391,11 @@ impl CompileNode for LambdaVariable {
             if !children.is_empty() {
                 panic!("Expected 0 child, found {:?}", children.len());
             }
-            let name_with_underscore = format!("_{}", name);
+            let name_with_underscores = format!("__{}", name);
             compiler
                 .inputs
-                .push((node.id, name_with_underscore.clone()));
-            let varname = Ident::new(name_with_underscore.as_str(), Span::call_site());
+                .push((node.id, name_with_underscores.clone()));
+            let varname = Ident::new(name_with_underscores.as_str(), Span::call_site());
 
             let res = quote! {
                 #varname
@@ -1429,7 +1429,7 @@ mod tests {
     fn test_simple_function() {
         let input1 = "var y: T; f($x) -> T = + y $x";
         let input2 = "var y: T; f($x) = + y $x";
-        let expexted = "let f = { | _x: ijzer_lib::tensor::Tensor::<_> | y.clone().apply_binary_op(&_x, |_a: _, _b: _| _a + _b).unwrap() } ;";
+        let expexted = "let f = { | __x: ijzer_lib::tensor::Tensor::<_> | y.clone().apply_binary_op(&__x, |_a: _, _b: _| _a + _b).unwrap() } ;";
         compiler_compare(input1, expexted);
         compiler_compare(input2, expexted);
     }
@@ -1496,14 +1496,14 @@ mod tests {
     #[test]
     fn test_lambda_variable() {
         let expected1 =
-            "let f = { | _x: ijzer_lib::tensor::Tensor::<_>| _x . apply_binary_op (& _x , | _a: _ , _b: _ | _a + _b) . unwrap () } ;";
+            "let f = { | __x: ijzer_lib::tensor::Tensor::<_>| __x . apply_binary_op (& __x , | _a: _ , _b: _ | _a + _b) . unwrap () } ;";
         compiler_compare("f($x) = + $x $x", expected1);
 
         let expected2 =
-            "let f = { | _x: ijzer_lib::tensor::Tensor::<_> , _y: ijzer_lib::tensor::Tensor::<_> | _x . apply_binary_op (& _y , | _a: _ , _b: _ | _a + _b) . unwrap () } ;";
+            "let f = { | __x: ijzer_lib::tensor::Tensor::<_> , __y: ijzer_lib::tensor::Tensor::<_> | __x . apply_binary_op (& __y , | _a: _ , _b: _ | _a + _b) . unwrap () } ;";
         compiler_compare("f($x, $y) = + $x $y", expected2);
 
-        let expected3 = "let h = { | _x: ijzer_lib::tensor::Tensor::<_> | k (_x , ijzer_lib::tensor::Tensor::<_>::from_vec(vec![1,2], None)) } ;";
+        let expected3 = "let h = { | __x: ijzer_lib::tensor::Tensor::<_> | k (__x , ijzer_lib::tensor::Tensor::<_>::from_vec(vec![1,2], None)) } ;";
         compiler_compare("var k: Fn(T,T->T); h($x) = k $x [1,2]", expected3);
     }
 
@@ -1610,11 +1610,11 @@ mod tests {
     #[test]
     fn test_lambda_variable_functional() -> Result<()> {
         let input = "g($x:Fn(N,N->N)) -> N = /$x [1]";
-        let expected = "let g = { | _x : fn (_ , _) -> _ | ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . reduce (_x) } ;";
+        let expected = "let g = { | __x : fn (_ , _) -> _ | ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . reduce (__x) } ;";
         compiler_compare(input, expected);
 
         let input = "g($x:Fn(N->T), $y:Fn(T->N)) -> Fn(T->T) = ~@($x,$y)";
-        let expected = "let g = { | _x : fn (_) -> ijzer_lib:: tensor :: Tensor :: < _ > , _y : fn (ijzer_lib:: tensor :: Tensor :: < _ >) -> _ | | _4_1 : ijzer_lib:: tensor :: Tensor :: < _ > | (_x) ((_y) (_4_1)) } ;";
+        let expected = "let g = { | __x : fn (_) -> ijzer_lib:: tensor :: Tensor :: < _ > , __y : fn (ijzer_lib:: tensor :: Tensor :: < _ >) -> _ | | _4_1 : ijzer_lib:: tensor :: Tensor :: < _ > | (__x) ((__y) (_4_1)) } ;";
         compiler_compare(input, expected);
 
         Ok(())
