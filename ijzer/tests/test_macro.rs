@@ -646,7 +646,10 @@ fn test_unary_function() {
     }
 
     let pi = std::f64::consts::PI;
-    let x = Tensor::from_vec(vec![pi / 2.0, pi, 3.0 * pi / 2.0, 2.0 * pi], Some(vec![2, 2]));
+    let x = Tensor::from_vec(
+        vec![pi / 2.0, pi, 3.0 * pi / 2.0, 2.0 * pi],
+        Some(vec![2, 2]),
+    );
     let y = _test_unary_function_on_tensor_functional(x);
     let expected = [1.0, 0.0, -1.0, 0.0];
     let actual = y.to_vec();
@@ -691,7 +694,7 @@ fn test_division() {
         /: x y
         "#
     }
-    
+
     let x = Tensor::from_vec(vec![1.0, 2.0, 3.0, 4.0], Some(vec![2, 2]));
     let y = 2.0;
     let z = _test_division_tensor_scalar(x, y);
@@ -710,7 +713,7 @@ fn test_division() {
     let y = Tensor::from_vec(vec![1.0, 2.0, 3.0, 4.0], Some(vec![2, 2]));
     let z = _test_division_scalar_tensor(x, y);
     assert_eq!(z.to_vec(), vec![2.0, 1.0, 2.0 / 3.0, 0.5]);
-    
+
     #[ijzer]
     fn _test_division_scalar_scalar(x: f64, y: f64) -> f64 {
         r#"
@@ -725,7 +728,6 @@ fn test_division() {
     let z = _test_division_scalar_scalar(x, y);
     assert_eq!(z, 2.0);
 }
-
 
 #[test]
 fn test_pow() {
@@ -765,7 +767,7 @@ fn test_pow() {
         ^ x y
         "#
     }
-    
+
     let x = 2.0;
     let y = Tensor::from_vec(vec![2.0, 3.0, 4.0], Some(vec![3]));
     let z = _test_pow_scalar_tensor(x, y);
@@ -786,3 +788,137 @@ fn test_pow() {
     assert_eq!(z, 4.0);
 }
 
+#[test]
+fn test_max() {
+    #[ijzer]
+    fn _test_max_tensor_tensor(x: Tensor<f64>, y: Tensor<f64>) -> Tensor<f64> {
+        r#"
+        var x: T<f64>
+        var y: T<f64>
+        max x y
+        "#
+    }
+
+    let x = Tensor::from_vec(vec![1.0, 2.0, 9.0, 16.0], Some(vec![2, 2]));
+    let y = Tensor::from_vec(vec![1.0, 4.0, 3.0, 4.0], Some(vec![2, 2]));
+    let z = _test_max_tensor_tensor(x, y);
+    assert_eq!(z.to_vec(), vec![1.0, 4.0, 9.0, 16.0]);
+
+    #[ijzer]
+    fn _test_max_tensor_scalar(x: Tensor<f64>, y: f64) -> Tensor<f64> {
+        r#"
+        var x: T<f64>
+        var y: N<f64>
+        max x y
+        "#
+    }
+
+    let x = Tensor::from_vec(vec![1.0, 2.0, 9.0, 16.0], Some(vec![2, 2]));
+    let y = 4.0;
+    let z = _test_max_tensor_scalar(x, y);
+    assert_eq!(z.to_vec(), vec![4.0, 4.0, 9.0, 16.0]);
+
+    #[ijzer]
+    fn _test_max_scalar_tensor(x: f64, y: Tensor<f64>) -> Tensor<f64> {
+        r#"
+        var x: N<f64>
+        var y: T<f64>
+        max x y
+        "#
+    }
+
+    let x = 4.0;
+    let y = Tensor::from_vec(vec![1.0, 2.0, 9.0, 16.0], Some(vec![2, 2]));
+    let z = _test_max_scalar_tensor(x, y);
+    assert_eq!(z.to_vec(), vec![4.0, 4.0, 9.0, 16.0]);
+
+    #[ijzer]
+    fn _test_max_scalar_scalar(x: f64, y: f64) -> f64 {
+        r#"
+        var x: N<f64>
+        var y: N<f64>
+        max x y
+        "#
+    }
+
+    let x = 4.0;
+    let y = 2.0;
+    let z = _test_max_scalar_scalar(x, y);
+    assert_eq!(z, 4.0);
+}
+
+#[test]
+fn test_min() {
+    #[ijzer]
+    fn _test_min_tensor_tensor(x: Tensor<f64>, y: Tensor<f64>) -> Tensor<f64> {
+        r#"
+        var x: T<f64>
+        var y: T<f64>
+        min x y
+        "#
+    }
+
+    let x = Tensor::from_vec(vec![1.0, 2.0, 9.0, 16.0], Some(vec![2, 2]));
+    let y = Tensor::from_vec(vec![1.0, 4.0, 3.0, 4.0], Some(vec![2, 2]));
+    let z = _test_min_tensor_tensor(x, y);
+    assert_eq!(z.to_vec(), vec![1.0, 2.0, 3.0, 4.0]);
+}
+
+#[test]
+fn test_equal() {
+    #[ijzer]
+    fn _test_equal_tensor_tensor(x: Tensor<f64>, y: Tensor<f64>) -> Tensor<f64> {
+        r#"
+        var x: T<f64>
+        var y: T<f64>
+        == x y
+        "#
+    }
+
+    let x = Tensor::from_vec(vec![1.0, 2.0, 9.0, 16.0], Some(vec![2, 2]));
+    let y = Tensor::from_vec(vec![1.0, 2.0, 3.0, 4.0], Some(vec![2, 2]));
+    let z = _test_equal_tensor_tensor(x, y);
+    assert_eq!(z.to_vec(), vec![1.0, 1.0, 0.0, 0.0]);
+
+    #[ijzer]
+    fn _test_equal_tensor_scalar(x: Tensor<f64>, y: f64) -> Tensor<f64> {
+        r#"
+        var x: T<f64>
+        var y: N<f64>
+        == x y
+        "#
+    }
+
+    let x = Tensor::from_vec(vec![1.0, 2.0, 9.0, 16.0], Some(vec![2, 2]));
+    let y = 2.0;
+    let z = _test_equal_tensor_scalar(x, y);
+    assert_eq!(z.to_vec(), vec![0.0, 1.0, 0.0, 0.0]);
+
+    #[ijzer]
+    fn _test_equal_scalar_tensor(x: f64, y: Tensor<f64>) -> Tensor<f64> {
+        r#"
+        var x: N<f64>
+        var y: T<f64>
+        == x y
+        "#
+    }
+
+    let x = 2.0;
+    let y = Tensor::from_vec(vec![1.0, 2.0, 9.0, 16.0], Some(vec![2, 2]));
+    let z = _test_equal_scalar_tensor(x, y);
+    assert_eq!(z.to_vec(), vec![0.0, 1.0, 0.0, 0.0]);
+
+    #[ijzer]
+    fn _test_equal_scalar_scalar(x: f64, y: f64) -> f64 {
+        r#"
+        var x: N<f64>
+        var y: N<f64>
+        == x y
+        "#
+    }
+
+    let x = 2.0;
+    let y = 2.0;
+    let z = _test_equal_scalar_scalar(x, y);
+    assert_eq!(z, 1.0);
+}

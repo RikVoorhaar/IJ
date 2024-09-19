@@ -557,17 +557,23 @@ impl CompileNode for BinaryOperation {
             BinaryMathFunctionEnum::Power => |a: TokenStream, b: TokenStream| quote! {#a.pow(#b)},
             BinaryMathFunctionEnum::Max => |a: TokenStream, b: TokenStream| quote! {#a.max(#b)},
             BinaryMathFunctionEnum::Min => |a: TokenStream, b: TokenStream| quote! {#a.min(#b)},
-            BinaryMathFunctionEnum::Equals => |a: TokenStream, b: TokenStream| quote! {#a == #b},
-            BinaryMathFunctionEnum::NotEquals => |a: TokenStream, b: TokenStream| quote! {#a != #b},
-            BinaryMathFunctionEnum::GreaterThan => {
-                |a: TokenStream, b: TokenStream| quote! {#a > #b}
+            BinaryMathFunctionEnum::Equals => {
+                |a: TokenStream, b: TokenStream| quote! {ijzer_lib::num_funcs::equals(#a, #b)}
             }
-            BinaryMathFunctionEnum::LessThan => |a: TokenStream, b: TokenStream| quote! {#a < #b},
+            BinaryMathFunctionEnum::NotEquals => {
+                |a: TokenStream, b: TokenStream| quote! {ijzer_lib::num_funcs::not_equals(#a, #b)}
+            }
+            BinaryMathFunctionEnum::GreaterThan => {
+                |a: TokenStream, b: TokenStream| quote! {ijzer_lib::num_funcs::greater_than(#a, #b)}
+            }
+            BinaryMathFunctionEnum::LessThan => {
+                |a: TokenStream, b: TokenStream| quote! {ijzer_lib::num_funcs::less_than(#a, #b)}
+            }
             BinaryMathFunctionEnum::GreaterThanOrEqual => {
-                |a: TokenStream, b: TokenStream| quote! {#a >= #b}
+                |a: TokenStream, b: TokenStream| quote! {ijzer_lib::num_funcs::greater_than_or_equal(#a, #b)}
             }
             BinaryMathFunctionEnum::LessThanOrEqual => {
-                |a: TokenStream, b: TokenStream| quote! {#a <= #b}
+                |a: TokenStream, b: TokenStream| quote! {ijzer_lib::num_funcs::less_than_or_equal(#a, #b)}
             }
         };
         _compile_binary_op(node, child_streams, binary_op)
@@ -638,7 +644,6 @@ impl CompileNode for Negate {
         }
     }
 }
-
 
 struct Group;
 impl CompileNode for Group {
