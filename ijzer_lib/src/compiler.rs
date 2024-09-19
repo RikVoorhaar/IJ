@@ -185,7 +185,7 @@ impl CompilerContext {
             Operation::Reshape => Reshape::compile(node, self, child_streams)?,
             Operation::UnaryFunction(_) => UnaryFunction::compile(node, self, child_streams)?,
             Operation::BinaryFunction(_) => BinaryOperation::compile(node, self, child_streams)?,
-            _ => NotImplemented::compile(node, self, child_streams)?,
+            // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
         Ok(stream)
@@ -464,21 +464,21 @@ fn _compile_binary_op(
 
             match (operand1_type, operand2_type) {
                 (IJType::Tensor(_), IJType::Tensor(_)) => {
-                    let binop_stream = binary_op(quote! {a}, quote! {b});
+                    let binop_stream = binary_op(quote! {_a}, quote! {_b});
                     quote! {
-                        #childstream1.apply_binary_op(&#childstream2, |a: #number_annot, b: #number_annot| #binop_stream).unwrap()
+                        #childstream1.apply_binary_op(&#childstream2, |_a: #number_annot, _b: #number_annot| #binop_stream).unwrap()
                     }
                 }
                 (IJType::Tensor(_), IJType::Number(_)) => {
-                    let binop_stream = binary_op(quote! {x}, quote! {#childstream2});
+                    let binop_stream = binary_op(quote! {_x}, quote! {#childstream2});
                     quote! {
-                        #childstream1.map(|x: #number_annot| #binop_stream)
+                        #childstream1.map(|_x: #number_annot| #binop_stream)
                     }
                 }
                 (IJType::Number(_), IJType::Tensor(_)) => {
-                    let binop_stream = binary_op(quote! {#childstream1}, quote! {x});
+                    let binop_stream = binary_op(quote! {#childstream1}, quote! {_x});
                     quote! {
-                        #childstream2.map(|x: #number_annot| #binop_stream)
+                        #childstream2.map(|_x: #number_annot| #binop_stream)
                     }
                 }
                 (IJType::Number(_), IJType::Number(_)) => {
@@ -638,17 +638,7 @@ impl CompileNode for Negate {
         }
     }
 }
-struct Multiply;
-impl CompileNode for Multiply {
-    fn compile(
-        node: Rc<Node>,
-        _compiler: &mut CompilerContext,
-        child_streams: HashMap<usize, TokenStream>,
-    ) -> Result<TokenStream> {
-        let binary_op = |a: TokenStream, b: TokenStream| quote! {#a * #b};
-        _compile_binary_op(node, child_streams, binary_op)
-    }
-}
+
 
 struct Group;
 impl CompileNode for Group {
@@ -1429,7 +1419,7 @@ mod tests {
         let input3 = "
         x = [1];
         y= + x x;";
-        let expexted = "let x : ijzer_lib:: tensor :: Tensor :: < _ > = ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) ; let y : ijzer_lib:: tensor :: Tensor :: < _ > = x.clone() . apply_binary_op (& x.clone() , | a : _ , b : _ | a + b) . unwrap () ;";
+        let expexted = "let x : ijzer_lib:: tensor :: Tensor :: < _ > = ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) ; let y : ijzer_lib:: tensor :: Tensor :: < _ > = x.clone() . apply_binary_op (& x.clone() , | _a : _ , _b : _ | _a + _b) . unwrap () ;";
         compiler_compare(input1, expexted);
         compiler_compare(input2, expexted);
         compiler_compare(input3, expexted);
@@ -1439,7 +1429,7 @@ mod tests {
     fn test_simple_function() {
         let input1 = "var y: T; f($x) -> T = + y $x";
         let input2 = "var y: T; f($x) = + y $x";
-        let expexted = "let f = { | _x: ijzer_lib::tensor::Tensor::<_> | y.clone().apply_binary_op(&_x, |a: _, b: _| a + b).unwrap() } ;";
+        let expexted = "let f = { | _x: ijzer_lib::tensor::Tensor::<_> | y.clone().apply_binary_op(&_x, |_a: _, _b: _| _a + _b).unwrap() } ;";
         compiler_compare(input1, expexted);
         compiler_compare(input2, expexted);
     }
@@ -1456,23 +1446,23 @@ mod tests {
 
     #[test]
     fn test_add() {
-        compiler_compare("+ [1] [2]", "ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . apply_binary_op (& ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) , | a : _ , b : _ | a + b) . unwrap ()");
-        compiler_compare("+ [1] 2","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . map (| x : _ | x + 2)");
-        compiler_compare("+ 1 [2]","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . map (| x : _ | 1 + x)");
+        compiler_compare("+ [1] [2]", "ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . apply_binary_op (& ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) , | _a : _ , _b : _ | _a + _b) . unwrap ()");
+        compiler_compare("+ [1] 2","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . map (| _x : _ | _x + 2)");
+        compiler_compare("+ 1 [2]","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . map (| _x : _ | 1 + _x)");
         compiler_compare("+ 1 2", "1+2");
     }
     #[test]
     fn test_subtract() {
-        compiler_compare("- [1] [2]", "ijzer_lib::tensor::Tensor::<_>::from_vec(vec![1], None).apply_binary_op(&ijzer_lib::tensor::Tensor::<_>::from_vec(vec![2], None), |a: _, b: _| a - b).unwrap()");
-        compiler_compare("- [1] 2","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . map (| x : _ | x - 2)");
-        compiler_compare("- 1 [2]","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . map (| x : _ | 1-x)");
+        compiler_compare("- [1] [2]", "ijzer_lib::tensor::Tensor::<_>::from_vec(vec![1], None).apply_binary_op(&ijzer_lib::tensor::Tensor::<_>::from_vec(vec![2], None), |_a: _, _b: _| _a - _b).unwrap()");
+        compiler_compare("- [1] 2","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . map (| _x : _ | _x - 2)");
+        compiler_compare("- 1 [2]","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . map (| _x : _ | 1-_x)");
         compiler_compare("- 1 2", "1-2");
     }
     #[test]
     fn test_multiply() {
-        compiler_compare("* [1] [2]", "ijzer_lib::tensor::Tensor::<_>::from_vec(vec![1], None).apply_binary_op(&ijzer_lib::tensor::Tensor::<_>::from_vec(vec![2], None), |a: _, b: _| a * b).unwrap()");
-        compiler_compare("* [1] 2","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . map (| x : _ | x * 2)");
-        compiler_compare("* 1 [2]","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . map (| x : _ | 1 * x)");
+        compiler_compare("* [1] [2]", "ijzer_lib::tensor::Tensor::<_>::from_vec(vec![1], None).apply_binary_op(&ijzer_lib::tensor::Tensor::<_>::from_vec(vec![2], None), |_a: _, _b: _| _a * _b).unwrap()");
+        compiler_compare("* [1] 2","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . map (| _x : _ | _x * 2)");
+        compiler_compare("* 1 [2]","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . map (| _x : _ | 1 * _x)");
         compiler_compare("* 1 2", "1*2");
     }
 
@@ -1506,11 +1496,11 @@ mod tests {
     #[test]
     fn test_lambda_variable() {
         let expected1 =
-            "let f = { | _x: ijzer_lib::tensor::Tensor::<_>| _x . apply_binary_op (& _x , | a: _ , b: _ | a + b) . unwrap () } ;";
+            "let f = { | _x: ijzer_lib::tensor::Tensor::<_>| _x . apply_binary_op (& _x , | _a: _ , _b: _ | _a + _b) . unwrap () } ;";
         compiler_compare("f($x) = + $x $x", expected1);
 
         let expected2 =
-            "let f = { | _x: ijzer_lib::tensor::Tensor::<_> , _y: ijzer_lib::tensor::Tensor::<_> | _x . apply_binary_op (& _y , | a: _ , b: _ | a + b) . unwrap () } ;";
+            "let f = { | _x: ijzer_lib::tensor::Tensor::<_> , _y: ijzer_lib::tensor::Tensor::<_> | _x . apply_binary_op (& _y , | _a: _ , _b: _ | _a + _b) . unwrap () } ;";
         compiler_compare("f($x, $y) = + $x $y", expected2);
 
         let expected3 = "let h = { | _x: ijzer_lib::tensor::Tensor::<_> | k (_x , ijzer_lib::tensor::Tensor::<_>::from_vec(vec![1,2], None)) } ;";

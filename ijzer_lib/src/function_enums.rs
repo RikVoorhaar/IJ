@@ -142,7 +142,7 @@ impl TryFrom<String> for BinaryMathFunctionEnum {
             "^" => BinaryMathFunctionEnum::Power,
             "+" => BinaryMathFunctionEnum::Add,
             "*" => BinaryMathFunctionEnum::Multiply,
-            "//" => BinaryMathFunctionEnum::Div,
+            "/:" => BinaryMathFunctionEnum::Div,
             "==" => BinaryMathFunctionEnum::Equals,
             "!=" => BinaryMathFunctionEnum::NotEquals,
             ">." => BinaryMathFunctionEnum::GreaterThan,
