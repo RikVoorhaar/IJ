@@ -6,6 +6,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 
 use crate::ast_node::{LineHasSemicolon, Node};
+use crate::function_enums::BinaryMathFunctionEnum;
 use crate::operations::Operation;
 use crate::types::IJType;
 
@@ -157,8 +158,6 @@ impl CompilerContext {
             Operation::Function(_) => Function::compile(node, self, child_streams)?,
             Operation::Group => Group::compile(node, self, child_streams)?,
             Operation::Assign => Assign::compile(node, self, child_streams)?,
-            Operation::Add => Add::compile(node, self, child_streams)?,
-            Operation::Multiply => Multiply::compile(node, self, child_streams)?,
             Operation::Identity => Identity::compile(node, self, child_streams)?,
             Operation::Nothing => Nothing::compile(node, self, child_streams)?,
             Operation::Subtract => Subtract::compile(node, self, child_streams)?,
@@ -184,6 +183,8 @@ impl CompilerContext {
             Operation::Index => Index::compile(node, self, child_streams)?,
             Operation::AssignSymbol(_) => AssignSymbol::compile(node, self, child_streams)?,
             Operation::Reshape => Reshape::compile(node, self, child_streams)?,
+            Operation::UnaryFunction(_) => UnaryFunction::compile(node, self, child_streams)?,
+            Operation::BinaryFunction(_) => BinaryOperation::compile(node, self, child_streams)?,
             // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
@@ -390,11 +391,11 @@ impl CompileNode for LambdaVariable {
             if !children.is_empty() {
                 panic!("Expected 0 child, found {:?}", children.len());
             }
-            let name_with_underscore = format!("_{}", name);
+            let name_with_underscores = format!("__{}", name);
             compiler
                 .inputs
-                .push((node.id, name_with_underscore.clone()));
-            let varname = Ident::new(name_with_underscore.as_str(), Span::call_site());
+                .push((node.id, name_with_underscores.clone()));
+            let varname = Ident::new(name_with_underscores.as_str(), Span::call_site());
 
             let res = quote! {
                 #varname
@@ -463,21 +464,21 @@ fn _compile_binary_op(
 
             match (operand1_type, operand2_type) {
                 (IJType::Tensor(_), IJType::Tensor(_)) => {
-                    let binop_stream = binary_op(quote! {a}, quote! {b});
+                    let binop_stream = binary_op(quote! {_a}, quote! {_b});
                     quote! {
-                        #childstream1.apply_binary_op(&#childstream2, |a: #number_annot, b: #number_annot| #binop_stream).unwrap()
+                        #childstream1.apply_binary_op(&#childstream2, |_a: #number_annot, _b: #number_annot| #binop_stream).unwrap()
                     }
                 }
                 (IJType::Tensor(_), IJType::Number(_)) => {
-                    let binop_stream = binary_op(quote! {x}, quote! {#childstream2});
+                    let binop_stream = binary_op(quote! {_x}, quote! {#childstream2});
                     quote! {
-                        #childstream1.map(|x: #number_annot| #binop_stream)
+                        #childstream1.map(|_x: #number_annot| #binop_stream)
                     }
                 }
                 (IJType::Number(_), IJType::Tensor(_)) => {
-                    let binop_stream = binary_op(quote! {#childstream1}, quote! {x});
+                    let binop_stream = binary_op(quote! {#childstream1}, quote! {_x});
                     quote! {
-                        #childstream2.map(|x: #number_annot| #binop_stream)
+                        #childstream2.map(|_x: #number_annot| #binop_stream)
                     }
                 }
                 (IJType::Number(_), IJType::Number(_)) => {
@@ -538,14 +539,49 @@ fn _compile_binary_op(
     Ok(res)
 }
 
-struct Add;
-impl CompileNode for Add {
+struct BinaryOperation;
+impl CompileNode for BinaryOperation {
     fn compile(
         node: Rc<Node>,
         _compiler: &mut CompilerContext,
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
-        let binary_op = |a: TokenStream, b: TokenStream| quote! {#a + #b};
+        let function = match node.op.clone() {
+            Operation::BinaryFunction(function) => function,
+            _ => unreachable!("Expected binary operation node, found {:?}", node.op),
+        };
+        let binary_op = match function {
+            BinaryMathFunctionEnum::Add => |a: TokenStream, b: TokenStream| quote! {#a + #b},
+            BinaryMathFunctionEnum::Multiply => |a: TokenStream, b: TokenStream| quote! {#a * #b},
+            BinaryMathFunctionEnum::Div => |a: TokenStream, b: TokenStream| quote! {#a / #b},
+            BinaryMathFunctionEnum::Power => |a: TokenStream, b: TokenStream| quote! {#a.pow(#b)},
+            BinaryMathFunctionEnum::Max => |a: TokenStream, b: TokenStream| quote! {#a.max(#b)},
+            BinaryMathFunctionEnum::Min => |a: TokenStream, b: TokenStream| quote! {#a.min(#b)},
+            BinaryMathFunctionEnum::Equals => {
+                |a: TokenStream, b: TokenStream| quote! {ijzer_lib::comparison_funcs::equals(#a, #b)}
+            }
+            BinaryMathFunctionEnum::NotEquals => {
+                |a: TokenStream, b: TokenStream| quote! {ijzer_lib::comparison_funcs::not_equals(#a, #b)}
+            }
+            BinaryMathFunctionEnum::GreaterThan => {
+                |a: TokenStream, b: TokenStream| quote! {ijzer_lib::comparison_funcs::greater_than(#a, #b)}
+            }
+            BinaryMathFunctionEnum::LessThan => {
+                |a: TokenStream, b: TokenStream| quote! {ijzer_lib::comparison_funcs::less_than(#a, #b)}
+            }
+            BinaryMathFunctionEnum::GreaterThanOrEqual => {
+                |a: TokenStream, b: TokenStream| quote! {ijzer_lib::comparison_funcs::greater_than_or_equal(#a, #b)}
+            }
+            BinaryMathFunctionEnum::LessThanOrEqual => {
+                |a: TokenStream, b: TokenStream| quote! {ijzer_lib::comparison_funcs::less_than_or_equal(#a, #b)}
+            }
+            BinaryMathFunctionEnum::Or => {
+                |a: TokenStream, b: TokenStream| quote! {ijzer_lib::comparison_funcs::or(#a, #b)}
+            }
+            BinaryMathFunctionEnum::And => {
+                |a: TokenStream, b: TokenStream| quote! {ijzer_lib::comparison_funcs::and(#a, #b)}
+            }
+        };
         _compile_binary_op(node, child_streams, binary_op)
     }
 }
@@ -612,17 +648,6 @@ impl CompileNode for Negate {
         } else {
             panic!("Expected negate node, found {:?}", node);
         }
-    }
-}
-struct Multiply;
-impl CompileNode for Multiply {
-    fn compile(
-        node: Rc<Node>,
-        _compiler: &mut CompilerContext,
-        child_streams: HashMap<usize, TokenStream>,
-    ) -> Result<TokenStream> {
-        let binary_op = |a: TokenStream, b: TokenStream| quote! {#a * #b};
-        _compile_binary_op(node, child_streams, binary_op)
     }
 }
 
@@ -785,19 +810,20 @@ impl CompileNode for Nothing {
     }
 }
 
-// struct NotImplemented;
-// impl CompileNode for NotImplemented {
-//     fn compile(
-//         node: Rc<Node>,
-//         _compiler: &mut CompilerContext,
-//         _: HashMap<usize, TokenStream>,
-//     ) -> Result<TokenStream> {
-//         let error_msg = format!("Compilation for operation '{:?}' not implemented", node.op);
-//         Ok(quote! {
-//             panic!(#error_msg);
-//         })
-//     }
-// }
+#[allow(dead_code)]
+struct NotImplemented;
+impl CompileNode for NotImplemented {
+    fn compile(
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
+        _: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        let error_msg = format!("Compilation for operation '{:?}' not implemented", node.op);
+        Ok(quote! {
+            panic!(#error_msg);
+        })
+    }
+}
 
 /// Apply nodes have as first argument a function, and the other arguments are the operands to apply the function to.
 struct Apply;
@@ -953,13 +979,15 @@ impl CompileNode for TensorBuilder {
         child_streams: HashMap<usize, TokenStream>,
     ) -> Result<TokenStream> {
         if let Operation::TensorBuilder(builder_name) = &node.op {
-            let builder_name_stream = syn::parse_str::<proc_macro2::TokenStream>(builder_name)
-                .map_err(|_| {
-                    syn::Error::new_spanned(
-                        builder_name,
-                        "Failed to parse builder name into a Rust TokenStream",
-                    )
-                })?;
+            let builder_name_stream = syn::parse_str::<proc_macro2::TokenStream>(
+                &builder_name.to_string(),
+            )
+            .map_err(|_| {
+                syn::Error::new_spanned(
+                    builder_name.to_string(),
+                    "Failed to parse builder name into a Rust TokenStream",
+                )
+            })?;
 
             match node.operands.len() {
                 1 => {
@@ -1276,6 +1304,62 @@ impl CompileNode for Reshape {
     }
 }
 
+struct UnaryFunction;
+impl CompileNode for UnaryFunction {
+    fn compile(
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        if let Operation::UnaryFunction(function_name) = &node.op {
+            let function_name_stream = syn::parse_str::<proc_macro2::TokenStream>(
+                &function_name.to_string(),
+            )
+            .map_err(|_| {
+                syn::Error::new_spanned(
+                    function_name.to_string(),
+                    "Failed to parse function name into a Rust TokenStream",
+                )
+            })?;
+
+            match node.output_type.clone() {
+                IJType::Tensor(_) => {
+                    let child_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
+                    Ok(quote! {
+                        #child_stream.map(|_x| _x.#function_name_stream())
+                    })
+                }
+                IJType::Number(_) => {
+                    let child_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
+                    Ok(quote! {
+                        #child_stream.#function_name_stream()
+                    })
+                }
+                IJType::Function(signature) => match *signature.output.clone() {
+                    IJType::Tensor(_) => {
+                        let input_type = signature.input[0].clone();
+                        let input_annot = annotation_from_type(&input_type)?;
+                        Ok(quote! {
+                            |_x: #input_annot| _x.map(|_y| _y.#function_name_stream())
+                        })
+                    }
+                    IJType::Number(_) => {
+                        let input_type = signature.input[0].clone();
+                        let input_annot = annotation_from_type(&input_type)?;
+                        Ok(quote! {
+                            |_x: #input_annot| _x.#function_name_stream()
+                        })
+                    }
+                    _ => unreachable!(),
+                },
+                _ => unreachable!(),
+            }
+        } else {
+            unreachable!()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1346,7 +1430,7 @@ mod tests {
         let input3 = "
         x = [1];
         y= + x x;";
-        let expexted = "let x : ijzer_lib:: tensor :: Tensor :: < _ > = ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) ; let y : ijzer_lib:: tensor :: Tensor :: < _ > = x.clone() . apply_binary_op (& x.clone() , | a : _ , b : _ | a + b) . unwrap () ;";
+        let expexted = "let x : ijzer_lib:: tensor :: Tensor :: < _ > = ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) ; let y : ijzer_lib:: tensor :: Tensor :: < _ > = x.clone() . apply_binary_op (& x.clone() , | _a : _ , _b : _ | _a + _b) . unwrap () ;";
         compiler_compare(input1, expexted);
         compiler_compare(input2, expexted);
         compiler_compare(input3, expexted);
@@ -1356,7 +1440,7 @@ mod tests {
     fn test_simple_function() {
         let input1 = "var y: T; f($x) -> T = + y $x";
         let input2 = "var y: T; f($x) = + y $x";
-        let expexted = "let f = { | _x: ijzer_lib::tensor::Tensor::<_> | y.clone().apply_binary_op(&_x, |a: _, b: _| a + b).unwrap() } ;";
+        let expexted = "let f = { | __x: ijzer_lib::tensor::Tensor::<_> | y.clone().apply_binary_op(&__x, |_a: _, _b: _| _a + _b).unwrap() } ;";
         compiler_compare(input1, expexted);
         compiler_compare(input2, expexted);
     }
@@ -1373,23 +1457,23 @@ mod tests {
 
     #[test]
     fn test_add() {
-        compiler_compare("+ [1] [2]", "ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . apply_binary_op (& ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) , | a : _ , b : _ | a + b) . unwrap ()");
-        compiler_compare("+ [1] 2","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . map (| x : _ | x + 2)");
-        compiler_compare("+ 1 [2]","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . map (| x : _ | 1 + x)");
+        compiler_compare("+ [1] [2]", "ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . apply_binary_op (& ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) , | _a : _ , _b : _ | _a + _b) . unwrap ()");
+        compiler_compare("+ [1] 2","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . map (| _x : _ | _x + 2)");
+        compiler_compare("+ 1 [2]","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . map (| _x : _ | 1 + _x)");
         compiler_compare("+ 1 2", "1+2");
     }
     #[test]
     fn test_subtract() {
-        compiler_compare("- [1] [2]", "ijzer_lib::tensor::Tensor::<_>::from_vec(vec![1], None).apply_binary_op(&ijzer_lib::tensor::Tensor::<_>::from_vec(vec![2], None), |a: _, b: _| a - b).unwrap()");
-        compiler_compare("- [1] 2","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . map (| x : _ | x - 2)");
-        compiler_compare("- 1 [2]","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . map (| x : _ | 1-x)");
+        compiler_compare("- [1] [2]", "ijzer_lib::tensor::Tensor::<_>::from_vec(vec![1], None).apply_binary_op(&ijzer_lib::tensor::Tensor::<_>::from_vec(vec![2], None), |_a: _, _b: _| _a - _b).unwrap()");
+        compiler_compare("- [1] 2","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . map (| _x : _ | _x - 2)");
+        compiler_compare("- 1 [2]","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . map (| _x : _ | 1-_x)");
         compiler_compare("- 1 2", "1-2");
     }
     #[test]
     fn test_multiply() {
-        compiler_compare("* [1] [2]", "ijzer_lib::tensor::Tensor::<_>::from_vec(vec![1], None).apply_binary_op(&ijzer_lib::tensor::Tensor::<_>::from_vec(vec![2], None), |a: _, b: _| a * b).unwrap()");
-        compiler_compare("* [1] 2","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . map (| x : _ | x * 2)");
-        compiler_compare("* 1 [2]","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . map (| x : _ | 1 * x)");
+        compiler_compare("* [1] [2]", "ijzer_lib::tensor::Tensor::<_>::from_vec(vec![1], None).apply_binary_op(&ijzer_lib::tensor::Tensor::<_>::from_vec(vec![2], None), |_a: _, _b: _| _a * _b).unwrap()");
+        compiler_compare("* [1] 2","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . map (| _x : _ | _x * 2)");
+        compiler_compare("* 1 [2]","ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [2] , None) . map (| _x : _ | 1 * _x)");
         compiler_compare("* 1 2", "1*2");
     }
 
@@ -1423,14 +1507,14 @@ mod tests {
     #[test]
     fn test_lambda_variable() {
         let expected1 =
-            "let f = { | _x: ijzer_lib::tensor::Tensor::<_>| _x . apply_binary_op (& _x , | a: _ , b: _ | a + b) . unwrap () } ;";
+            "let f = { | __x: ijzer_lib::tensor::Tensor::<_>| __x . apply_binary_op (& __x , | _a: _ , _b: _ | _a + _b) . unwrap () } ;";
         compiler_compare("f($x) = + $x $x", expected1);
 
         let expected2 =
-            "let f = { | _x: ijzer_lib::tensor::Tensor::<_> , _y: ijzer_lib::tensor::Tensor::<_> | _x . apply_binary_op (& _y , | a: _ , b: _ | a + b) . unwrap () } ;";
+            "let f = { | __x: ijzer_lib::tensor::Tensor::<_> , __y: ijzer_lib::tensor::Tensor::<_> | __x . apply_binary_op (& __y , | _a: _ , _b: _ | _a + _b) . unwrap () } ;";
         compiler_compare("f($x, $y) = + $x $y", expected2);
 
-        let expected3 = "let h = { | _x: ijzer_lib::tensor::Tensor::<_> | k (_x , ijzer_lib::tensor::Tensor::<_>::from_vec(vec![1,2], None)) } ;";
+        let expected3 = "let h = { | __x: ijzer_lib::tensor::Tensor::<_> | k (__x , ijzer_lib::tensor::Tensor::<_>::from_vec(vec![1,2], None)) } ;";
         compiler_compare("var k: Fn(T,T->T); h($x) = k $x [1,2]", expected3);
     }
 
@@ -1507,14 +1591,14 @@ mod tests {
     fn test_function_composition_functional() {
         let input = "~@(-,+):Fn(N,N->N)";
         let expected =
-            "| _10_1 : _ , _10_2 : _ | (| a : _ | - a) ((| a : _ , b : _ | a + b) (_10_1 , _10_2))";
+            "| _14_1 : _ , _14_2 : _ | (| a : _ | - a) ((| a : _ , b : _ | a + b) (_14_1 , _14_2))";
         compiler_compare(input, expected);
     }
 
     #[test]
     fn test_reduction_in_composition() {
         let input = "~@(/+,+):Fn(T,T->N)";
-        let expected = "| _6_1 : ijzer_lib:: tensor :: Tensor :: < _ > , _6_2 : ijzer_lib:: tensor :: Tensor :: < _ > | (| _1 : ijzer_lib:: tensor :: Tensor :: < _ > | _1 . reduce (| a : _ , b : _ | a + b)) ((| x1 : ijzer_lib:: tensor :: Tensor :: < _ > , x2 : ijzer_lib:: tensor :: Tensor :: < _ > | x1 . apply_binary_op (& x2 , | a : _ , b : _ | a + b) . unwrap ()) (_6_1 , _6_2))";
+        let expected = "| _9_1 : ijzer_lib:: tensor :: Tensor :: < _ > , _9_2 : ijzer_lib:: tensor :: Tensor :: < _ > | (| _1 : ijzer_lib:: tensor :: Tensor :: < _ > | _1 . reduce (| a : _ , b : _ | a + b)) ((| x1 : ijzer_lib:: tensor :: Tensor :: < _ > , x2 : ijzer_lib:: tensor :: Tensor :: < _ > | x1 . apply_binary_op (& x2 , | a : _ , b : _ | a + b) . unwrap ()) (_9_1 , _9_2))";
         compiler_compare(input, expected);
     }
 
@@ -1537,11 +1621,11 @@ mod tests {
     #[test]
     fn test_lambda_variable_functional() -> Result<()> {
         let input = "g($x:Fn(N,N->N)) -> N = /$x [1]";
-        let expected = "let g = { | _x : fn (_ , _) -> _ | ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . reduce (_x) } ;";
+        let expected = "let g = { | __x : fn (_ , _) -> _ | ijzer_lib:: tensor :: Tensor :: < _ > :: from_vec (vec ! [1] , None) . reduce (__x) } ;";
         compiler_compare(input, expected);
 
         let input = "g($x:Fn(N->T), $y:Fn(T->N)) -> Fn(T->T) = ~@($x,$y)";
-        let expected = "let g = { | _x : fn (_) -> ijzer_lib:: tensor :: Tensor :: < _ > , _y : fn (ijzer_lib:: tensor :: Tensor :: < _ >) -> _ | | _4_1 : ijzer_lib:: tensor :: Tensor :: < _ > | (_x) ((_y) (_4_1)) } ;";
+        let expected = "let g = { | __x : fn (_) -> ijzer_lib:: tensor :: Tensor :: < _ > , __y : fn (ijzer_lib:: tensor :: Tensor :: < _ >) -> _ | | _4_1 : ijzer_lib:: tensor :: Tensor :: < _ > | (__x) ((__y) (_4_1)) } ;";
         compiler_compare(input, expected);
 
         Ok(())
@@ -1610,7 +1694,8 @@ mod tests {
     #[test]
     fn test_shape() -> Result<()> {
         let input = "var x: T; %x";
-        let expected = "ijzer_lib::tensor::Tensor::<usize>::from_vec(x.clone().shape().to_vec(), None)";
+        let expected =
+            "ijzer_lib::tensor::Tensor::<usize>::from_vec(x.clone().shape().to_vec(), None)";
         compiler_compare(input, expected);
 
         let input = "var x: T;.~%x";
@@ -1724,7 +1809,7 @@ mod tests {
         compiler_compare(input, expected);
 
         let input = r"~I:Fn(T->T)";
-        let expected = "| _1 | _1";
+        let expected = "| _2 | _2";
         compiler_compare(input, expected);
 
         Ok(())
@@ -1733,7 +1818,8 @@ mod tests {
     #[test]
     fn test_array_from_arrays() -> Result<()> {
         let input = r"var x: T; var y: T; [x,y]";
-        let expected = "ijzer_lib::tensor::Tensor::<_>::from_tensors(&[x.clone(), y.clone()]).unwrap()";
+        let expected =
+            "ijzer_lib::tensor::Tensor::<_>::from_tensors(&[x.clone(), y.clone()]).unwrap()";
         compiler_compare(input, expected);
 
         Ok(())
@@ -1769,6 +1855,88 @@ mod tests {
 
         let input = r"var x: T; var s: T<usize>; .~>% x s";
         let expected = "(| _x : ijzer_lib:: tensor :: Tensor :: < _ > , _s : ijzer_lib:: tensor :: Tensor :: < usize > | { let mut _2 = _x.clone() ; _2 . reshape (& _s . to_vec ()) . unwrap () ; _2 }) (x . clone () , s . clone ())";
+        compiler_compare(input, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_unary_functional() -> Result<()> {
+        let input = r"var x: T; sin x";
+        let expected = "x.clone().map(|_x| _x.sin())";
+        compiler_compare(input, expected);
+
+        let input = r"var x: N; sin x";
+        let expected = "x.sin()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; .~sin: Fn(T->T) x";
+        let expected = "(| _x : ijzer_lib :: tensor :: Tensor :: < _ > | _x . map (| _y | _y . sin ())) (x . clone ())";
+        compiler_compare(input, expected);
+
+        let input = r"var x: N; .~sin: Fn(N->N) x";
+        let expected = "(| _x : _ | _x . sin ()) (x)";
+        compiler_compare(input, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_binary_functional() -> Result<()> {
+        let input = r"var x: T; var y: T; + x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| _a + _b).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; * x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| _a * _b).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; /: x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| _a / _b).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; ^ x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| _a.pow(_b)).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; max x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| _a.max(_b)).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; min x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| _a.min(_b)).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; == x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| ijzer_lib::comparison_funcs::equals(_a, _b)).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; != x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| ijzer_lib::comparison_funcs::not_equals(_a, _b)).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; >. x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| ijzer_lib::comparison_funcs::greater_than(_a, _b)).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; <. x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| ijzer_lib::comparison_funcs::less_than(_a, _b)).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; >= x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| ijzer_lib::comparison_funcs::greater_than_or_equal(_a, _b)).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; <= x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| ijzer_lib::comparison_funcs::less_than_or_equal(_a, _b)).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; && x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| ijzer_lib::comparison_funcs::and(_a, _b)).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; || x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| ijzer_lib::comparison_funcs::or(_a, _b)).unwrap()";
         compiler_compare(input, expected);
 
         Ok(())

@@ -1,11 +1,10 @@
 use std::fmt::Debug;
+use crate::function_enums::{TensorBuilderEnum, UnaryMathFunctionEnum, BinaryMathFunctionEnum};
 
 use crate::tokens::Number;
 
 #[derive(Clone, PartialEq)]
 pub enum Operation {
-    Add,
-    Multiply,
     Subtract,
     Negate,
     Group,
@@ -22,7 +21,7 @@ pub enum Operation {
     LambdaVariable(String),
     Apply,
     GeneralizedContraction,
-    TensorBuilder(String),
+    TensorBuilder(TensorBuilderEnum),
     Transpose,
     Shape,
     QR,
@@ -32,13 +31,13 @@ pub enum Operation {
     Index,
     AssignSymbol(String),
     Reshape,
+    UnaryFunction(UnaryMathFunctionEnum),
+    BinaryFunction(BinaryMathFunctionEnum),
 }
 
 impl Debug for Operation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Add => write!(f, "Add"),
-            Self::Multiply => write!(f, "Multiply"),
             Self::Subtract => write!(f, "Subtract"),
             Self::Negate => write!(f, "Negate"),
             Self::Group => write!(f, "Group"),
@@ -65,6 +64,8 @@ impl Debug for Operation {
             Self::Index => write!(f, "<|"),
             Self::AssignSymbol(s) => write!(f, "AssignSymbol({})", s),
             Self::Reshape => write!(f, "Reshape"),
+            Self::UnaryFunction(s) => write!(f, "UnaryFunction({})", s),
+            Self::BinaryFunction(s) => write!(f, "BinaryFunction({})", s),
         }
     }
 }

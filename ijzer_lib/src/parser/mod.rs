@@ -14,7 +14,7 @@ use utils::{
 };
 
 mod binary_op;
-use binary_op::{next_node_simple_binary_op, Add, Multiply};
+use binary_op::BinaryOp;
 
 mod parenthesis;
 use parenthesis::LParen;
@@ -84,6 +84,9 @@ use index::Index;
 mod reshape;
 use reshape::Reshape;
 
+mod unary_function;
+use unary_function::UnaryFunction;
+
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
@@ -114,8 +117,7 @@ pub fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node
     let op = context.get_token_at_index(slice.start)?;
     let rest = slice.move_start(1)?;
     match op {
-        Token::Plus => next_node_simple_binary_op(Operation::Add, rest, context),
-        Token::Multiplication => next_node_simple_binary_op(Operation::Multiply, rest, context),
+        Token::BinaryFunction(_) => BinaryOp::next_node(op.clone(), rest, context),
         Token::Number(_) => NumberNode::next_node(op.clone(), rest, context),
         Token::Minus => MinusOp::next_node(op.clone(), rest, context),
         Token::LParen => LParen::next_node(op.clone(), rest, context),
@@ -140,6 +142,7 @@ pub fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node
         Token::Diag => Diag::next_node(op.clone(), rest, context),
         Token::Index => Index::next_node(op.clone(), rest, context),
         Token::Reshape => Reshape::next_node(op.clone(), rest, context),
+        Token::UnaryFunction(_) => UnaryFunction::next_node(op.clone(), rest, context),
         _ => Err(SyntaxError::UnexpectedToken(op.clone()).into()),
     }
 }
@@ -153,16 +156,12 @@ fn next_node_functional(
 ) -> Result<(Vec<Rc<Node>>, TokenSlice)> {
     let token = context.get_token_at_index(slice.start)?;
     let (nodes, rest) = match token {
+        Token::BinaryFunction(_) => {
+            BinaryOp::next_node_functional_impl(token.clone(), slice, context, needed_outputs)?
+        }
         Token::Reduction => {
             Reduction::next_node_functional_impl(Token::Reduction, slice, context, needed_outputs)?
         }
-        Token::Plus => Add::next_node_functional_impl(Token::Plus, slice, context, needed_outputs)?,
-        Token::Multiplication => Multiply::next_node_functional_impl(
-            Token::Multiplication,
-            slice,
-            context,
-            needed_outputs,
-        )?,
         Token::Symbol(_) => {
             Symbol::next_node_functional_impl(token.clone(), slice, context, needed_outputs)?
         }
@@ -225,10 +224,18 @@ fn next_node_functional(
         }
         Token::SVD => Svd::next_node_functional_impl(Token::SVD, slice, context, needed_outputs)?,
         Token::QR => QR::next_node_functional_impl(Token::QR, slice, context, needed_outputs)?,
-        Token::Diag => Diag::next_node_functional_impl(Token::Diag, slice, context, needed_outputs)?,
+        Token::Diag => {
+            Diag::next_node_functional_impl(Token::Diag, slice, context, needed_outputs)?
+        }
         Token::Reshape => {
             Reshape::next_node_functional_impl(Token::Reshape, slice, context, needed_outputs)?
         }
+        Token::UnaryFunction(name) => UnaryFunction::next_node_functional_impl(
+            Token::UnaryFunction(name.clone()),
+            slice,
+            context,
+            needed_outputs,
+        )?,
         _ => {
             return Err(SyntaxError::SliceCannotBeParsedAsFunction(
                 context.token_slice_to_string(slice),
@@ -271,6 +278,7 @@ mod tests {
     use crate::ast_node::Variable;
     use crate::tokens;
     use crate::types::FunctionSignature;
+    use crate::function_enums::BinaryMathFunctionEnum;
 
     #[test]
     fn test_tensor_assignment() {
@@ -352,7 +360,7 @@ mod tests {
             IJType::Function(expected_signature.clone())
         );
         let second_operand = &node.operands[1];
-        assert_eq!(second_operand.op, Operation::Add);
+        assert_eq!(second_operand.op, Operation::BinaryFunction(BinaryMathFunctionEnum::Add));
         assert_eq!(second_operand.output_type, IJType::Tensor(None));
 
         let expected_var = Variable {

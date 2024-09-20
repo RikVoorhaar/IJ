@@ -229,6 +229,7 @@ impl IJType {
             .ok_or(SyntaxError::ExpectedFunction(format!("{:?}", other)))?;
 
         Ok(signature1.output.type_match(&signature2.output)
+            && signature1.input.len() == signature2.input.len()
             && signature1
                 .input
                 .iter()

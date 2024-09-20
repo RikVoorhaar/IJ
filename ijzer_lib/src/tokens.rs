@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use crate::function_enums::{TensorBuilderEnum, UnaryMathFunctionEnum, BinaryMathFunctionEnum};
 pub use logos::Logos;
 use std::{
     fmt::{Debug, Display},
@@ -139,12 +140,6 @@ pub enum Token {
     #[token("\n")]
     Newline,
 
-    #[token("+")]
-    Plus,
-
-    #[token("*")]
-    Multiplication,
-
     #[token("-")]
     Minus,
 
@@ -166,7 +161,7 @@ pub enum Token {
     #[token(",")]
     Comma,
 
-    #[regex("[a-zA-Z][a-zA-Z0-9]*", |lex| lex.slice().parse().ok())]
+    #[regex("[a-zA-Z][a-zA-Z0-9]*", |lex| lex.slice().parse().ok(), priority = 0)]
     Symbol(SymbolToken),
 
     #[regex("\\$[a-zA-Z0-9]+", |lex| lex.slice().trim_start_matches('$').parse().ok())]
@@ -226,8 +221,8 @@ pub enum Token {
     #[regex(r"<\w+>", |lex| lex.slice().trim_start_matches('<').trim_end_matches('>').parse().ok())]
     NumberType(String),
 
-    #[regex(r"(eye|randu|randn|zeros|ones)", |lex| Some(lex.slice().to_string()))]
-    TensorBuilder(String),
+    #[regex(r"(eye|randu|randn|zeros|ones)", |lex| TensorBuilderEnum::try_from(lex.slice().to_string()).unwrap())]
+    TensorBuilder(TensorBuilderEnum),
 
     #[token("|")]
     Transpose,
@@ -252,14 +247,18 @@ pub enum Token {
 
     #[token(">%")]
     Reshape,
+
+    #[regex(r"(abs|acos|asin|atan|ceil|cos|cosh|exp|floor|ln|log2|log10|round|sin|sinh|sqrt|tan|tanh)", |lex| UnaryMathFunctionEnum::try_from(lex.slice().to_string()).unwrap())]
+    UnaryFunction(UnaryMathFunctionEnum),
+
+    #[regex(r"(max|min|\^|\+|\*|/:|==|!=|>.|<.|>=|<=|&&|\|\|)", |lex| BinaryMathFunctionEnum::try_from(lex.slice().to_string()).unwrap())]
+    BinaryFunction(BinaryMathFunctionEnum),
 }
 
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Newline => write!(f, "\\n"),
-            Self::Plus => write!(f, "+"),
-            Self::Multiplication => write!(f, "*"),
             Self::Minus => write!(f, "-"),
             Self::Number(n) => write!(f, "{}", n),
             Self::LParen => write!(f, "("),
@@ -296,6 +295,8 @@ impl Display for Token {
             Self::Diag => write!(f, "diag"),
             Self::Index => write!(f, ">"),
             Self::Reshape => write!(f, ">%"),
+            Self::UnaryFunction(s) => write!(f, "{}", s),
+            Self::BinaryFunction(s) => write!(f, "{}", s),
         }
     }
 }
@@ -356,6 +357,25 @@ mod tests {
         assert!(tokens.iter().all(|t| matches!(t, Token::TensorBuilder(_))));
         println!("{:?}", tokens);
         assert_eq!(tokens.len(), 5);
+    }
+
+    #[test]
+    fn test_unary_functions() {
+        let input =
+            "abs acos asin atan ceil cos cosh exp floor ln log2 log10 round sin sinh sqrt tan tanh";
+        let tokens = lexer(input).unwrap();
+        assert!(tokens.iter().all(|t| matches!(t, Token::UnaryFunction(_))));
+        println!("{:?}", tokens);
+        assert_eq!(tokens.len(), 18);
+    }
+
+    #[test]
+    fn test_binary_functions() {
+        let input = "max min ^";
+        let tokens = lexer(input).unwrap();
+        assert!(tokens.iter().all(|t| matches!(t, Token::BinaryFunction(_))));
+        println!("{:?}", tokens);
+        assert_eq!(tokens.len(), 3);
     }
 
     #[test]

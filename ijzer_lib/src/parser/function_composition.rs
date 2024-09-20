@@ -395,6 +395,7 @@ impl ParseNodeFunctional for FunctionComposition {
 mod tests {
     use super::*;
     use crate::ast_node::Node;
+    use crate::function_enums::BinaryMathFunctionEnum;
     use crate::operations::Operation;
     use crate::parser::{parse_str, parse_str_no_context};
     use crate::types::FunctionSignature;
@@ -632,7 +633,7 @@ mod tests {
         let child1 = node.operands[0].clone();
         assert_eq!(child1.op, Operation::FunctionComposition(2));
         let child2 = node.operands[1].clone();
-        assert_eq!(child2.op, Operation::Add);
+        assert_eq!(child2.op, Operation::BinaryFunction(BinaryMathFunctionEnum::Add));
         Ok(())
     }
 

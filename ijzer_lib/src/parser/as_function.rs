@@ -32,7 +32,7 @@ impl AsFunction {
 
             let node = nodes
                 .iter()
-                .find(|n| n.output_type == fn_type)
+                .find(|n| n.output_type.type_match_function(&fn_type).unwrap_or(false))
                 .ok_or_else(|| {
                     SyntaxError::TypeError(
                         fn_type.to_string(),
@@ -44,7 +44,16 @@ impl AsFunction {
                     )
                 })?;
 
-            return Ok((vec![node.clone()], rest));
+            return Ok((
+                vec![Rc::new(Node::new_skip_number_inference(
+                    node.op.clone(),
+                    node.input_types.clone(),
+                    fn_type,
+                    node.operands.clone(),
+                    context,
+                )?)],
+                rest,
+            ));
         }
 
         Ok((nodes, rest))
@@ -92,6 +101,7 @@ impl ParseNodeFunctional for AsFunction {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::function_enums::BinaryMathFunctionEnum;
     use crate::operations::Operation;
     use crate::parser::{parse_str, parse_str_no_context};
     use crate::types::FunctionSignature;
@@ -131,7 +141,10 @@ mod tests {
     fn test_as_function_declaration() -> Result<()> {
         let (node, _) = parse_str_no_context("~+:Fn(N,N->N)")?;
 
-        assert_eq!(node.op, Operation::Add);
+        assert_eq!(
+            node.op,
+            Operation::BinaryFunction(BinaryMathFunctionEnum::Add)
+        );
         assert_eq!(node.output_type, IJType::number_function(2));
         Ok(())
     }
@@ -162,7 +175,10 @@ mod tests {
     fn test_as_function_double() -> Result<()> {
         let (node, _) = parse_str_no_context("~~+:Fn(N,N->N)")?;
 
-        assert_eq!(node.op, Operation::Add);
+        assert_eq!(
+            node.op,
+            Operation::BinaryFunction(BinaryMathFunctionEnum::Add)
+        );
         assert_eq!(node.output_type, IJType::number_function(2));
         Ok(())
     }
