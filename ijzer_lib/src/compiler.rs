@@ -575,6 +575,12 @@ impl CompileNode for BinaryOperation {
             BinaryMathFunctionEnum::LessThanOrEqual => {
                 |a: TokenStream, b: TokenStream| quote! {ijzer_lib::comparison_funcs::less_than_or_equal(#a, #b)}
             }
+            BinaryMathFunctionEnum::Or => {
+                |a: TokenStream, b: TokenStream| quote! {ijzer_lib::comparison_funcs::or(#a, #b)}
+            }
+            BinaryMathFunctionEnum::And => {
+                |a: TokenStream, b: TokenStream| quote! {ijzer_lib::comparison_funcs::and(#a, #b)}
+            }
         };
         _compile_binary_op(node, child_streams, binary_op)
     }
@@ -1923,6 +1929,14 @@ mod tests {
 
         let input = r"var x: T; var y: T; <= x y";
         let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| ijzer_lib::comparison_funcs::less_than_or_equal(_a, _b)).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; && x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| ijzer_lib::comparison_funcs::and(_a, _b)).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; || x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| ijzer_lib::comparison_funcs::or(_a, _b)).unwrap()";
         compiler_compare(input, expected);
 
         Ok(())

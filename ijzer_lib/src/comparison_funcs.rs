@@ -48,6 +48,22 @@ pub fn less_than_or_equal<T: One + Zero + PartialOrd>(a: T, b: T) -> T {
     }
 }
 
+pub fn or<T: One + Zero + PartialEq>(a: T, b: T) -> T {
+    if a != T::zero() || b != T::zero() {
+        T::one()
+    } else {
+        T::zero()
+    }
+}
+
+pub fn and<T: One + Zero + PartialEq>(a: T, b: T) -> T {
+    if a != T::zero() && b != T::zero() {
+        T::one()
+    } else {
+        T::zero()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -103,5 +119,32 @@ mod tests {
         assert_eq!(less_than_or_equal(2.0_f64, 2.0_f64), 1.0);
         assert_eq!(less_than_or_equal(2_i64, 2_i64), 1);
     }
-}
 
+    #[test]
+    fn test_or() {
+        assert_eq!(or(1.0_f64, 0.0_f64), 1.0);
+        assert_eq!(or(0.0_f64, 1.0_f64), 1.0);
+        assert_eq!(or(0.0_f64, 0.0_f64), 0.0);
+        assert_eq!(or(2.0_f64, 1.0_f64), 1.0);
+        assert_eq!(or(0.0_f64, 2.0_f64), 1.0);
+        assert_eq!(or(1_i64, 0_i64), 1);
+        assert_eq!(or(0_i64, 1_i64), 1);
+        assert_eq!(or(0_i64, 0_i64), 0);
+
+    }
+
+    #[test]
+    fn test_and() {
+        assert_eq!(and(1.0_f64, 1.0_f64), 1.0);
+        assert_eq!(and(1.0_f64, 0.0_f64), 0.0);
+        assert_eq!(and(0.0_f64, 1.0_f64), 0.0);
+        assert_eq!(and(0.0_f64, 0.0_f64), 0.0);
+        assert_eq!(and(1_i64, 1_i64), 1);
+        assert_eq!(and(1_i64, 0_i64), 0);
+        assert_eq!(and(0_i64, 1_i64), 0);
+        assert_eq!(and(0_i64, 0_i64), 0);
+        assert_eq!(and(2_i64, 1_i64), 1);
+        assert_eq!(and(1_i64, 2_i64), 1);
+        assert_eq!(and(0_i64, 2_i64), 0);
+    }
+}

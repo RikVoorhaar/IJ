@@ -2,7 +2,6 @@
 mod tests {
     use crate::prelude::*;
 
-
     #[test]
     fn test_division() {
         #[ijzer]
@@ -380,5 +379,39 @@ mod tests {
         let y = Tensor::from_vec(vec![1.0, 4.0, 3.0, 4.0], Some(vec![2, 2]));
         let z = _test_less_equal_tensor_tensor(x, y);
         assert_eq!(z.to_vec(), vec![1.0, 1.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_and() {
+        #[ijzer]
+        fn _test_and_tensor_tensor(x: Tensor<f64>, y: Tensor<f64>) -> Tensor<f64> {
+            r#"
+        var x: T<f64>
+        var y: T<f64>
+        && x y
+        "#
+        }
+
+        let x = Tensor::from_vec(vec![1.0, 0.0, 0.0, 2.0, 1.0], Some(vec![5]));
+        let y = Tensor::from_vec(vec![1.0, 0.0, 1.0, 0.0, 2.0], Some(vec![5]));
+        let z = _test_and_tensor_tensor(x, y);
+        assert_eq!(z.to_vec(), vec![1.0, 0.0, 0.0, 0.0, 1.0]);
+    }
+
+    #[test]
+    fn test_or() {
+        #[ijzer]
+        fn _test_or_tensor_tensor(x: Tensor<f64>, y: Tensor<f64>) -> Tensor<f64> {
+            r#"
+        var x: T<f64>
+        var y: T<f64>
+        || x y
+        "#
+        }
+
+        let x = Tensor::from_vec(vec![1.0, 0.0, 0.0, 2.0, 1.0], Some(vec![5]));
+        let y = Tensor::from_vec(vec![1.0, 0.0, 1.0, 0.0, 2.0], Some(vec![5]));
+        let z = _test_or_tensor_tensor(x, y);
+        assert_eq!(z.to_vec(), vec![1.0,0.0,1.0, 1.0, 1.0]);
     }
 }

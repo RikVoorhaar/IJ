@@ -251,7 +251,7 @@ pub enum Token {
     #[regex(r"(abs|acos|asin|atan|ceil|cos|cosh|exp|floor|ln|log2|log10|round|sin|sinh|sqrt|tan|tanh)", |lex| UnaryMathFunctionEnum::try_from(lex.slice().to_string()).unwrap())]
     UnaryFunction(UnaryMathFunctionEnum),
 
-    #[regex(r"(max|min|\^|\+|\*|/:|==|!=|>.|<.|>=|<=)", |lex| BinaryMathFunctionEnum::try_from(lex.slice().to_string()).unwrap())]
+    #[regex(r"(max|min|\^|\+|\*|/:|==|!=|>.|<.|>=|<=|&&|\|\|)", |lex| BinaryMathFunctionEnum::try_from(lex.slice().to_string()).unwrap())]
     BinaryFunction(BinaryMathFunctionEnum),
 }
 

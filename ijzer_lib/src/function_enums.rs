@@ -130,6 +130,8 @@ pub enum BinaryMathFunctionEnum {
     LessThan,
     GreaterThanOrEqual,
     LessThanOrEqual,
+    Or,
+    And,
 }
 
 impl TryFrom<String> for BinaryMathFunctionEnum {
@@ -149,6 +151,8 @@ impl TryFrom<String> for BinaryMathFunctionEnum {
             "<." => BinaryMathFunctionEnum::LessThan,
             ">=" => BinaryMathFunctionEnum::GreaterThanOrEqual,
             "<=" => BinaryMathFunctionEnum::LessThanOrEqual,
+            "||" => BinaryMathFunctionEnum::Or,
+            "&&" => BinaryMathFunctionEnum::And,
             _ => return Err(syntax_error::SyntaxError::InvalidEnumVariant(value).into()),
         };
         Ok(variant)
@@ -170,6 +174,8 @@ impl fmt::Display for BinaryMathFunctionEnum {
             BinaryMathFunctionEnum::LessThan => write!(f, "<."),
             BinaryMathFunctionEnum::GreaterThanOrEqual => write!(f, ">="),
             BinaryMathFunctionEnum::LessThanOrEqual => write!(f, "<="),
+            BinaryMathFunctionEnum::Or => write!(f, "or"),
+            BinaryMathFunctionEnum::And => write!(f, "and"),
         }
     }
 }
