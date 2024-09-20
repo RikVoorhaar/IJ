@@ -1874,4 +1874,57 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_binary_functional() -> Result<()> {
+        let input = r"var x: T; var y: T; + x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| _a + _b).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; * x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| _a * _b).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; /: x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| _a / _b).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; ^ x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| _a.pow(_b)).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; max x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| _a.max(_b)).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; min x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| _a.min(_b)).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; == x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| ijzer_lib::num_funcs::equals(_a, _b)).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; != x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| ijzer_lib::num_funcs::not_equals(_a, _b)).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; >. x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| ijzer_lib::num_funcs::greater_than(_a, _b)).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; <. x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| ijzer_lib::num_funcs::less_than(_a, _b)).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; >= x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| ijzer_lib::num_funcs::greater_than_or_equal(_a, _b)).unwrap()";
+        compiler_compare(input, expected);
+
+        let input = r"var x: T; var y: T; <= x y";
+        let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| ijzer_lib::num_funcs::less_than_or_equal(_a, _b)).unwrap()";
+        compiler_compare(input, expected);
+
+        Ok(())
+    }
 }
