@@ -173,3 +173,4 @@ impl fmt::Display for BinaryMathFunctionEnum {
         }
     }
 }
+
