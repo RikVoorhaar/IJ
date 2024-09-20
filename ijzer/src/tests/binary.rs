@@ -414,4 +414,31 @@ mod tests {
         let z = _test_or_tensor_tensor(x, y);
         assert_eq!(z.to_vec(), vec![1.0,0.0,1.0, 1.0, 1.0]);
     }
+
+    #[test]
+    fn test_any() {
+        #[ijzer]
+        fn _test_any_tensor() -> f64 {
+            r#"
+        x: T<f64> = [1.0, 2.0, 3.0, 4.0]
+        /|| == x 2.0
+        "#
+        }
+
+        let z = _test_any_tensor();
+        assert_eq!(z, 1.0);
+    }
+    #[test]
+    fn test_all() {
+        #[ijzer]
+        fn _test_all_tensor() -> f64 {
+            r#"
+        x: T<f64> = [1.0, 2.0, 3.0, 4.0]
+        /&& == x 2.0
+        "#
+        }
+
+        let z = _test_all_tensor();
+        assert_eq!(z, 0.0);
+    }
 }
