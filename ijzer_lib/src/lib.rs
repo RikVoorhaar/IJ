@@ -10,7 +10,7 @@ pub mod syntax_error;
 pub mod tensor;
 pub mod tokens;
 pub mod types;
-pub mod num_funcs;
+pub mod comparison_funcs;
 
 pub fn compile(input: &str) -> Result<TokenStream> {
     let mut ast_context = ast_node::ASTContext::new();
