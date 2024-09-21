@@ -8,13 +8,17 @@ use ndarray_linalg::svd::*;
 use ndarray_linalg::triangular::*;
 
 use ndarray_linalg::{Lapack, Scalar};
-use num_traits::{Float, Num, Zero};
+use num_traits::{cast::ToPrimitive, Float, Num, Zero};
 use rand::Rng;
 use std::fmt;
 use std::ops::{Index, IndexMut};
 
+use std::cmp::PartialOrd;
+
+pub trait TensorElement: Clone + Num + PartialOrd + ToPrimitive {}
+impl<T> TensorElement for T where T: Clone + Num + PartialOrd + ToPrimitive {}
 #[derive(Clone)]
-pub struct Tensor<T: Clone + Num> {
+pub struct Tensor<T: TensorElement> {
     data: Box<[T]>,
     shape: Vec<usize>,
     strides: Vec<usize>,
@@ -53,7 +57,7 @@ pub fn broadcast_shapes(shape1: &[usize], shape2: &[usize]) -> Option<Vec<usize>
     Some(result)
 }
 
-impl<T: Clone + Num> Tensor<T> {
+impl<T: TensorElement> Tensor<T> {
     pub fn new(data: Box<[T]>, shape: Vec<usize>) -> Tensor<T> {
         let strides = strides_from_shape(&shape);
         let size = shape.iter().product();
@@ -358,8 +362,27 @@ impl<T: Clone + Num> Tensor<T> {
         let data = self.data.clone().into_vec();
         Array::from_shape_vec(shape, data).unwrap()
     }
+    pub fn range(start: T, end: T) -> Tensor<T> {
+        if start >= end {
+            return Tensor::from_vec(vec![], None);
+        }
+        let capacity = (end.clone() + T::one() - start.clone()).to_usize().unwrap_or(0);
+        let mut data = Vec::with_capacity(capacity);
+        let mut current = start;
+        let mut size = 0;
+        for _ in 0..capacity {
+            data.push(current.clone());
+            size += 1;
+            current = current + T::one();
+            if current >= end {
+                break;
+            }
+        }
+
+        Tensor::new(data.into_boxed_slice(), vec![size])
+    }
 }
-impl<T: Num + Clone + Scalar + Lapack> Tensor<T> {
+impl<T: TensorElement + Scalar + Lapack> Tensor<T> {
     pub fn qr(&self) -> Result<(Tensor<T>, Tensor<T>)> {
         let (q, r) = self.to_ndarray2().qr()?;
 
@@ -476,7 +499,7 @@ fn matrix_solve_least_squares<T: Clone + Num + Scalar + Lapack>(
     Ok(vt_truncated.t().dot(&s_inv_mat.dot(&u.t().dot(b))))
 }
 
-impl<T: Clone + Float> Tensor<T> {
+impl<T: Clone + Float + PartialOrd> Tensor<T> {
     pub fn randn(shape: &[usize]) -> Tensor<T> {
         let mut rng = rand::thread_rng();
         let normal = rand_distr::Normal::new(0.0, 1.0).unwrap();
@@ -500,7 +523,7 @@ impl<T: Clone + Float> Tensor<T> {
     }
 }
 
-impl<T: Clone + Num> Index<&[usize]> for Tensor<T> {
+impl<T: TensorElement> Index<&[usize]> for Tensor<T> {
     type Output = T;
     fn index(&self, index: &[usize]) -> &Self::Output {
         let position: usize = index
@@ -512,7 +535,7 @@ impl<T: Clone + Num> Index<&[usize]> for Tensor<T> {
     }
 }
 
-impl<T: Clone + Num> IndexMut<&[usize]> for Tensor<T> {
+impl<T: TensorElement> IndexMut<&[usize]> for Tensor<T> {
     fn index_mut(&mut self, index: &[usize]) -> &mut Self::Output {
         let position: usize = index
             .iter()
@@ -523,7 +546,7 @@ impl<T: Clone + Num> IndexMut<&[usize]> for Tensor<T> {
     }
 }
 
-impl<T: fmt::Display + Clone + Num> fmt::Display for Tensor<T> {
+impl<T: fmt::Display + TensorElement> fmt::Display for Tensor<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let dims = self.shape.clone();
         if dims.is_empty() {
@@ -871,11 +894,7 @@ mod tests {
         let tensor1 = Tensor::from_vec(vec![1.0, 0.0, 0.0, 1.0], Some(vec![2, 2]));
         let tensor2 = Tensor::from_vec(vec![2.0, 0.0, 0.0, 3.0], Some(vec![2, 2]));
         let result = tensor1
-            .generalized_contraction(
-                &tensor2,
-                |x| x.reduce(|a, b| a + b),
-                |a, b| a * b,
-            )
+            .generalized_contraction(&tensor2, |x| x.reduce(|a, b| a + b), |a, b| a * b)
             .unwrap();
         assert_eq!(result.to_vec(), vec![2.0, 0.0, 0.0, 3.0]);
     }
@@ -885,11 +904,7 @@ mod tests {
         let tensor1 = Tensor::from_vec(vec![1.0, 2.0, 3.0, 4.0], Some(vec![2, 2]));
         let tensor2 = Tensor::from_vec(vec![5.0, 6.0, 7.0, 8.0], Some(vec![2, 2]));
         let result = tensor1
-            .generalized_contraction(
-                &tensor2,
-                |x| x.reduce(|a, b| a + b),
-                |a, b| a * b,
-            )
+            .generalized_contraction(&tensor2, |x| x.reduce(|a, b| a + b), |a, b| a * b)
             .unwrap();
         assert_eq!(result.to_vec(), vec![19.0, 22.0, 43.0, 50.0]);
     }
@@ -899,11 +914,7 @@ mod tests {
         let tensor1 = Tensor::from_vec(vec![1.0, 2.0], Some(vec![2]));
         let tensor2 = Tensor::from_vec(vec![3.0, 4.0], Some(vec![2]));
         let result = tensor1
-            .generalized_contraction(
-                &tensor2,
-                |x| x.reduce(|a, b| a + b),
-                |a, b| a * b,
-            )
+            .generalized_contraction(&tensor2, |x| x.reduce(|a, b| a + b), |a, b| a * b)
             .unwrap();
         assert_eq!(result.to_vec(), vec![11.0]);
     }
@@ -913,11 +924,7 @@ mod tests {
         let tensor1 = Tensor::from_vec(vec![1.0, 2.0], Some(vec![2]));
         let tensor2 = Tensor::from_vec(vec![3.0, 4.0, 5.0, 6.0], Some(vec![2, 2]));
         let result = tensor1
-            .generalized_contraction(
-                &tensor2,
-                |x| x.reduce(|a, b| a + b),
-                |a, b| a * b,
-            )
+            .generalized_contraction(&tensor2, |x| x.reduce(|a, b| a + b), |a, b| a * b)
             .unwrap();
         assert_eq!(result.to_vec(), vec![13.0, 16.0]);
     }
@@ -927,11 +934,7 @@ mod tests {
         let tensor1 = Tensor::from_vec(vec![1.0, 2.0, 3.0, 4.0], Some(vec![2, 2]));
         let tensor2 = Tensor::from_vec(vec![5.0, 6.0], Some(vec![2]));
         let result = tensor1
-            .generalized_contraction(
-                &tensor2,
-                |x| x.reduce(|a, b| a + b),
-                |a, b| a * b,
-            )
+            .generalized_contraction(&tensor2, |x| x.reduce(|a, b| a + b), |a, b| a * b)
             .unwrap();
         assert_eq!(result.to_vec(), vec![17.0, 39.0]);
     }
@@ -1138,5 +1141,45 @@ mod tests {
         assert_eq!(result.shape(), &vec![3, 2]);
         assert_eq!(result.to_vec(), vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
         Ok(())
+    }
+    #[test]
+    fn test_range_int() {
+        let tensor = Tensor::range(0, 5);
+        assert_eq!(tensor.to_vec(), vec![0, 1, 2, 3, 4]);
+
+        let tensor = Tensor::range(5, 1);
+        assert_eq!(tensor.to_vec(), vec![]);
+
+        let tensor = Tensor::range(3, 3);
+        assert_eq!(tensor.to_vec(), vec![]);
+
+        let tensor = Tensor::range(-2, 2);
+        assert_eq!(tensor.to_vec(), vec![-2, -1, 0, 1]);
+    }
+
+    #[test]
+    fn test_range_float() {
+        let tensor = Tensor::range(1.0, 5.0);
+        assert_eq!(tensor.to_vec(), vec![1.0, 2.0, 3.0, 4.0]);
+        let tensor = Tensor::range(1.0, 5.1);
+        assert_eq!(tensor.to_vec(), vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+
+        let tensor = Tensor::range(5.0, 1.0);
+        assert_eq!(tensor.to_vec(), vec![]);
+
+        let tensor = Tensor::range(3.0, 3.0);
+        assert_eq!(tensor.to_vec(), vec![]);
+
+        let tensor = Tensor::range(1.5, 4.5);
+        assert_eq!(tensor.to_vec(), vec![1.5, 2.5, 3.5]);
+
+        let tensor = Tensor::range(1.5, 1.5);
+        assert_eq!(tensor.to_vec(), vec![]);
+
+        let tensor = Tensor::range(1.5, 1.6);
+        assert_eq!(tensor.to_vec(), vec![1.5]);
+
+        let tensor = Tensor::range(-2.5, 2.5);
+        assert_eq!(tensor.to_vec(), vec![-2.5, -1.5, -0.5, 0.5, 1.5]);
     }
 }

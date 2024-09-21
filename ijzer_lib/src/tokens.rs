@@ -253,6 +253,9 @@ pub enum Token {
 
     #[regex(r"(max|min|\^|\+|\*|/:|==|!=|>.|<.|>=|<=|&&|\|\|)", |lex| BinaryMathFunctionEnum::try_from(lex.slice().to_string()).unwrap())]
     BinaryFunction(BinaryMathFunctionEnum),
+
+    #[token("..")]
+    Range,
 }
 
 impl Display for Token {
@@ -297,6 +300,7 @@ impl Display for Token {
             Self::Reshape => write!(f, ">%"),
             Self::UnaryFunction(s) => write!(f, "{}", s),
             Self::BinaryFunction(s) => write!(f, "{}", s),
+            Self::Range => write!(f, ".."),
         }
     }
 }

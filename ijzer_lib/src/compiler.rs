@@ -185,6 +185,7 @@ impl CompilerContext {
             Operation::Reshape => Reshape::compile(node, self, child_streams)?,
             Operation::UnaryFunction(_) => UnaryFunction::compile(node, self, child_streams)?,
             Operation::BinaryFunction(_) => BinaryOperation::compile(node, self, child_streams)?,
+            Operation::Range => Range::compile(node, self, child_streams)?,
             // _ => NotImplemented::compile(node, self, child_streams)?,
         };
 
@@ -1360,6 +1361,36 @@ impl CompileNode for UnaryFunction {
     }
 }
 
+struct Range;
+impl CompileNode for Range {
+    fn compile(
+        node: Rc<Node>,
+        _compiler: &mut CompilerContext,
+        child_streams: HashMap<usize, TokenStream>,
+    ) -> Result<TokenStream> {
+        match node.output_type.clone() {
+            IJType::Tensor(_) => {
+                let start_stream = child_streams.get(&node.operands[0].id).unwrap().clone();
+                let end_stream = child_streams.get(&node.operands[1].id).unwrap().clone();
+                let tensor_annot = annotation_from_type(&node.output_type)?;
+                Ok(quote! {
+                    #tensor_annot::range(#start_stream, #end_stream)
+                })
+            }
+            IJType::Function(signature) => {
+                let input_type = signature.input[0].clone();
+                let input_annot = annotation_from_type(&input_type)?;
+                let output_type = signature.output.clone();
+                let output_annot = annotation_from_type(&output_type)?;
+                Ok(quote! {
+                    |_start: #input_annot, _end: #input_annot| #output_annot::range(_start, _end)
+                })
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1939,6 +1970,35 @@ mod tests {
         let expected = "x.clone().apply_binary_op(&y.clone(), |_a: _, _b: _| ijzer_lib::comparison_funcs::or(_a, _b)).unwrap()";
         compiler_compare(input, expected);
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_range() -> Result<()> {
+        let input = r".. 1 2 ";
+        let expected = "ijzer_lib::tensor::Tensor::<_>::range(1, 2)";
+        compiler_compare(input, expected);
+
+        let input = r"var a: N; var b: N; .. a b";
+        let expected = "ijzer_lib::tensor::Tensor::<_>::range(a, b)";
+        compiler_compare(input, expected);
+
+        let input = r"var a: N<usize>; var b: N; .. a b";
+        let expected = "ijzer_lib::tensor::Tensor::<usize>::range(a, b)";
+        compiler_compare(input, expected);
+
+        let input = r"var a: N; var b: N<usize>; .. a b";
+        let expected = "ijzer_lib::tensor::Tensor::<usize>::range(a, b)";
+        compiler_compare(input, expected);
+
+        let input = r"var a: N<usize>; var b: N<usize>; .. a b";
+        let expected = "ijzer_lib::tensor::Tensor::<usize>::range(a, b)";
+        compiler_compare(input, expected);
+
+        let input = r"~ .. ";
+        let expected =
+            "| _start: _ , _end: _ | ijzer_lib::tensor::Tensor::<_>::range(_start, _end)";
+        compiler_compare(input, expected);
         Ok(())
     }
 }
