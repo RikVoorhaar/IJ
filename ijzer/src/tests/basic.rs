@@ -607,4 +607,29 @@ mod tests {
         assert_eq!(y.to_vec(), vec![1, 2, 3, 4, 5, 6]);
     }
 
+    #[test]
+    fn test_range() {
+        #[ijzer]
+        fn _test_range_i64() -> Tensor<i64> {
+            r#"
+        .. 0 10
+        "#
+        }
+
+        let y = _test_range_i64();
+        assert_eq!(y.to_vec(), vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+
+        #[ijzer]
+        fn _test_range_f64() -> Tensor<f64> {
+            r#"
+        .. 0.0 10.0
+        "#
+        }
+
+        let y = _test_range_f64();
+        assert_eq!(
+            y.to_vec(),
+            vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
+        );
+    }
 }

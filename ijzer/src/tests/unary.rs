@@ -202,7 +202,6 @@ mod tests {
         "#
         }
 
-
         let x = Tensor::from_vec(vec![0.0, f64::ln(2.0)], Some(vec![2]));
         let y = _test_cosh_on_tensor(x);
         let expected = [1.0, 5.0 / 4.0];
@@ -250,7 +249,7 @@ mod tests {
             assert_abs_diff_eq!(a, e, epsilon = 1e-6);
         }
     }
-    
+
     #[test]
     fn test_ln() {
         #[ijzer]
@@ -425,5 +424,5 @@ mod tests {
         for (a, e) in actual.iter().zip(expected.iter()) {
             assert_abs_diff_eq!(a, e, epsilon = 1e-6);
         }
-    }   
+    }
 }

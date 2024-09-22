@@ -412,7 +412,7 @@ mod tests {
         let x = Tensor::from_vec(vec![1.0, 0.0, 0.0, 2.0, 1.0], Some(vec![5]));
         let y = Tensor::from_vec(vec![1.0, 0.0, 1.0, 0.0, 2.0], Some(vec![5]));
         let z = _test_or_tensor_tensor(x, y);
-        assert_eq!(z.to_vec(), vec![1.0,0.0,1.0, 1.0, 1.0]);
+        assert_eq!(z.to_vec(), vec![1.0, 0.0, 1.0, 1.0, 1.0]);
     }
 
     #[test]
