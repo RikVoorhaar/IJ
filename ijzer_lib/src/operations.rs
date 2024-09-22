@@ -33,6 +33,7 @@ pub enum Operation {
     Reshape,
     UnaryFunction(UnaryMathFunctionEnum),
     BinaryFunction(BinaryMathFunctionEnum),
+    Range,
 }
 
 impl Debug for Operation {
@@ -66,6 +67,7 @@ impl Debug for Operation {
             Self::Reshape => write!(f, "Reshape"),
             Self::UnaryFunction(s) => write!(f, "UnaryFunction({})", s),
             Self::BinaryFunction(s) => write!(f, "BinaryFunction({})", s),
+            Self::Range => write!(f, "Range"),
         }
     }
 }

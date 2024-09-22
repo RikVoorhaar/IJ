@@ -87,6 +87,9 @@ use reshape::Reshape;
 mod unary_function;
 use unary_function::UnaryFunction;
 
+mod range;
+use range::Range;
+
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
@@ -143,6 +146,7 @@ pub fn next_node(slice: TokenSlice, context: &mut ASTContext) -> Result<(Rc<Node
         Token::Index => Index::next_node(op.clone(), rest, context),
         Token::Reshape => Reshape::next_node(op.clone(), rest, context),
         Token::UnaryFunction(_) => UnaryFunction::next_node(op.clone(), rest, context),
+        Token::Range => Range::next_node(op.clone(), rest, context),
         _ => Err(SyntaxError::UnexpectedToken(op.clone()).into()),
     }
 }
@@ -236,6 +240,9 @@ fn next_node_functional(
             context,
             needed_outputs,
         )?,
+        Token::Range => {
+            Range::next_node_functional_impl(Token::Range, slice, context, needed_outputs)?
+        }
         _ => {
             return Err(SyntaxError::SliceCannotBeParsedAsFunction(
                 context.token_slice_to_string(slice),
