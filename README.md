@@ -25,6 +25,10 @@ fn example(x: Tensor<f64>) -> Tensor<f64> {
     + x y // add the two tensors and return the result implicitly
     "#
 }
+
+// We can now use the function like any rust function
+let x = Tensor::range(0,20);
+println!("{:?}", example(x));
 ```
 
 For an explanation of the language see the docs or the blog post. See also the examples included in the `ijzer` directory.
