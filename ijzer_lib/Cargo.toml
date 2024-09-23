@@ -2,6 +2,11 @@
 name = "ijzer_lib"
 version = "0.1.0"
 edition = "2021"
+authors = ["Rik Voorhaar <rik.voorhaar@gmail.com>"]
+description = "Library for IJzer. Provides tools for tensors, parsing syntax tree of the IJ language and transpiling it to rust code."
+repository = "https://github.com/RikVoorhaar/IJ"
+license = "MIT"
+
 
 
 [dependencies]
