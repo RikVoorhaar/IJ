@@ -16,6 +16,9 @@ IJzer brings the power of an array programming language **inside your Rust proje
 Just import `ijzer` and use the `ijzer` macro:
 
 ```rust
+use ijzer::prelude::*;
+
+
 #[ijzer]
 /// Add a random normal tensor to the input array
 fn example(x: Tensor<f64>) -> Tensor<f64> {
