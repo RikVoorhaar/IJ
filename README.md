@@ -17,6 +17,7 @@ Just import `ijzer` and use the `ijzer` macro:
 
 ```rust
 use ijzer::prelude::*;
+use ijzer::Tensor;
 
 
 #[ijzer]
