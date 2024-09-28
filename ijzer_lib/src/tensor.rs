@@ -1,3 +1,4 @@
+//! Implementation of custom tensor type and operations
 use anyhow::{anyhow, Result};
 use itertools::Itertools;
 use ndarray::{s, Array, Array2, ArrayBase, Dimension, IxDyn};

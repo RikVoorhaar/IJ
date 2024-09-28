@@ -1,3 +1,4 @@
+//! Parses the main operations and constructs the AST.
 #[cfg(test)]
 mod test_utils;
 #[cfg(test)]
@@ -5,89 +6,89 @@ pub use test_utils::{
     create_context_with_tokens_from_str, is_specific_syntax_error, parse_str, parse_str_no_context,
 };
 
-mod parser_functions;
+pub mod parser_functions;
 pub use parser_functions::{parse_line, parse_lines};
 
-mod utils;
+pub mod utils;
 use utils::{
     check_ok_needed_outputs, comma_separate, find_matching_parenthesis, gather_all, gather_operands,
 };
 
-mod binary_op;
+pub mod binary_op;
 use binary_op::BinaryOp;
 
-mod parenthesis;
+pub mod parenthesis;
 use parenthesis::LParen;
 
-mod array;
+pub mod array;
 use array::LSqBracket;
 
-mod symbol;
+pub mod symbol;
 use symbol::Symbol;
 
-mod reduction;
+pub mod reduction;
 use reduction::Reduction;
 
-mod minus;
+pub mod minus;
 use minus::MinusOp;
 
-mod number;
+pub mod number;
 use number::NumberNode;
 
-mod identity;
+pub mod identity;
 use identity::IdentityNode;
 
-mod lambda_variable;
+pub mod lambda_variable;
 use lambda_variable::LambdaVariable;
 
-mod function_composition;
+pub mod function_composition;
 use function_composition::FunctionComposition;
 
-mod type_conversion;
+pub mod type_conversion;
 use type_conversion::TypeConversion;
 
-mod as_function;
+pub mod as_function;
 use as_function::AsFunction;
 
-mod assign;
+pub mod assign;
 
-mod apply;
+pub mod apply;
 use apply::Apply;
 
-mod generalized_contraction;
+pub mod generalized_contraction;
 use generalized_contraction::GeneralizedContraction;
 
-mod tensor_builder;
+pub mod tensor_builder;
 use tensor_builder::TensorBuilder;
 
-mod transpose;
+pub mod transpose;
 use transpose::Transpose;
 
-mod shape;
+pub mod shape;
 use shape::Shape;
 
-mod qr;
+pub mod qr;
 use qr::QR;
 
-mod svd;
+pub mod svd;
 use svd::Svd;
 
-mod solve;
+pub mod solve;
 use solve::Solve;
 
-mod diag;
+pub mod diag;
 use diag::Diag;
 
-mod index;
+pub mod index;
 use index::Index;
 
-mod reshape;
+pub mod reshape;
 use reshape::Reshape;
 
-mod unary_function;
+pub mod unary_function;
 use unary_function::UnaryFunction;
 
-mod range;
+pub mod range;
 use range::Range;
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};

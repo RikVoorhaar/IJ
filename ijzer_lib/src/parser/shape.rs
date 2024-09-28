@@ -1,3 +1,13 @@
+//! Shape operator.
+//! 
+//! Example:
+//! ```ijzer
+//! %[1,2]
+//! ```
+//! 
+//! This will produce a scalar `2`.
+//! 
+//! The shape operator takes in a tensor and produces a scalar.
 use super::{check_ok_needed_outputs, gather_operands, ParseNode, ParseNodeFunctional};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};

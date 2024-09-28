@@ -1,3 +1,4 @@
+//! Enums for the unary functions, binary functions, and tensor builders.
 use crate::syntax_error;
 use anyhow::Result;
 use std::convert::TryFrom;

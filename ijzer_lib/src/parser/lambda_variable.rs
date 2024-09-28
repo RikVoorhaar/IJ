@@ -1,3 +1,7 @@
+//! Parses lambda variables `$x`.
+//! 
+//! The type of the lambda variable must be added to the context before it can be parsed. 
+//! This is done in the left hand side of an assignment.
 use super::{ParseNode, ParseNodeFunctional};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};

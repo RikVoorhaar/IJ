@@ -1,3 +1,14 @@
+//! Reshape operator.
+//! 
+//! Example:
+//! ```ijzer
+//! >% [2,1] [1,2]
+//! ```
+//! 
+//! This will produce a 2x1 tensor. 
+//! 
+//! The reshape operator takes in a tensor and a shape, and produces a tensor.
+//! The shape tensor must be castable to a usize. 
 use super::{check_ok_needed_outputs, gather_operands, ParseNode, ParseNodeFunctional};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};

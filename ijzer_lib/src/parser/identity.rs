@@ -1,3 +1,6 @@
+//! Parses the identity operation `I`.
+//! 
+//! The identity operation tries to infer the output type from the operand. If it is unable, it must be annotated explicitly.
 use super::{gather_operands, ParseNode, ParseNodeFunctional};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};

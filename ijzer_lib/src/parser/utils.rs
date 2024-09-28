@@ -1,3 +1,4 @@
+//! Utility functions for the parser
 use super::next_node;
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};

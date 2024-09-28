@@ -1,3 +1,25 @@
+//! Parses binary operations.
+//! 
+//! Supported operations:
+//! - max
+//! - min
+//! - ^ (power)
+//! - +
+//! - *
+//! - /: (division)
+//! - == (equal)
+//! - != (not equal)
+//! - >. (greater than)
+//! - <. (less than)
+//! - >= (greater than or equal to)
+//! - <= (less than or equal to)
+//! - && (logical and)
+//! - || (logical or)
+//! 
+//! If either operand is a tensor, the output is a tensor. Only if both operands are scalars, the output is a scalar. 
+//! 
+//! If the number type is specified for at least one operand, the output type is inferred.
+//! If no number type is specified for an operand, the output type is `_`.
 use super::{check_ok_needed_outputs, gather_operands, ParseNode, ParseNodeFunctional};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};

@@ -1,3 +1,11 @@
+//! Parses the array operation `[]`.
+//! 
+//! This operation is used to create an array of values.
+//! Example: `[1, 2, 3]` is a tensor with the values `[1, 2, 3]`.
+//! Arrays can also be typed using the following syntax: `[1, 2, 3]<i64>`.
+//! In this case the type of the array is `i64` and the array has 3 elements.
+//! Arrays can also be nested to arbitrary depth. For example: `[[1, 2, 3], [4, 5, 6]]` is a tensor with 2x3 elements.
+//! The parser does not check for consistent element count across nested arrays.
 use super::utils::{comma_separate, gather_operands};
 use super::{find_matching_parenthesis, ParseNode};
 

@@ -1,3 +1,4 @@
+//! IJType struct and methods for type inference and parsing
 use crate::syntax_error::SyntaxError;
 use crate::tokens::{
     comma_separate_on_tokens, find_matching_parenthesis_on_tokens, lexer, split_tokens_at_indices,

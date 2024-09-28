@@ -1,3 +1,5 @@
+//! Compiler for the AST
+//! Takes in a list of AST nodes and outputs a Rust TokenStream.
 use anyhow::Result;
 use std::{collections::HashMap, rc::Rc};
 use syn::Ident;

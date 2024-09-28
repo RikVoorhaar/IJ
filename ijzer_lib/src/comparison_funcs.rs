@@ -1,3 +1,4 @@
+//! Comparison functions, treating non-boolean types as either 0 or 1.
 use num_traits::{One, Zero};
 
 pub fn equals<T: One + Zero + PartialEq>(a: T, b: T) -> T {

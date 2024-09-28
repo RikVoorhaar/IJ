@@ -1,3 +1,4 @@
+//! Syntax errors for the parser
 use crate::tokens::Token;
 
 use thiserror::Error;

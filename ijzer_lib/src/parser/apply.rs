@@ -1,3 +1,7 @@
+//! Parses the apply operation `.`
+//! 
+//! This operations takes a function and applies it to a list of arguments.
+//! Example: if `f: Fn(N,N->N)` then `.f 1 2` is equivalent to `f(1, 2)` in Rust.
 use super::{gather_operands, next_node, Operation, ParseNode};
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::syntax_error::SyntaxError;

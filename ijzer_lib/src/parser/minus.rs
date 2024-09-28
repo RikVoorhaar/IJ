@@ -1,3 +1,7 @@
+//! Parses the minus operation `-`.
+//! 
+//! It does not fall under either the binary or unary operations, so it is treated separately.
+//! It first determines whether it is givien one operand or two, and based on that infers the correct operation.
 use super::{check_ok_needed_outputs, gather_operands, ParseNode, ParseNodeFunctional};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};

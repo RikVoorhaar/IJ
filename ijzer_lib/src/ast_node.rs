@@ -1,3 +1,4 @@
+//! Nodes and other data structures for the AST
 use crate::operations::Operation;
 use crate::syntax_error::SyntaxError;
 use crate::tokens::Token;

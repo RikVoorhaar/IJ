@@ -1,3 +1,4 @@
+//! Utility functions for parsing.
 use crate::ast_node::{ASTContext, LineHasSemicolon, Node, Variable};
 use crate::operations::Operation;
 use crate::parser::assign::parse_assign;
@@ -7,6 +8,11 @@ use crate::types::IJType;
 use anyhow::Result;
 use std::rc::Rc;
 
+/// Parses a list of lines.
+/// 
+/// This function takes a list of tokens and parses them into a list of lines.
+/// Each line is a tuple containing a node and a flag indicating whether the line has a semicolon.
+/// Returns a `Node` for each line. Lines with multiple statements broken by semicolons are parsed as if they were separate lines.
 pub fn parse_lines(
     tokens: Vec<Token>,
     context: &mut ASTContext,
@@ -42,6 +48,7 @@ pub fn parse_lines(
     Ok(parsed_lines)
 }
 
+/// Parses a single line of tokens.
 pub fn parse_line(tokens: Vec<Token>, context: &mut ASTContext) -> Result<Rc<Node>> {
     if let Some(pos) = tokens.iter().position(|t| *t == Token::Semicolon) {
         if pos != tokens.len() - 1 {
@@ -54,6 +61,7 @@ pub fn parse_line(tokens: Vec<Token>, context: &mut ASTContext) -> Result<Rc<Nod
     context.line_no += 1;
     parse_ast(context)
 }
+
 
 fn parse_ast(context: &mut ASTContext) -> Result<Rc<Node>> {
     match context.tokens.as_slice() {
@@ -73,6 +81,9 @@ fn parse_ast(context: &mut ASTContext) -> Result<Rc<Node>> {
     }
 }
 
+/// Parses a variable declaration statement.
+/// Exmaple `var a: T`
+/// This returns `Nothing` and just adds context to the symbol table.
 fn parse_var_statement(context: &mut ASTContext) -> Result<Rc<Node>> {
     match context.tokens.as_slice() {
         [Token::Variable, Token::Symbol(symbol), Token::TypeDeclaration, rest @ ..] => {

@@ -1,3 +1,26 @@
+//! Unary functions
+//! 
+//! List:
+//! - abs
+//! - acos
+//! - asin
+//! - atan
+//! - ceil
+//! - cos
+//! - cosh
+//! - exp
+//! - floor
+//! - ln
+//! - log2
+//! - log10
+//! - round
+//! - sin
+//! - sinh
+//! - sqrt
+//! - tan
+//! - tanh
+//! 
+//! When applied to a tensor, the function is applied element-wise. Otherwise this acts as an `Fn(N->N)` or `Fn(T->T)`.
 use super::{check_ok_needed_outputs, gather_operands, ParseNode, ParseNodeFunctional};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};

@@ -1,3 +1,18 @@
+//! Tensor builder functions:
+//! - eye (identity matrix)
+//! - randu (uniform random tensor)
+//! - randn (normal random tensor)
+//! - zeros (tensor of zeros)
+//! - ones (tensor of ones)
+//! 
+//! The tensor builder functions take in a tensor of sizes and return a tensor. 
+//! 
+//! Example:
+//! ```ijzer
+//! eye<f64> [2,2]
+//! ```
+//! 
+//! This will produce a 2x2 identity matrix.
 use super::{check_ok_needed_outputs, gather_operands, ParseNode, ParseNodeFunctional};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};

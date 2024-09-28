@@ -1,3 +1,18 @@
+//! Parses the assignment operation `=`.
+//! 
+//! This operation is used to assign a value to a variable.
+//! 
+//! Example: `x = 1` assigns the value `1` to the variable `x`.
+//! 
+//! The parser supports both single variable assignments and group assignments. Group assignments assign a
+//! list of variables to a list of values. For example: `(x,y) = (1,2)` assigns the values `1` to `x` and `2`
+//! to `y`.
+//! 
+//! The parser also supports type annotations for the assigned variables. For example: `x: i32 = 1` assigns
+//! the value `1` to the variable `x` with type `i32`.
+//! 
+//! The parser also supports lambda assignments. For
+//! example: `f($x,$y) = +$x $y` assigns the lambda `(x,y) => x+y` to the variable `f`.
 use crate::ast_node::Variable;
 use crate::operations::Operation;
 use crate::parser::lambda_variable::parse_lambda_assign_lhs;
@@ -422,7 +437,10 @@ mod tests {
         let node = parse_assign(&mut context)?;
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 2);
-        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
+        assert_eq!(
+            node.operands[0].op,
+            Operation::AssignSymbol("g".to_string())
+        );
         assert_eq!(node.operands[0].output_type, IJType::Tensor(None));
         assert_eq!(node.operands[1].op, Operation::Array);
         assert_eq!(node.operands[1].output_type, IJType::Tensor(None));
@@ -436,7 +454,10 @@ mod tests {
         let node = parse_assign(&mut context)?;
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 2);
-        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
+        assert_eq!(
+            node.operands[0].op,
+            Operation::AssignSymbol("g".to_string())
+        );
         assert_eq!(node.operands[0].output_type, IJType::Tensor(None));
         assert_eq!(node.operands[1].op, Operation::Array);
         assert_eq!(node.operands[1].output_type, IJType::Tensor(None));
@@ -451,7 +472,10 @@ mod tests {
         let node = parse_assign(&mut context)?;
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 2);
-        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
+        assert_eq!(
+            node.operands[0].op,
+            Operation::AssignSymbol("g".to_string())
+        );
         assert_eq!(node.operands[0].output_type, IJType::Number(None));
         assert_eq!(node.operands[1].output_type, IJType::Number(None));
         Ok(())
@@ -482,7 +506,10 @@ mod tests {
         println!("{:?}", node);
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 3);
-        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
+        assert_eq!(
+            node.operands[0].op,
+            Operation::AssignSymbol("g".to_string())
+        );
         assert_eq!(
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
@@ -503,7 +530,10 @@ mod tests {
         println!("{:?}", node);
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 3);
-        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
+        assert_eq!(
+            node.operands[0].op,
+            Operation::AssignSymbol("g".to_string())
+        );
         assert_eq!(
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
@@ -523,7 +553,10 @@ mod tests {
         println!("{:?}", node);
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 3);
-        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
+        assert_eq!(
+            node.operands[0].op,
+            Operation::AssignSymbol("g".to_string())
+        );
         assert_eq!(
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
@@ -550,7 +583,10 @@ mod tests {
         println!("{:?}", node);
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 3);
-        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
+        assert_eq!(
+            node.operands[0].op,
+            Operation::AssignSymbol("g".to_string())
+        );
         assert_eq!(
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
@@ -571,7 +607,10 @@ mod tests {
         println!("{:?}", node);
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 3);
-        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
+        assert_eq!(
+            node.operands[0].op,
+            Operation::AssignSymbol("g".to_string())
+        );
         assert_eq!(
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
@@ -592,7 +631,10 @@ mod tests {
         println!("{:?}", node);
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 3);
-        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
+        assert_eq!(
+            node.operands[0].op,
+            Operation::AssignSymbol("g".to_string())
+        );
         assert_eq!(
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
@@ -613,7 +655,10 @@ mod tests {
         println!("{:?}", node);
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 4);
-        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
+        assert_eq!(
+            node.operands[0].op,
+            Operation::AssignSymbol("g".to_string())
+        );
         assert_eq!(
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
@@ -635,7 +680,10 @@ mod tests {
         println!("{:?}", node);
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 3);
-        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
+        assert_eq!(
+            node.operands[0].op,
+            Operation::AssignSymbol("g".to_string())
+        );
         assert_eq!(
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
@@ -665,7 +713,10 @@ mod tests {
         println!("{:?}", node);
         assert_eq!(node.op, Operation::Assign);
         assert_eq!(node.operands.len(), 4);
-        assert_eq!(node.operands[0].op, Operation::AssignSymbol("g".to_string()));
+        assert_eq!(
+            node.operands[0].op,
+            Operation::AssignSymbol("g".to_string())
+        );
         assert_eq!(
             node.operands[0].output_type,
             IJType::Function(FunctionSignature::new(
@@ -715,16 +766,24 @@ mod tests {
         let mut context = ASTContext::from_tokens(tokens.clone());
         let assign_node = parse_assign(&mut context)?;
         let node0 = assign_node.operands[0].clone();
-        assert_eq!(node0.output_type, IJType::Group(vec![IJType::Number(None), IJType::Number(None)]));
+        assert_eq!(
+            node0.output_type,
+            IJType::Group(vec![IJType::Number(None), IJType::Number(None)])
+        );
         assert_eq!(node0.op, Operation::Group);
         assert_eq!(node0.operands.len(), 2);
-
 
         let tokens = lexer("(x: N<a>, y: N) = (1<a>,2<b>)")?;
         let mut context = ASTContext::from_tokens(tokens.clone());
         let assign_node = parse_assign(&mut context)?;
         let node0 = assign_node.operands[0].clone();
-        assert_eq!(node0.output_type, IJType::Group(vec![IJType::Number(Some("a".to_string())), IJType::Number(Some("b".to_string()))]));
+        assert_eq!(
+            node0.output_type,
+            IJType::Group(vec![
+                IJType::Number(Some("a".to_string())),
+                IJType::Number(Some("b".to_string()))
+            ])
+        );
         assert_eq!(node0.op, Operation::Group);
         assert_eq!(node0.operands.len(), 2);
 
@@ -732,7 +791,13 @@ mod tests {
         let mut context = ASTContext::from_tokens(tokens.clone());
         let assign_node = parse_assign(&mut context)?;
         let node0 = assign_node.operands[0].clone();
-        assert_eq!(node0.output_type, IJType::Group(vec![IJType::Number(Some("a".to_string())), IJType::Number(None)]));
+        assert_eq!(
+            node0.output_type,
+            IJType::Group(vec![
+                IJType::Number(Some("a".to_string())),
+                IJType::Number(None)
+            ])
+        );
         assert_eq!(node0.op, Operation::Group);
         assert_eq!(node0.operands.len(), 2);
         Ok(())

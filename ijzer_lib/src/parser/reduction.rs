@@ -1,3 +1,13 @@
+//! Reduction operator.
+//! 
+//! Example:
+//! ```ijzer
+//! /+ [1,2]
+//! ```
+//! 
+//! This is a reduction over the tensor `[1,2]` using the addition function. 
+//! 
+//! The reduction operator takes in a `fn(N,N->N)` and a tensor, and produces a scalar. 
 use super::{
     check_ok_needed_outputs, gather_operands, next_node_specific_function, ParseNode,
     ParseNodeFunctional,
