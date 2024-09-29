@@ -9,8 +9,8 @@ license = "MIT"
 
 
 [dependencies]
-ijzer_macro = { path = "../ijzer_macro", version = "0.1.0" }
-ijzer_lib = { path = "../ijzer_lib", version = "0.1.0" }
+ijzer_macro = { path = "../ijzer_macro", version = "0.1.1" }
+ijzer_lib = { path = "../ijzer_lib", version = "0.1.1" }
 num-traits = "0.2.18"
 anyhow = "1.0.86"
 approx = "0.5.1"

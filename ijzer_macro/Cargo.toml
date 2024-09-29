@@ -1,6 +1,6 @@
 [package]
 name = "ijzer_macro"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Rik Voorhaar <rik.voorhaar@gmail.com>"]
 description = "Macro for using IJzer in a rust project."
@@ -8,7 +8,7 @@ repository = "https://github.com/RikVoorhaar/IJ"
 license = "MIT"
 
 [dependencies]
-ijzer_lib = { path = "../ijzer_lib", version = "0.1.0" }
+ijzer_lib = { path = "../ijzer_lib", version = "0.1.1" }
 proc-macro2 = "1.0.78"
 quote = "1.0.35"
 regex = "1.10.3"
