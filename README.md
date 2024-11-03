@@ -169,6 +169,13 @@ The langauage also supports a range of unary math operations. For example `abs x
 
 ### Solve
 
+You can solve linear systems and least squares problem using the `\` operator (inspired by Matlab). If `A` is a matrix and `B` a vector or matrix, then `\ A B` returns the solution to the linear system `AX=B`. The matri `A` is `[l,m]` and `B` is `[l,n]`. Depending on the shape `[l,m]` of `A` we distinguish 3 cases, where `A` is always assumed to be of maximum rank (`/min [l,m]`):
+- `l==m`: `AX=B` is solved using the LU decomposition and a triangular solver.
+- `l>m`: overdetermined system. This is solved using QR factorization: we compute `Q,R=qr(A)` and then $R^\top X = Q^\top B$ is solved with a triangular solver. 
+- `l<m`: undertermined system; least squares solution is determined using pseudoinverse. The SVD $USV^\top=A$ is computed after which the solution is obtained using $X = VS^\dagger U^\top$, where $S^\dagger$ is the pseudoinverse of $S$ (since $S$ is diagonal, we just compute the reciprical of all non-zero elements). 
+
+If either `A` or `B` are not matrices, they are first converted to matrices. For `A` we compute the matriziation with respect to the last dimension; if it has shape $(a_0,\dots,a_n)$ then it is turned into a matrix of shape $(\ell,a_n)$ with $\ell =\prod_{i=0}^{n-1}a_i$. Then tensor $B$ must have shape $(a_0,\dots, a_{n-1}, b_0,\dots,b_m)$, i.e. the first $n$ dimensions of $A$ and $B$ must match. It is then matricized to shape $(\ell, \prod_{i=0}^m b_i)$. 
+
 ### Reduction operator
 
 The `/` operator denotes reduction and has singature `Fn(N,N->N),T->N`. It takes a biunary operator or function and applies it to a tensor and reduces the result to a number. For example `/+ x` computes the sum of all elements of `x`, while `/* x` computes the product and `/max x` computes the largest element.
