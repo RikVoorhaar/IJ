@@ -169,12 +169,13 @@ The langauage also supports a range of unary math operations. For example `abs x
 
 ### Solve
 
-You can solve linear systems and least squares problem using the `\` operator (inspired by Matlab). If `A` is a matrix and `B` a vector or matrix, then `\ A B` returns the solution to the linear system `AX=B`. The matri `A` is `[l,m]` and `B` is `[l,n]`. Depending on the shape `[l,m]` of `A` we distinguish 3 cases, where `A` is always assumed to be of maximum rank (`/min [l,m]`):
-- `l==m`: `AX=B` is solved using the LU decomposition and a triangular solver.
-- `l>m`: overdetermined system. This is solved using QR factorization: we compute `Q,R=qr(A)` and then $R^\top X = Q^\top B$ is solved with a triangular solver. 
-- `l<m`: undertermined system; least squares solution is determined using pseudoinverse. The SVD $USV^\top=A$ is computed after which the solution is obtained using $X = VS^\dagger U^\top$, where $S^\dagger$ is the pseudoinverse of $S$ (since $S$ is diagonal, we just compute the reciprical of all non-zero elements). 
+You can solve linear systems and least squares problem using the `\` operator (inspired by Matlab). If `A` is a matrix and `B` a vector or matrix, then `\ A B` returns the solution to the linear system `AX=B`. The matrix `A` is `[l,m]` and `B` is `[l,n]`. Depending on the shape `[l,m]` of `A` we distinguish 3 cases, where `A` is always assumed to be of maximum rank (`/min [l,m]`):
 
-If either `A` or `B` are not matrices, they are first converted to matrices. For `A` we compute the matriziation with respect to the last dimension; if it has shape $(a_0,\dots,a_n)$ then it is turned into a matrix of shape $(\ell,a_n)$ with $\ell =\prod_{i=0}^{n-1}a_i$. Then tensor $B$ must have shape $(a_0,\dots, a_{n-1}, b_0,\dots,b_m)$, i.e. the first $n$ dimensions of $A$ and $B$ must match. It is then matricized to shape $(\ell, \prod_{i=0}^m b_i)$. 
+-   `l==m`: `AX=B` is solved using the LU decomposition and a triangular solver.
+-   `l>m`: overdetermined system. This is solved using QR factorization: we compute `Q,R=qr(A)` and then $R^\top X = Q^\top B$ is solved with a triangular solver.
+-   `l<m`: undertermined system; least squares solution is determined using pseudoinverse. The SVD $USV^\top=A$ is computed after which the solution is obtained using $X = VS^\dagger U^\top$, where $S^\dagger$ is the pseudoinverse of $S$ (since $S$ is diagonal, we just compute the reciprical of all non-zero elements).
+
+If either `A` or `B` are not matrices, they are first converted to matrices. For `A` we compute the matriziation with respect to the last dimension; if it has shape $(a_0,\dots,a_n)$ then it is turned into a matrix of shape $(\ell,a_n)$ with $\ell =\prod_{i=0}^{n-1}a_i$. Then tensor $B$ must have shape $(a_0,\dots, a_{n-1}, b_0,\dots,b_m)$, i.e. the first $n$ dimensions of $A$ and $B$ must match. It is then matricized to shape $(\ell, \prod_{i=0}^m b_i)$.
 
 ### Reduction operator
 
@@ -182,15 +183,104 @@ The `/` operator denotes reduction and has singature `Fn(N,N->N),T->N`. It takes
 
 ### Externally defined variables and functions
 
+Externally defined variables and functions are declared using the `var` keyword. For example `var x: T<f64>` declares that `x` is an external variable of type `T<f64>`, or `var f: Fn(N->N)` declares that `f` is an `N->N` function. The variable is then available in the scope of the IJzer macro. The IJzer compiler does not check if the variable is actually available within its scope; this is up to the user.
+
+The `var` keyword can be used to tell IJzer that _any_ variable is available inside the scope, whether that's because its a function argument, or it's just a function or variable defined in an outer scope.
+
+For example:
+
+```rust
+
+use ijzer::prelude::*;
+use ijzer::Tensor;
+
+fn square(x: f64) -> f64 {
+    x * x
+}
+
+#[ijzer]
+fn example(x: f64) -> f64 {
+    r"#
+    var x: N<f64>
+    var square: Fn(N<f64> -> N<f64>)
+    f(x)
+    "#
+}
+
+let x = 2.0f64;
+println!("{:?}", example(x)); // Returns 4.0
+```
+
+This allows IJzer to interface with arbitrary `rust` code. Since `ijzer` is just a macro, any rust code can also use any `ijzer` code. It is thus truly an extension of the `rust` language.
+
 ### Functions
+
+Functions can be created using an assignment operator, just like variables. The functions arguments are denoted with `$` signs
+
+```ij
+plus($x: T, $y: T) -> T = + $x $y
+plus [1,2] [3,4]  // returns [4,6]
+```
+
+The type declaration here is optional. Undeclared inputs are assumed to be tensors, and the output is infered; `plus($x, $y) = + $x $y` is equivalent.
 
 ### Composition
 
-### Function conversion
+Functions can be composed using the `@` operator. For example `@(-,+)` is the composition of addition followed by negation, and `@(f,g,h) x` is equivalent to `f g h x`.
+
+Some functions like `+` have multiple variants (e.g. scalar+scalar, or scalar+tensor). The composition operator takes all possible variants into account, and only keeps the variants which are consistent.
+
+### Type conversion
+
+Any scalar can be interpreted as a tensor of shape `[1]`. This can be done using the `<-` operator. For example `<-T 1.0` returns the tensor `[1.0]`. Tensors can of course also be converted to tensors `<-T [1.0]` results in `[1.0]`.
+
+More interestingly, type conversion can also be applied to functions. The arguments to a function can be converted from tensor to number (equivalent to pre-composing the function with a type convertsion), whereas the output of a function can be converted from number to tensor. For example, the following operations are allowed:
+
+```ij
+var f: Fn(T->N)
+<-Fn(N->N) f 1 // first convert 1 to [1] and then apply f
+<-Fn(T->T) f [1] // first apply f then convert f([1]) to [f([1])]
+<-Fn(N->T) f 1 // first convert 1 to [1], then apply f, then convert to tensor
+```
+
+Sometimes you want to evaluate an expression as a function and not evaluate the expression on any argument. For example
+```ij
+var f: Fn(T,T->T)
+g: Fn(T,T->T) = @(-,f)  // Gives an error
+```
+The reason this fails is because it tries to parse the arguments of this function, but no arguments are given. To fix this, you can use the `as_function` operator `~`:
+
+```ij
+var f: Fn(T,T->T)
+g: Fn(T,T->T) = ~@(-,+)  // This works
+```
+
+This is also a second way to defined functions. 
+
+In some cases the input to the `~` operator faces an ambiguous function, for example `~+` could be a function of type `Fn(N,N->N)`, `Fn(T,N->T)`, `Fn(N,T->T)` or `Fn(T,T->T)`. In this case you can give a type annotation to the `~` operator, for example `~+: Fn(N,N->N)` is a function of type `Fn(N,N->N)`.
 
 ### Matrix multiplication
+There is no matrix multiplication primitive in `ij`. Instead it can be constructed using the generalized contraction operator `?`. Matrix multiplication is just `?/+*`, wich may be all you have to remember:
+```ij
+?/+* A B // Matrix multiply A and B
+```
+
+The genrealized contraction operator takes in two functions `f: Fn(T->T)` and `g: Fn(T,T->T)` (for matrix multiplication `f=/+` is summation and `g=*` is a pairwise product). A tensor `A` of shape $[a_1, a_2, \dots, a_m, k]$ taken together with a tensor `B` of shape $[k, b_1, \dots, b_n]$. The final result is then a tensor of shape $[a_1,\dots,a_m, b_1,\dots,b_n]$ with entries:
+$$
+\mathtt{?fg(A,\, B)}[i_1,\dots, i_m, j_1,\dots, j_m] = f(g(A[i_1,\dots,i_m, \colon], B[\colon, j_1,\dots,j_n]))
+$$
+
+> I personally don't know of any other uses of the generalized contraction operator ohter than matrix multiplication. This is inspired from the J language where the same operation exists (albeit in slightly different form). 
+
 
 ### Shape operations
+
+The shape of tensors can be requested using the `%` operator, which always returns a `T<usize>`. Tensors can also be reshaped using `>%`:
+```ij
+x: T = [1.0, 2.0]
+y: T = >% x [1, 2]
+z: T<usize> = %y  // [1, 2]
+```
 
 ### Matrix decompositions
 
@@ -199,3 +289,7 @@ The SVD and QR decompositions are supported as language primitives. For both ope
 The [QR decomposition](https://en.wikipedia.org/wiki/QR_decomposition) has signature `T->T,T` and computes the reduced QR decomposition. That is, if `X` has shape `[m,n]` then `(Q,R) = qr X` creates matrices of shape `[m,/min[m,n]]` and `[/min[m,n],n]`. The first matrix has orthonormal columns, while the second is upper-triangular.
 
 The [Singular value decomposition (SVD)](https://en.wikipedia.org/wiki/Singular_value_decomposition) has signature `T->T,T,T` and computes the reduced SVD. If `X` has shape `[m,n]` (for simplicity assume `m>=n`) then `(U, S, Vt) = svd X` gives tensors of shapes `[m,n], [n], [n,n]`. To reconstruct the matrix `X` for this we have to do `?/+* U (?/+* diag(S) Vt)` (the `diag` is optional due to broadcasting).
+
+## Control flow
+
+Why would you need that?
