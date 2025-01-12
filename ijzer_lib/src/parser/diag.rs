@@ -1,3 +1,6 @@
+//! Parses the diag operation `diag`.
+//! 
+//! This operation is used to create a diagonal matrix from a tensor.
 use super::{check_ok_needed_outputs, gather_operands, ParseNode, ParseNodeFunctional};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};

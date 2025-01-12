@@ -1,3 +1,4 @@
+//! Test utilities for the parser
 use super::{parser_functions, ASTContext, Node, SyntaxError};
 
 use crate::{ast_node::TokenSlice, tokens::lexer};

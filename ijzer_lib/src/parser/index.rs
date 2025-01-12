@@ -1,3 +1,10 @@
+//! Parses the index operation `<|` used for tensor indexing.
+//! 
+//! Example: `<| x [0,1]` returns the element at index `[0,1]` of tensor `x`.
+//! The arguments can be either:
+//! - A list of numbers (the result is a scalar)
+//! - A list of numbers and colons (the result is a tensor with the specified dimensions)
+//! - A list of tensors (the result is a tensor with the specified dimensions)
 use super::{comma_separate, find_matching_parenthesis, gather_operands, ParseNode};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};

@@ -1,3 +1,6 @@
+//! Symbol operator.
+//! 
+//! Looks up a symbol in the symbol table and returns a node with the same type.
 use super::{check_ok_needed_outputs, gather_operands, ParseNode, ParseNodeFunctional};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};

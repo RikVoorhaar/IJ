@@ -1,3 +1,4 @@
+//! Enum for the operations in the AST
 use std::fmt::Debug;
 use crate::function_enums::{TensorBuilderEnum, UnaryMathFunctionEnum, BinaryMathFunctionEnum};
 

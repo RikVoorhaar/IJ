@@ -1,3 +1,9 @@
+//! Parses function composition `@`.
+//! 
+//! Function composition applies a sequence of functions to a set of operands.
+//! 
+//! The functions must be supplied in a comma separated list within parentheses.
+//! Example: `@(f,g) x` applies the functions `f` and `g` to the operand `x`.
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::operations::Operation;
 use crate::parser::{comma_separate, find_matching_parenthesis, ParseNode, ParseNodeFunctional};
@@ -704,4 +710,18 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_function_composition_assign_wrong_type() -> Result<()> {
+        let mut context = ASTContext::new();
+        let result = parse_str("f: Fn(T,T->T) = @(-,+)", &mut context);
+        assert!(result.is_err());
+
+        let mut context = ASTContext::new();
+        parse_str("var f: Fn(T,T->T)", &mut context)?;
+        let result = parse_str("g: Fn(T,T->T) = ~@(-,f)", &mut context);
+        assert!(result.is_ok());
+        Ok(())
+    }
 }
+

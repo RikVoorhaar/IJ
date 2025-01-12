@@ -1,3 +1,9 @@
+//! QR decomposition
+//! 
+//! Example:
+//! ```ijzer
+//! (q,r) = qr X
+//! ```
 use super::{check_ok_needed_outputs, gather_operands, ParseNode, ParseNodeFunctional};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};

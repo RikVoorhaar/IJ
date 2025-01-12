@@ -1,3 +1,12 @@
+//! Type conversion operator.
+//! 
+//! Example:
+//! ```ijzer
+//! <-N<a> 1.0
+//! ```
+//! 
+//! This will produce a number `1.0` of type `N<a>`.
+//! Can convert numbers into tensors. And can convert functions into other functions.
 use super::{next_node, next_node_functional};
 use crate::{
     ast_node::{ASTContext, Node, TokenSlice},

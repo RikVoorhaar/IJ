@@ -1,3 +1,7 @@
+//! Parses numbers and infers their type.
+//! 
+//! For example `1` is a number, and so is `1.0<f64>`. 
+//! If no type is specified, the type is inferred to be `_`.
 use super::ParseNode;
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};

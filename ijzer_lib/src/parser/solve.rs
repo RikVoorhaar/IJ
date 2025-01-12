@@ -1,3 +1,13 @@
+//! Solve operator. Solves the system AX=B. 
+//! 
+//! Example:
+//! ```ijzer
+//! \ [1,2] [1,2]
+//! ```
+//! 
+//! This will produce a tensor `[1,2]`.
+//! 
+//! The solve operator takes in two tensors and produces a tensor.
 use super::{check_ok_needed_outputs, gather_operands, ParseNode, ParseNodeFunctional};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};

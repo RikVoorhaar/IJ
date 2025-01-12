@@ -2,11 +2,16 @@
 name = "ijzer"
 version = "0.1.0"
 edition = "2021"
+authors = ["Rik Voorhaar <rik.voorhaar@gmail.com>"]
+description = "Main crate for IJzer. Provides a macro for using IJzer in a rust project, and a prelude with dependencies.."
+repository = "https://github.com/RikVoorhaar/IJ"
+license = "MIT"
+include = ["../logo.svg", "../README.md"]
 
 
 [dependencies]
-ijzer_macro = { path = "../ijzer_macro" }
-ijzer_lib = { path = "../ijzer_lib" }
+ijzer_macro = { path = "../ijzer_macro", version = "0.1.1" }
+ijzer_lib = { path = "../ijzer_lib", version = "0.1.1" }
 num-traits = "0.2.18"
 anyhow = "1.0.86"
 approx = "0.5.1"

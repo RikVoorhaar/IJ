@@ -1,3 +1,11 @@
+//! Transpose operator.
+//! 
+//! Example:
+//! ```ijzer
+//! |[[1,2],[3,4]]
+//! ```
+//! 
+//! This will produce a tensor `[[1,3],[2,4]]`.
 use super::{gather_operands, ParseNode, ParseNodeFunctional};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};

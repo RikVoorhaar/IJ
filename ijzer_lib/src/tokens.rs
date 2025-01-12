@@ -1,3 +1,4 @@
+//! Enum for the tokens in the lexer and methods for lexing (using logos)
 use anyhow::{anyhow, Result};
 use crate::function_enums::{TensorBuilderEnum, UnaryMathFunctionEnum, BinaryMathFunctionEnum};
 pub use logos::Logos;

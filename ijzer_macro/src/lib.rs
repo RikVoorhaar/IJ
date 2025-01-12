@@ -1,3 +1,23 @@
+//! Macro wrapper for the IJzer compiler.
+//! 
+//! This allows using IJzer in a rust project.
+//! 
+//! Example:
+//! 
+//! ```rust
+//! use ijzer_macro::ijzer;
+//! use ijzer_lib::tensor::Tensor;
+//! 
+//! #[ijzer]
+//! fn square_tensor(x: Tensor<f32>) -> Tensor<f32> {
+//!     r#"
+//!     * x x 
+//!     "#
+//! }
+//! let x: Tensor<f32> = Tensor::new(vec![1.0, 2.0, 3.0]);
+//! let y: Tensor<f32> = square_tensor(x);
+//! ```
+//! Because the `ijzer` language is not valid rust, the body must be wrapped in a (raw) string. The signature of the function is not parsed, and only the body is parsed to the IJzer compiler.
 extern crate proc_macro;
 use ijzer_lib::compile;
 use proc_macro::TokenStream;

@@ -1,3 +1,7 @@
+//! Parses the `as_function` operation `~`.
+//! 
+//! This operation is used to convert a value to a function.
+//! For example if `f: N->N` then `f` without arguments would be an error, since `f` tries to consume an argument. To avoid this you can use `~f` to convert `f` to a function, returning a value of type `Fn(N->N)`. For example `f = ~@(-,+)` creates a function `f: Fn(N,N->N)` that adds and negates its arguments.
 use super::{next_node_functional, ParseNode, ParseNodeFunctional};
 use crate::ast_node::{ASTContext, Node, TokenSlice};
 use crate::syntax_error::SyntaxError;

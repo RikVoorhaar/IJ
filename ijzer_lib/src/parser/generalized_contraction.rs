@@ -1,3 +1,8 @@
+//! Parses the generalized contraction operation `?`.
+//! 
+//! This operation is used to contract two tensors using two functions.
+//! 
+//! This is mainly used to define matrix multiplicatio ?/+*
 use super::{
     check_ok_needed_outputs, gather_operands, next_node_specific_function, ParseNode,
     ParseNodeFunctional,

@@ -1,3 +1,14 @@
+//! SVD operator.
+//! 
+//! The SVD operator takes in a tensor and produces 3 tensors.
+//! 
+//! Example:
+//! ```ijzer
+//! (u, s, vt) = svd X
+//! ```
+//! 
+//! 
+//! 
 use super::{check_ok_needed_outputs, gather_operands, ParseNode, ParseNodeFunctional};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};

@@ -1,3 +1,10 @@
+//! Range operator. 
+//! 
+//! Produces a range from a start to an end value. 
+//! Example:
+//! ```ijzer
+//! .. 1 10
+//! ```
 use super::{check_ok_needed_outputs, gather_operands, ParseNode, ParseNodeFunctional};
 
 use crate::ast_node::{ASTContext, Node, TokenSlice};

@@ -1,3 +1,10 @@
+//! Parses left parentheses `(` and right parentheses `)`.
+//! 
+//! Parentheses are used to group operands and to denote the start and end of a group.
+//! A group with a single operand is however just the identity function.
+//! 
+//! Example: `(1)` is parsed as `1`.
+//! And `(1 2)` or `(1,2)` are returning a `Group` with two operands, and a type of `(N,N)`
 use super::{
     find_matching_parenthesis, gather_all, next_node_functional, ParseNode, ParseNodeFunctional,
 };
