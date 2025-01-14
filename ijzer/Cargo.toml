@@ -1,6 +1,6 @@
 [package]
 name = "ijzer"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Rik Voorhaar <rik.voorhaar@gmail.com>"]
 description = "Main crate for IJzer. Provides a macro for using IJzer in a rust project, and a prelude with dependencies.."
