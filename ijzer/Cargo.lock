@@ -249,7 +249,7 @@ dependencies = [
 
 [[package]]
 name = "ijzer"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "approx 0.5.1",
