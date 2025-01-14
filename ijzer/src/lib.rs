@@ -1,4 +1,4 @@
-#![doc = include_str!("../../README.md")]
+#![doc = include_str!("../README.md")]
 pub mod prelude {
     pub use ijzer_lib::comparison_funcs::*;
     pub use ijzer_lib::tensor::Tensor;

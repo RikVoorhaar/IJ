@@ -6,7 +6,7 @@ authors = ["Rik Voorhaar <rik.voorhaar@gmail.com>"]
 description = "Main crate for IJzer. Provides a macro for using IJzer in a rust project, and a prelude with dependencies.."
 repository = "https://github.com/RikVoorhaar/IJ"
 license = "MIT"
-include = ["../logo.svg", "../README.md", "src/**/*"]
+include = ["../logo.svg", "README.md", "src/**/*"]
 
 
 [dependencies]
